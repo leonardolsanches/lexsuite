@@ -1,1 +1,122 @@
-[]
+[
+  {
+    "id": "s01-capa",
+    "position": 1,
+    "filepath": "pages/slides/S01Capa.tsx",
+    "title": "Capa — Lex Suite",
+    "description": "Slide de capa com identidade visual, submódulos Lex Rural e Lex Executio, e principais tecnologias.",
+    "speakerNotes": "Apresentar a plataforma: dois módulos especializados para advogados brasileiros, IA local com Ollama, sem custo de API."
+  },
+  {
+    "id": "s02-arquitetura-geral",
+    "position": 2,
+    "filepath": "pages/slides/S02ArquiteturaGeral.tsx",
+    "title": "Arquitetura Geral do Sistema",
+    "description": "Diagrama SVG completo mostrando Browser → Render Cloud (Frontend + API) → Cloudflare Tunnel → Mini PC (Ollama + DB Bridge + PostgreSQL).",
+    "speakerNotes": "Sistema distribuído: frontend e API na nuvem (Render), IA e banco local no Mini PC, comunicação via Cloudflare Tunnel."
+  },
+  {
+    "id": "s03-stack-tecnologica",
+    "position": 3,
+    "filepath": "pages/slides/S03StackTecnologica.tsx",
+    "title": "Stack Tecnológica",
+    "description": "Frontend: React 19 + Vite + Wouter + TanStack Query + shadcn/ui. Backend: Express 5 + Clerk + Pino + DB Bridge + Ollama.",
+    "speakerNotes": "Stack moderna e bem estabelecida. pnpm workspace monorepo. TypeScript em todo o projeto."
+  },
+  {
+    "id": "s04-modulos",
+    "position": 4,
+    "filepath": "pages/slides/S04Modulos.tsx",
+    "title": "Módulos da Plataforma",
+    "description": "Lex Rural (tema ouro) para crédito agrícola e execuções rurais. Lex Executio (tema azul) para processo de execução civil e SISBAJUD.",
+    "speakerNotes": "Cada módulo tem workflows especializados, prompts específicos e acesso controlado por user_modules."
+  },
+  {
+    "id": "s05-render-frontend",
+    "position": 5,
+    "filepath": "pages/slides/S05RenderFrontend.tsx",
+    "title": "Render — Frontend (SPA Estática)",
+    "description": "Deploy como site estático no Render. Build Vite com rewrite rule para SPA, variáveis VITE_CLERK_PUBLISHABLE_KEY e VITE_API_URL.",
+    "speakerNotes": "Build gera dist/public/index.html. Render serve via CDN com edge caching. Wouter gerencia roteamento no browser."
+  },
+  {
+    "id": "s06-render-api",
+    "position": 6,
+    "filepath": "pages/slides/S06RenderAPI.tsx",
+    "title": "Render — API Server (Node.js)",
+    "description": "Express 5 com middleware chain: pinoHttp → clerkProxy → cors → json → clerkMiddleware → rotas → errorHandler.",
+    "speakerNotes": "requireAuth extrai userId do JWT Clerk, chama getOrCreateUser via DB Bridge e injeta no request."
+  },
+  {
+    "id": "s07-mini-pc",
+    "position": 7,
+    "filepath": "pages/slides/S07MiniPC.tsx",
+    "title": "Mini PC — Infraestrutura Local",
+    "description": "Três serviços: Ollama LLM (:11434), DB Bridge FastAPI (:8000), PostgreSQL (:5432). Hardware dedicado sem custo de API.",
+    "speakerNotes": "DB Bridge é um proxy FastAPI que expõe o PostgreSQL local via HTTP REST. Eliminamos TCP direto do Render ao banco."
+  },
+  {
+    "id": "s08-cloudflare-tunnel",
+    "position": 8,
+    "filepath": "pages/slides/S08CloudflareTunnel.tsx",
+    "title": "Cloudflare Tunnel — Ponte Segura",
+    "description": "cloudflared abre WebSocket de saída para Cloudflare. URL pública HTTPS gerada automaticamente muda a cada reinicialização.",
+    "speakerNotes": "Pontos de atenção: ao reiniciar Mini PC, atualizar DB_BRIDGE_URL e OLLAMA_BASE_URL nos secrets do Render e fazer redeploy."
+  },
+  {
+    "id": "s09-fluxo-render-minipc",
+    "position": 9,
+    "filepath": "pages/slides/S09FluxoRenderMiniPC.tsx",
+    "title": "Fluxo Completo: Render ↔ Mini PC",
+    "description": "Diagrama de sequência SVG: Browser → Render API → Clerk Auth → DB Bridge (prompt) → Cloudflare → Ollama → streaming response.",
+    "speakerNotes": "Latência típica 2-5s até primeiro token. Streaming via SSE do Ollama pipe para o response do Express."
+  },
+  {
+    "id": "s10-modelos-llm",
+    "position": 10,
+    "filepath": "pages/slides/S10ModelosLLM.tsx",
+    "title": "Modelos LLM — Comparativo",
+    "description": "Tabela comparativa: Llama 3.1 8B (6GB), Llama 3.3 70B (40GB), Mistral 7B (5GB), Qwen 2.5 14B (9GB), Phi-3.5 mini (3GB).",
+    "speakerNotes": "Llama 3.3 70B para peças complexas. Qwen 2.5 14B melhor PT-BR. Phi-3.5 para desenvolvimento e testes."
+  },
+  {
+    "id": "s11-embeddings",
+    "position": 11,
+    "filepath": "pages/slides/S11Embeddings.tsx",
+    "title": "Embeddings — Representação Vetorial",
+    "description": "nomic-embed-text (768 dims, 274MB) padrão. mxbai-embed-large (1024 dims, 669MB) para corpus especializado. Gerados via Ollama.",
+    "speakerNotes": "Fluxo: texto → Ollama /api/embeddings → float[768] → DB Bridge POST /chunks/insert → pgvector."
+  },
+  {
+    "id": "s12-rag-pipeline",
+    "position": 12,
+    "filepath": "pages/slides/S12RAGPipeline.tsx",
+    "title": "Pipeline RAG — Retrieval-Augmented Generation",
+    "description": "Fase 1 (indexação): Documento → Chunks → Embed → pgvector. Fase 2 (recuperação): Query → Embed → Cosine Search → Contexto → LLM → Resposta.",
+    "speakerNotes": "RAG fundamenta as respostas em documentos reais do caso, eliminando alucinações e aumentando precisão jurídica."
+  },
+  {
+    "id": "s13-pgvector",
+    "position": 13,
+    "filepath": "pages/slides/S13pgvector.tsx",
+    "title": "pgvector — Banco Vetorial",
+    "description": "Extensão PostgreSQL. Tabela chunks com VECTOR(768), índice IVFFlat. Busca por distância cosseno (<=>) com ORDER BY + LIMIT 5.",
+    "speakerNotes": "pgvector elimina necessidade de banco vetorial externo (Pinecone, Weaviate). Dados permanecem no PostgreSQL local."
+  },
+  {
+    "id": "s14-autenticacao",
+    "position": 14,
+    "filepath": "pages/slides/S14Autenticacao.tsx",
+    "title": "Autenticação — Clerk",
+    "description": "Clerk dev instance. JWT Bearer em toda API. requireAuth() → getAuth(req) → userId → getOrCreateUser → users table. user_modules controla acesso.",
+    "speakerNotes": "Instância dev funciona em qualquer domínio com email/password. Google SSO desabilitado. Retry 401 com 2x/500ms no QueryClient."
+  },
+  {
+    "id": "s15-encerramento",
+    "position": 15,
+    "filepath": "pages/slides/S15Encerramento.tsx",
+    "title": "Encerramento — Sumário Executivo",
+    "description": "Slide de encerramento: 2 módulos, 5 LLMs, embeddings 768d, R$0 custo de API. Stack: Express 5, React 19, Clerk, DB Bridge, Cloudflare, RAG.",
+    "speakerNotes": "Plataforma completa com IA local, privacidade dos dados do cliente e custo zero de API para inferência LLM."
+  }
+]
