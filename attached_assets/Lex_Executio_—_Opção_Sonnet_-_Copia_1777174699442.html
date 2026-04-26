@@ -1,0 +1,2859 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lex Executio — Assistente de Execuções</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600&family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap');
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0c0d10;
+    --bg2: #13151a;
+    --bg3: #1c1f27;
+    --border: rgba(255,255,255,0.07);
+    --border2: rgba(255,255,255,0.13);
+    --text: #e8eaf0;
+    --text2: #9098ac;
+    --text3: #5a6278;
+    --blue: #4a7fc1;
+    --blue2: #6a9fd8;
+    --blue-bg: rgba(74,127,193,0.09);
+    --blue-border: rgba(74,127,193,0.28);
+    --green: #3a7a56;
+    --green2: #4d9e70;
+    --green-bg: rgba(58,122,86,0.12);
+    --red: #8b3a3a;
+    --red2: #c05050;
+    --red-bg: rgba(139,58,58,0.12);
+    --amber: #b8862a;
+    --amber2: #d4a845;
+    --amber-bg: rgba(184,134,42,0.09);
+    --amber-border: rgba(184,134,42,0.28);
+  }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  header {
+    border-bottom: 1px solid var(--border);
+    padding: 0 28px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 56px;
+    background: var(--bg);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .logo { display: flex; align-items: center; gap: 10px; }
+
+  .logo-icon {
+    width: 28px; height: 28px;
+    background: var(--blue-bg);
+    border: 1px solid var(--blue-border);
+    border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Playfair Display', serif;
+    font-size: 13px; color: var(--blue2); font-weight: 600;
+  }
+
+  .logo-text { font-family: 'Playfair Display', serif; font-size: 15px; font-weight: 500; color: var(--text); }
+  .logo-sub { font-size: 10px; color: var(--text3); letter-spacing: 0.06em; text-transform: uppercase; }
+
+  .header-right { display: flex; align-items: center; gap: 10px; }
+
+  .header-badge {
+    font-size: 10.5px; color: var(--blue2);
+    background: var(--blue-bg); border: 1px solid var(--blue-border);
+    padding: 3px 10px; border-radius: 20px; letter-spacing: 0.03em;
+  }
+
+  .key-btn {
+    display: flex; align-items: center; gap: 7px;
+    padding: 5px 12px; border: 1px solid var(--border2);
+    border-radius: 20px; background: transparent;
+    color: var(--text3); font-size: 11px; cursor: pointer;
+    font-family: 'Inter', sans-serif; transition: all 0.15s;
+  }
+  .key-btn:hover { color: var(--text2); border-color: var(--text3); }
+  .key-btn.configured { color: var(--green2); border-color: rgba(58,122,86,0.4); background: var(--green-bg); }
+  .key-indicator { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+  /* MODAL */
+  .modal-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.8);
+    display: flex; align-items: center; justify-content: center; z-index: 1000;
+  }
+  .modal-overlay.hidden { display: none; }
+  .modal {
+    background: var(--bg2); border: 1px solid var(--border2);
+    border-radius: 14px; padding: 32px; width: 440px; max-width: 90vw;
+  }
+  .modal-icon {
+    width: 44px; height: 44px; background: var(--blue-bg);
+    border: 1px solid var(--blue-border); border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; color: var(--blue2); margin-bottom: 20px;
+  }
+  .modal-title { font-family: 'Playfair Display', serif; font-size: 19px; font-weight: 500; color: var(--text); margin-bottom: 8px; }
+  .modal-text { font-size: 13px; color: var(--text3); line-height: 1.6; margin-bottom: 20px; }
+  .modal-text a { color: var(--blue2); text-decoration: none; }
+  .modal-text a:hover { text-decoration: underline; }
+  .key-input-wrap { position: relative; margin-bottom: 14px; }
+  .key-input-wrap input {
+    width: 100%; background: var(--bg3); border: 1px solid var(--border2);
+    border-radius: 8px; padding: 10px 48px 10px 14px;
+    font-size: 13px; color: var(--text);
+    font-family: 'IBM Plex Mono', monospace; outline: none; transition: border-color 0.15s;
+  }
+  .key-input-wrap input:focus { border-color: var(--blue); }
+  .key-toggle {
+    position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+    background: none; border: none; color: var(--text3); cursor: pointer; font-size: 11px;
+  }
+  .modal-hint { font-size: 11px; color: var(--text3); margin-bottom: 20px; display: flex; align-items: center; gap: 6px; }
+  .hint-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green2); flex-shrink: 0; }
+
+  /* APP LAYOUT */
+  .app { display: flex; flex: 1; overflow: hidden; height: calc(100vh - 56px); }
+
+  /* SIDEBAR */
+  .sidebar {
+    width: 250px; min-width: 250px; border-right: 1px solid var(--border);
+    display: flex; flex-direction: column; background: var(--bg2); overflow-y: auto;
+  }
+
+  .sidebar-section { padding: 18px 14px 12px; }
+
+  .sidebar-label {
+    font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.12em;
+    color: var(--text3); margin-bottom: 10px; padding: 0 4px;
+  }
+
+  .workflow-item {
+    display: flex; align-items: flex-start; gap: 10px;
+    padding: 9px 11px; border-radius: 8px; cursor: pointer;
+    transition: background 0.15s; margin-bottom: 2px; border: 1px solid transparent;
+  }
+  .workflow-item:hover { background: var(--bg3); }
+  .workflow-item.active { background: var(--blue-bg); border-color: var(--blue-border); }
+
+  .workflow-num { font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--text3); min-width: 16px; padding-top: 2px; }
+  .workflow-item.active .workflow-num { color: var(--blue2); }
+  .workflow-name { font-size: 12px; font-weight: 500; color: var(--text); line-height: 1.3; margin-bottom: 2px; }
+  .workflow-item.active .workflow-name { color: var(--blue2); }
+  .workflow-desc { font-size: 10.5px; color: var(--text3); line-height: 1.4; }
+  .workflow-info { flex: 1; }
+
+  .divider { height: 1px; background: var(--border); margin: 8px 14px; }
+
+  .sidebar-category {
+    font-size: 9px; text-transform: uppercase; letter-spacing: 0.12em;
+    color: var(--blue); margin: 14px 14px 6px; font-weight: 600;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .sidebar-category::after { content: ''; flex: 1; height: 1px; background: var(--blue-border); }
+
+  /* MAIN */
+  .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+  /* TWO MODES: form mode and paste mode */
+  .mode-bar {
+    border-bottom: 1px solid var(--border);
+    padding: 0 24px;
+    display: flex; align-items: center; gap: 0;
+    background: var(--bg2); min-height: 44px;
+  }
+
+  .mode-tab {
+    padding: 12px 18px; cursor: pointer; font-size: 12px;
+    color: var(--text3); border-bottom: 2px solid transparent;
+    white-space: nowrap; transition: all 0.15s; user-select: none;
+  }
+  .mode-tab:hover { color: var(--text2); }
+  .mode-tab.active { color: var(--blue2); border-bottom-color: var(--blue2); }
+
+  .content { flex: 1; display: flex; overflow: hidden; }
+
+  /* INPUT PANEL */
+  .input-panel {
+    width: 400px; min-width: 400px; border-right: 1px solid var(--border);
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+
+  .panel-header {
+    padding: 20px 24px 14px; border-bottom: 1px solid var(--border); flex-shrink: 0;
+  }
+  .panel-title { font-family: 'Playfair Display', serif; font-size: 17px; font-weight: 500; color: var(--text); margin-bottom: 5px; }
+  .panel-subtitle { font-size: 11.5px; color: var(--text3); line-height: 1.5; }
+
+  .panel-body { flex: 1; overflow-y: auto; padding: 18px 24px; }
+
+  /* FORM FIELDS */
+  .field-group { margin-bottom: 18px; }
+  .field-group-title {
+    font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.1em;
+    color: var(--blue2); margin-bottom: 10px; padding-bottom: 7px;
+    border-bottom: 1px solid var(--blue-border); font-weight: 500;
+  }
+  .field { margin-bottom: 12px; }
+
+  label { display: block; font-size: 11px; color: var(--text2); margin-bottom: 4px; font-weight: 500; }
+
+  input[type="text"], input[type="date"], select, textarea {
+    width: 100%; background: var(--bg3); border: 1px solid var(--border2);
+    border-radius: 7px; padding: 7px 11px; font-size: 12.5px; color: var(--text);
+    font-family: 'Inter', sans-serif; transition: border-color 0.15s; outline: none;
+  }
+  input[type="text"]:focus, input[type="date"]:focus, select:focus, textarea:focus { border-color: var(--blue); }
+  select option { background: var(--bg3); }
+  textarea { resize: vertical; min-height: 100px; line-height: 1.5; }
+
+  .radio-group, .checkbox-group { display: flex; flex-wrap: wrap; gap: 5px; }
+  .radio-btn, .check-btn {
+    display: flex; align-items: center; gap: 5px; padding: 4px 9px;
+    border: 1px solid var(--border2); border-radius: 5px; cursor: pointer;
+    font-size: 11.5px; color: var(--text2); transition: all 0.12s; user-select: none;
+  }
+  .radio-btn:hover, .check-btn:hover { border-color: var(--text3); color: var(--text); }
+  .radio-btn.selected, .check-btn.selected { border-color: var(--blue); background: var(--blue-bg); color: var(--blue2); }
+  .radio-btn input, .check-btn input { display: none; }
+
+  /* PASTE AREA */
+  .paste-area {
+    flex: 1; overflow-y: auto; padding: 18px 24px;
+    display: flex; flex-direction: column; gap: 14px;
+  }
+
+  .paste-hint {
+    font-size: 12px; color: var(--text3); line-height: 1.6;
+    background: var(--blue-bg); border: 1px solid var(--blue-border);
+    border-radius: 8px; padding: 12px 14px;
+  }
+  .paste-hint strong { color: var(--blue2); }
+
+  /* PDF UPLOAD */
+  .pdf-drop-zone {
+    border: 1.5px dashed var(--border2); border-radius: 10px;
+    padding: 24px 16px; text-align: center; cursor: pointer;
+    transition: all 0.2s; background: var(--bg3);
+  }
+  .pdf-drop-zone:hover, .pdf-drop-zone.drag-over {
+    border-color: var(--blue); background: var(--blue-bg);
+  }
+  .pdf-drop-zone input[type="file"] { display: none; }
+  .pdf-drop-icon { font-size: 28px; margin-bottom: 8px; opacity: 0.6; }
+  .pdf-drop-label { font-size: 12.5px; color: var(--text2); margin-bottom: 4px; font-weight: 500; }
+  .pdf-drop-sub { font-size: 11px; color: var(--text3); }
+  .pdf-drop-sub span { color: var(--blue2); cursor: pointer; text-decoration: underline; }
+
+  .pdf-files-list { display: flex; flex-direction: column; gap: 6px; }
+  .pdf-file-item {
+    display: flex; align-items: center; gap: 10px;
+    background: var(--bg3); border: 1px solid var(--border2);
+    border-radius: 7px; padding: 8px 12px;
+  }
+  .pdf-file-icon { font-size: 16px; opacity: 0.7; flex-shrink: 0; }
+  .pdf-file-info { flex: 1; min-width: 0; }
+  .pdf-file-name { font-size: 12px; color: var(--text); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pdf-file-status { font-size: 10.5px; color: var(--text3); margin-top: 2px; }
+  .pdf-file-status.ok { color: var(--green2); }
+  .pdf-file-status.err { color: var(--red2); }
+  .pdf-file-remove {
+    background: none; border: none; color: var(--text3); cursor: pointer;
+    font-size: 14px; padding: 2px 4px; flex-shrink: 0; transition: color 0.12s;
+  }
+  .pdf-file-remove:hover { color: var(--red2); }
+
+  .pdf-progress {
+    font-size: 11px; color: var(--blue2); text-align: center; padding: 4px;
+    display: none;
+  }
+
+  .big-textarea {
+    min-height: 160px; width: 100%;
+    background: var(--bg3); border: 1px solid var(--border2);
+    border-radius: 8px; padding: 14px; font-size: 13px; color: var(--text);
+    font-family: 'Inter', sans-serif; outline: none; resize: vertical; line-height: 1.6;
+  }
+  .big-textarea:focus { border-color: var(--blue); }
+
+  /* PANEL FOOTER */
+  .panel-footer { padding: 14px 24px; border-top: 1px solid var(--border); flex-shrink: 0; }
+
+  .btn-primary {
+    width: 100%; padding: 10px 20px;
+    background: var(--blue); color: #fff;
+    border: none; border-radius: 8px; font-size: 13px; font-weight: 600;
+    cursor: pointer; font-family: 'Inter', sans-serif;
+    transition: background 0.15s, transform 0.1s;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+  }
+  .btn-primary:hover { background: var(--blue2); }
+  .btn-primary:active { transform: scale(0.99); }
+  .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .btn-secondary {
+    width: 100%; padding: 8px 20px; background: transparent;
+    color: var(--text2); border: 1px solid var(--border2);
+    border-radius: 8px; font-size: 12px; cursor: pointer;
+    font-family: 'Inter', sans-serif; transition: all 0.15s; margin-top: 7px;
+  }
+  .btn-secondary:hover { color: var(--text); border-color: var(--text3); }
+
+  /* OUTPUT PANEL */
+  .output-panel { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+  .output-header {
+    padding: 16px 24px 12px; border-bottom: 1px solid var(--border);
+    flex-shrink: 0; display: flex; align-items: center; justify-content: space-between;
+  }
+  .output-title { font-size: 12.5px; font-weight: 500; color: var(--text2); display: flex; align-items: center; gap: 8px; }
+  .status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text3); }
+  .status-dot.loading { background: var(--blue2); animation: pulse 1s infinite; }
+  .status-dot.done { background: var(--green2); }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+  .output-actions { display: flex; gap: 7px; }
+  .action-btn {
+    padding: 4px 11px; border: 1px solid var(--border2); border-radius: 5px;
+    background: transparent; color: var(--text2); font-size: 11px; cursor: pointer;
+    font-family: 'Inter', sans-serif; transition: all 0.12s;
+  }
+  .action-btn:hover { color: var(--text); border-color: var(--text3); }
+
+  .output-body { flex: 1; overflow-y: auto; padding: 24px; }
+
+  /* EMPTY STATE */
+  .empty-state {
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; height: 100%; text-align: center; gap: 14px; padding: 40px;
+  }
+  .empty-icon {
+    width: 52px; height: 52px; border: 1px solid var(--blue-border);
+    border-radius: 12px; display: flex; align-items: center; justify-content: center;
+    background: var(--blue-bg); font-family: 'Playfair Display', serif;
+    font-size: 20px; color: var(--blue2);
+  }
+  .empty-title { font-family: 'Playfair Display', serif; font-size: 18px; font-weight: 500; color: var(--text); }
+  .empty-text { font-size: 12.5px; color: var(--text3); max-width: 340px; line-height: 1.6; }
+
+  /* OUTPUT CONTENT */
+  .output-content { font-size: 13.5px; line-height: 1.8; color: var(--text); }
+  .output-content h1 {
+    font-family: 'Playfair Display', serif; font-size: 19px; font-weight: 600;
+    color: var(--text); margin: 0 0 18px; padding-bottom: 10px; border-bottom: 1px solid var(--border);
+  }
+  .output-content h2 {
+    font-size: 10px; font-weight: 600; color: var(--blue2);
+    margin: 22px 0 8px; text-transform: uppercase; letter-spacing: 0.08em;
+  }
+  .output-content h3 { font-size: 13.5px; font-weight: 600; color: var(--text); margin: 14px 0 6px; }
+  .output-content p { margin-bottom: 10px; }
+  .output-content strong { color: var(--blue2); font-weight: 600; }
+  .output-content ul, .output-content ol { padding-left: 18px; margin-bottom: 10px; }
+  .output-content li { margin-bottom: 5px; color: var(--text2); }
+
+  .streaming-cursor {
+    display: inline-block; width: 2px; height: 13px;
+    background: var(--blue2); vertical-align: middle; animation: blink .8s infinite;
+  }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+  .spinner {
+    display: inline-block; width: 13px; height: 13px;
+    border: 2px solid rgba(74,127,193,0.3); border-top-color: var(--blue2);
+    border-radius: 50%; animation: spin .7s linear infinite;
+  }
+  @keyframes spin { to{transform:rotate(360deg)} }
+
+  .api-error {
+    background: var(--red-bg); border: 1px solid rgba(139,58,58,0.3);
+    border-radius: 8px; padding: 14px; color: var(--red2); font-size: 13px; margin-top: 16px;
+  }
+
+  /* PDF token counter */
+  .pdf-token-bar { margin-top:8px; padding:8px 10px; border-radius:6px; background:var(--bg3); border:1px solid var(--border); font-size:11px; }
+  .pdf-token-bar.ok   { border-color:var(--border); }
+  .pdf-token-bar.warn { border-color:#c9a84c; background:rgba(201,168,76,0.08); }
+  .pdf-token-bar.over { border-color:var(--red); background:var(--red-bg); }
+  .pdf-token-label { display:flex; justify-content:space-between; margin-bottom:5px; }
+  .pdf-token-fill { height:4px; border-radius:2px; transition:width .3s; }
+  .pdf-token-fill.ok   { background:var(--green2); }
+  .pdf-token-fill.warn { background:#c9a84c; }
+  .pdf-token-fill.over { background:var(--red2); }
+  .pdf-token-msg { font-size:10.5px; margin-top:4px; }
+
+  /* RISK BADGES */
+  .badge {
+    display: inline-flex; align-items: center; padding: 2px 7px;
+    border-radius: 4px; font-size: 10px; font-weight: 600;
+    letter-spacing: 0.05em; text-transform: uppercase;
+  }
+  .badge-blue { background: var(--blue-bg); color: var(--blue2); border: 1px solid var(--blue-border); }
+  .badge-green { background: var(--green-bg); color: var(--green2); }
+  .badge-amber { background: var(--amber-bg); color: var(--amber2); border: 1px solid var(--amber-border); }
+  .badge-red { background: var(--red-bg); color: var(--red2); }
+
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 10px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">⚖</div>
+    <div>
+      <div class="logo-text">Lex Executio</div>
+      <div class="logo-sub">Análise de Execuções</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="header-badge">CPC/2015 · STJ · STF · Direito Executivo</div>
+    <button class="key-btn" id="keyBtn" onclick="openApiModal()">
+      <div class="key-indicator"></div>
+      <span id="keyBtnLabel">Configurar API Key</span>
+    </button>
+  </div>
+</header>
+
+<!-- MODAL -->
+<div class="modal-overlay" id="apiModal">
+  <div class="modal">
+    <div class="modal-icon">⚿</div>
+    <div class="modal-title">Anthropic API Key</div>
+    <div class="modal-text">
+      Insira sua chave de API da Anthropic para usar o assistente.<br><br>
+      Obtenha em <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a> → <strong style="color:var(--text2)">API Keys</strong>.<br><br>
+      A chave fica salva apenas neste navegador e é enviada apenas à API da Anthropic.
+    </div>
+    <div class="key-input-wrap">
+      <input type="password" id="apiKeyInput" placeholder="sk-ant-api03-..." autocomplete="off" onkeydown="if(event.key==='Enter')saveApiKey()">
+      <button class="key-toggle" onclick="toggleKeyVisibility()">mostrar</button>
+    </div>
+    <div class="modal-hint">
+      <div class="hint-dot"></div>
+      Sua chave começa com <code style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text2)">sk-ant-</code>
+    </div>
+    <button class="btn-primary" onclick="saveApiKey()">Salvar e continuar</button>
+    <button class="btn-secondary" id="skipBtn" onclick="closeApiModal()" style="display:none">Fechar</button>
+  </div>
+</div>
+
+<div class="app">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sidebar-section">
+
+      <div class="sidebar-category">Execuções</div>
+
+      <div class="workflow-item" onclick="selectWorkflow(0)">
+        <div class="workflow-num">01</div>
+        <div class="workflow-info">
+          <div class="workflow-name">Análise — Perspectiva do Executado</div>
+          <div class="workflow-desc">Defesas, nulidades, embargos e estratégia</div>
+        </div>
+      </div>
+
+      <div class="workflow-item" onclick="selectWorkflow(1)">
+        <div class="workflow-num">02</div>
+        <div class="workflow-info">
+          <div class="workflow-name">Análise — Perspectiva do Exequente</div>
+          <div class="workflow-desc">Diligências, blindagem e satisfação do crédito</div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+      <div class="sidebar-category">Cobrança e Monitória</div>
+
+      <div class="workflow-item" onclick="selectWorkflow(2)">
+        <div class="workflow-num">03</div>
+        <div class="workflow-info">
+          <div class="workflow-name">Análise de Cobrança / Monitória</div>
+          <div class="workflow-desc">Perspectiva do devedor · CDC · direito bancário</div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+      <div class="sidebar-category">Elaborar Peças</div>
+
+      <div class="workflow-item" onclick="selectWorkflow(3)">
+        <div class="workflow-num">04</div>
+        <div class="workflow-info">
+          <div class="workflow-name">Elaborar Embargos</div>
+          <div class="workflow-desc">Embargos à execução ou monitórios · CPC/2015</div>
+        </div>
+      </div>
+
+      <div class="workflow-item" onclick="selectWorkflow(4)">
+        <div class="workflow-num">05</div>
+        <div class="workflow-info">
+          <div class="workflow-name">Elaborar Exceção de Pré-Executividade</div>
+          <div class="workflow-desc">Matérias de ordem pública · Súmula 393/STJ</div>
+        </div>
+      </div>
+
+      <div class="workflow-item" onclick="selectWorkflow(7)">
+        <div class="workflow-num">06</div>
+        <div class="workflow-info">
+          <div class="workflow-name">Desbloqueio SISBAJUD</div>
+          <div class="workflow-desc">Impugnação ao bloqueio · salário · poupança 40 SM</div>
+        </div>
+      </div>
+
+      <div class="workflow-item" onclick="selectWorkflow(8)">
+        <div class="workflow-num">07</div>
+        <div class="workflow-info">
+          <div class="workflow-name">Defesa — Quebra de Sigilo Bancário</div>
+          <div class="workflow-desc">Impugnação incidental · STJ REsp 1.951.176-SP</div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+      <div class="sidebar-category">Decisões e Acórdãos</div>
+
+      <div class="workflow-item" onclick="selectWorkflow(5)">
+        <div class="workflow-num">08</div>
+        <div class="workflow-info">
+          <div class="workflow-name">Analisador de Decisões Judiciais</div>
+          <div class="workflow-desc">Vícios, recursos, estratégia de impugnação</div>
+        </div>
+      </div>
+
+      <div class="workflow-item" onclick="selectWorkflow(6)">
+        <div class="workflow-num">09</div>
+        <div class="workflow-info">
+          <div class="workflow-name">Analisador de Acórdãos STJ/STF</div>
+          <div class="workflow-desc">REsp, RE, AREsp e rotas aos tribunais superiores</div>
+        </div>
+      </div>
+
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main" style="display:flex;flex-direction:column;overflow:hidden;">
+
+    <!-- PROCESS TABS BAR -->
+    <div class="mode-bar" id="tabsBar" style="display:flex;align-items:center;gap:0;padding:0 16px;border-bottom:1px solid var(--border);min-height:44px;overflow-x:auto;flex-shrink:0;">
+      <div id="processTabs" style="display:flex;align-items:center;gap:4px;flex:1;min-width:0;"></div>
+      <button onclick="addProcess()" style="margin-left:8px;flex-shrink:0;background:var(--blue-bg);border:1px solid var(--blue-border);color:var(--blue2);border-radius:6px;padding:5px 13px;font-size:12px;cursor:pointer;white-space:nowrap;font-family:Inter,sans-serif;">+ Novo Processo</button>
+      <button onclick="runQueue()" id="btnRunAll" style="margin-left:6px;flex-shrink:0;background:var(--green-bg);border:1px solid rgba(58,122,86,0.4);color:var(--green2);border-radius:6px;padding:5px 13px;font-size:12px;cursor:pointer;white-space:nowrap;font-family:Inter,sans-serif;display:none;">▶ Executar Todos</button>
+    </div>
+
+    <!-- MODE BAR -->
+    <div class="mode-bar" id="modeBar">
+      <div class="mode-tab active" id="tab-form" onclick="switchMode('form')">Formulário guiado</div>
+      <div class="mode-tab" id="tab-paste" onclick="switchMode('paste')">Colar texto</div>
+      <div class="mode-tab" id="tab-pdf" onclick="switchMode('pdf')">Upload de PDF</div>
+    </div>
+
+    <div class="content" style="flex:1;overflow:hidden;">
+
+      <!-- INPUT PANEL -->
+      <div class="input-panel">
+        <div class="panel-header">
+          <div class="panel-title" id="panelTitle">Análise do Executado</div>
+          <div class="panel-subtitle" id="panelSubtitle">Preencha os dados do processo para análise técnica completa</div>
+        </div>
+
+        <!-- FORM MODE -->
+        <div class="panel-body" id="formBody"></div>
+
+        <!-- PASTE MODE -->
+        <div class="paste-area" id="pasteBody" style="display:none">
+          <div class="paste-hint">
+            <strong>Cole aqui o texto dos autos</strong> — petição inicial, decisões, auto de penhora, embargos ou qualquer peça. Quanto mais completo, mais precisa a análise.
+          </div>
+          <textarea class="big-textarea" id="pasteText" placeholder="Cole aqui o conteúdo dos autos, decisões ou peças processuais..."></textarea>
+          <div class="field">
+            <label>Informações adicionais / contexto relevante</label>
+            <textarea id="pasteContext" placeholder="Ex: fase atual, urgência, objetivo da consulta..." style="min-height:70px;width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:7px;padding:8px 11px;font-size:12.5px;color:var(--text);font-family:Inter,sans-serif;outline:none;resize:vertical"></textarea>
+          </div>
+        </div>
+
+        <!-- PDF MODE -->
+        <div class="paste-area" id="pdfBody" style="display:none">
+          <div class="paste-hint">
+            <strong>Carregue um ou mais PDFs</strong> dos autos — petição inicial, decisões, embargos, planilhas do banco. O texto será extraído automaticamente e enviado para análise.<br><br>
+            PDFs pesados ou digitalizados (imagem) podem não ter texto extraível. Nesse caso use a opção "Colar texto".
+          </div>
+          <div class="pdf-drop-zone" id="pdfDropZone" onclick="document.getElementById('pdfFileInput').click()" ondragover="onDragOver(event)" ondragleave="onDragLeave(event)" ondrop="onDrop(event)">
+            <input type="file" id="pdfFileInput" accept=".pdf" multiple onchange="onFileSelect(event)">
+            <div class="pdf-drop-icon">📄</div>
+            <div class="pdf-drop-label">Arraste PDFs aqui ou <span onclick="event.stopPropagation();document.getElementById('pdfFileInput').click()">clique para selecionar</span></div>
+            <div class="pdf-drop-sub">Múltiplos arquivos suportados · Máx. 50MB por arquivo</div>
+          </div>
+          <div class="pdf-progress" id="pdfProgress">Extraindo texto dos PDFs...</div>
+          <div class="pdf-files-list" id="pdfFilesList"></div>
+          <div id="pdfSizeBar"></div>
+          <div class="field" style="margin-top:4px">
+            <label>Contexto adicional / objetivo da análise</label>
+            <textarea id="pdfContext" placeholder="Ex: fase atual do processo, urgência, o que precisa identificar..." style="min-height:70px;width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:7px;padding:8px 11px;font-size:12.5px;color:var(--text);font-family:Inter,sans-serif;outline:none;resize:vertical"></textarea>
+          </div>
+        </div>
+
+        <div class="panel-footer">
+          <button class="btn-primary" id="btnExecutar" onclick="executarPrompt()">
+            <span>Executar Análise</span>
+            <span>→</span>
+          </button>
+          <button class="btn-secondary" onclick="limpar()">Limpar campos</button>
+        </div>
+      </div>
+
+      <!-- OUTPUT PANEL -->
+      <div class="output-panel">
+        <div class="output-header">
+          <div class="output-title">
+            <div class="status-dot" id="statusDot"></div>
+            <span id="outputLabel">Aguardando execução</span>
+          </div>
+          <div class="output-actions">
+            <button class="action-btn" onclick="copyOutput()">Copiar</button>
+            <button class="action-btn" id="btnSavePdf" onclick="saveCurrentPdf()" style="display:none">Salvar PDF</button>
+            <button class="action-btn" onclick="clearOutput()">Limpar</button>
+          </div>
+        </div>
+        <div class="output-body" id="outputBody">
+          <div class="empty-state" id="emptyState">
+            <div class="empty-icon">⚖</div>
+            <div class="empty-title">Pronto para análise</div>
+            <div class="empty-text">Preencha o formulário ou cole o texto dos autos e clique em "Executar Análise".<br>Para analisar vários processos, use "+ Novo Processo" e depois "▶ Executar Todos".</div>
+          </div>
+          <div class="output-content" id="outputContent" style="display:none"></div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<script>
+const WORKFLOWS = [
+  {
+    name: "Análise — Perspectiva do Executado",
+    subtitle: "Defesas disponíveis, nulidades, embargos e estratégia de resistência",
+    promptKey: "EXECUTADO",
+    fields: [
+      { group: "DADOS GERAIS DO PROCESSO", fields: [
+        { id: "num_proc", label: "Número do processo", type: "text" },
+        { id: "vara", label: "Vara / Comarca / Tribunal", type: "text" },
+        { id: "exequente", label: "Nome do exequente (credor)", type: "text" },
+        { id: "executado", label: "Nome do executado (devedor)", type: "text" },
+        { id: "valor_execucao", label: "Valor da execução (R$)", type: "text" },
+      ]},
+      { group: "TIPO DE EXECUÇÃO E TÍTULO", fields: [
+        { id: "especie_exec", label: "Espécie de execução", type: "radio", options: ["Exec. título extrajudicial (art. 783 CPC)", "Cumprimento de sentença (art. 513 CPC)", "Execução fiscal (Lei 6.830/80)", "Execução de alimentos (art. 528 CPC)", "Outra"] },
+        { id: "tipo_titulo", label: "Tipo de título", type: "radio", options: ["Sentença condenatória", "Acórdão", "Contrato", "Cheque / NP / Duplicata", "CDA / título fiscal", "Escritura pública", "Outro"] },
+        { id: "natureza_obrigacao", label: "Natureza da obrigação", type: "radio", options: ["Pagamento de quantia certa", "Entrega de coisa certa", "Obrigação de fazer", "Obrigação de não fazer"] },
+        { id: "desc_titulo", label: "Descrição do título e eventuais vícios identificados", type: "textarea" },
+      ]},
+      { group: "FASE PROCESSUAL E PRAZOS", fields: [
+        { id: "fase", label: "Fase atual do processo", type: "radio", options: ["Após citação — antes da penhora", "Penhora realizada", "Avaliação realizada", "Leilão designado", "Embargos em curso", "Pós-julgamento dos embargos", "Outra"] },
+        { id: "data_citacao", label: "Data da citação do executado", type: "date" },
+        { id: "prazo_embargos", label: "Prazo de embargos (art. 915 CPC — 15 dias)", type: "radio", options: ["Em curso", "Expirado", "Não sei"] },
+        { id: "embargos_opostos", label: "Embargos já foram opostos?", type: "radio", options: ["Sim", "Não"] },
+        { id: "data_leilao", label: "Data do leilão (se designado)", type: "date" },
+      ]},
+      { group: "PENHORA E BENS", fields: [
+        { id: "penhora", label: "Há penhora?", type: "radio", options: ["Sim", "Não", "SISBAJUD bloqueado"] },
+        { id: "bem_penhorado", label: "Bem(ns) penhorado(s)", type: "text" },
+        { id: "bem_familia", label: "O bem é único imóvel / moradia da família?", type: "radio", options: ["Sim", "Não", "Não sei"] },
+        { id: "impenhoraveis", label: "Há outros bens possivelmente impenhoráveis?", type: "radio", options: ["Sim", "Não", "Não sei"] },
+        { id: "valor_avaliacao", label: "Valor da avaliação do bem (R$)", type: "text" },
+      ]},
+      { group: "DEFESAS E MATÉRIAS DISPONÍVEIS", fields: [
+        { id: "materias", label: "Matérias que pretende arguir", type: "checkbox", options: ["Nulidade do título", "Prescrição / decadência", "Excesso de execução", "Impenhorabilidade de bem", "Pagamento / quitação", "Parcelamento (art. 916 CPC)", "Incompetência do juízo", "Nulidade da citação", "Prescrição intercorrente"] },
+        { id: "prescricao_info", label: "Datas relevantes para prescrição (vencimento, ajuizamento)", type: "text" },
+        { id: "exc_pre_exec", label: "Há matéria de ordem pública demonstrável sem instrução?", type: "radio", options: ["Sim — qual:", "Não", "Não sei"] },
+        { id: "exc_detalhe", label: "Detalhe da matéria de ordem pública (se houver)", type: "text" },
+      ]},
+      { group: "CONTEXTO ADICIONAL", fields: [
+        { id: "fatos_relevantes", label: "Fatos relevantes / irregularidades identificadas", type: "textarea" },
+        { id: "objetivo", label: "Objetivo principal da consulta", type: "radio", options: ["Identificar defesas disponíveis", "Analisar viabilidade de embargos", "Verificar nulidades", "Estratégia completa de resistência", "Análise de urgência (leilão iminente)"] },
+      ]},
+    ]
+  },
+  {
+    name: "Análise — Perspectiva do Exequente",
+    subtitle: "Diligências patrimoniais, blindagem e estratégia de satisfação do crédito",
+    promptKey: "EXEQUENTE",
+    fields: [
+      { group: "DADOS GERAIS DO PROCESSO", fields: [
+        { id: "num_proc_e", label: "Número do processo", type: "text" },
+        { id: "vara_e", label: "Vara / Comarca / Tribunal", type: "text" },
+        { id: "exequente_e", label: "Nome do exequente (credor)", type: "text" },
+        { id: "executado_e", label: "Nome do executado (devedor)", type: "text" },
+        { id: "valor_exec_e", label: "Valor da execução (R$)", type: "text" },
+      ]},
+      { group: "TIPO DE EXECUÇÃO E TÍTULO", fields: [
+        { id: "especie_e", label: "Espécie de execução", type: "radio", options: ["Exec. título extrajudicial (art. 783 CPC)", "Cumprimento de sentença (art. 513 CPC)", "Execução fiscal (Lei 6.830/80)", "Execução de alimentos", "Outra"] },
+        { id: "tipo_titulo_e", label: "Tipo de título", type: "radio", options: ["Sentença condenatória", "Acórdão", "Contrato", "Cheque / NP / Duplicata", "CDA / título fiscal", "Escritura pública", "Outro"] },
+        { id: "fragil_titulo", label: "O título tem fragilidades formais que o executado pode explorar?", type: "radio", options: ["Sim — quais:", "Não identificadas", "Não sei"] },
+        { id: "fragil_detalhe", label: "Descrever as fragilidades (se houver)", type: "text" },
+      ]},
+      { group: "FASE E DILIGÊNCIAS JÁ REALIZADAS", fields: [
+        { id: "fase_e", label: "Fase atual", type: "radio", options: ["Início — pré-penhora", "SISBAJUD realizado", "Penhora de bem imóvel", "Penhora de veículo", "Leilão designado", "Embargos opostos pelo executado", "Outra"] },
+        { id: "sisbajud", label: "SISBAJUD", type: "radio", options: ["Realizado — resultado positivo", "Realizado — infrutífero", "Realizado — parcial", "Não realizado"] },
+        { id: "renajud", label: "RENAJUD (veículos)", type: "radio", options: ["Realizado — encontrou veículos", "Realizado — sem resultado", "Não realizado"] },
+        { id: "imoveis_pesq", label: "Pesquisa de imóveis (cartório / ONR)", type: "radio", options: ["Realizada — encontrou imóveis", "Realizada — sem resultado", "Não realizada"] },
+        { id: "averb_premon", label: "Averbação premonitória (art. 828 CPC)", type: "radio", options: ["Realizada", "Não realizada"] },
+        { id: "desconsid_pj", label: "Incidente de desconsideração da personalidade jurídica", type: "radio", options: ["Instaurado", "Em análise", "Não instaurado", "N/A"] },
+      ]},
+      { group: "DEFESAS DO EXECUTADO", fields: [
+        { id: "embargos_exec", label: "Executado opôs embargos?", type: "radio", options: ["Sim — em curso", "Sim — já julgados", "Não"] },
+        { id: "conteudo_embargos", label: "Matérias alegadas nos embargos (se houver)", type: "text" },
+        { id: "exc_pre_e", label: "Executado opôs exceção de pré-executividade?", type: "radio", options: ["Sim", "Não"] },
+        { id: "risco_defesas", label: "Qual o principal risco das defesas do executado?", type: "text" },
+      ]},
+      { group: "PATRIMÔNIO E BENS LOCALIZADOS", fields: [
+        { id: "bens_encontrados", label: "Bens localizados até agora", type: "checkbox", options: ["Conta bancária (SISBAJUD)", "Veículo (RENAJUD)", "Imóvel", "Cotas societárias", "Previdência privada", "Faturamento empresarial", "Outros créditos"] },
+        { id: "bens_penhorados", label: "Bens efetivamente penhorados", type: "text" },
+        { id: "prescricao_int", label: "Há risco de prescrição intercorrente?", type: "radio", options: ["Sim — processo parado há:", "Não", "Não sei"] },
+        { id: "prazo_parado", label: "Há quanto tempo o processo está parado? (se aplicável)", type: "text" },
+      ]},
+      { group: "OBJETIVO E CONTEXTO", fields: [
+        { id: "objetivo_e", label: "Objetivo principal da consulta", type: "radio", options: ["Mapear novas diligências patrimoniais", "Antecipar defesas do executado", "Análise completa do processo", "Verificar risco de prescrição intercorrente", "Estratégia para leilão"] },
+        { id: "contexto_e", label: "Fatos relevantes / contexto adicional", type: "textarea" },
+      ]},
+    ]
+  },
+  {
+    name: "Análise de Cobrança / Monitória",
+    subtitle: "Perspectiva do devedor/réu · CDC · direito bancário · CPC/2015",
+    promptKey: "COBRANCA",
+    fields: [
+      { group: "DADOS GERAIS DO PROCESSO", fields: [
+        { id: "num_proc_c", label: "Número do processo", type: "text" },
+        { id: "vara_c", label: "Vara / Comarca / Tribunal", type: "text" },
+        { id: "credor", label: "Nome do autor / credor", type: "text" },
+        { id: "devedor", label: "Nome do réu / devedor", type: "text" },
+        { id: "valor_c", label: "Valor cobrado (R$)", type: "text" },
+      ]},
+      { group: "TIPO DE AÇÃO E TÍTULO", fields: [
+        { id: "tipo_acao_c", label: "Tipo de ação proposta", type: "radio", options: ["Ação de cobrança ordinária", "Ação monitória (art. 700 CPC)", "Busca e apreensão (Dec.-Lei 911/69)", "Execução de título extrajudicial", "Outra"] },
+        { id: "tipo_credor_c", label: "Qualificação do credor", type: "radio", options: ["Banco originário do contrato", "Cessionário / FIDC / securitizadora", "Endossatário / avalista sub-rogado", "Outro"] },
+        { id: "tipo_titulo_c", label: "Documento que embasa a cobrança", type: "radio", options: ["Contrato bancário / CCB", "Nota promissória", "Cheque", "Duplicata", "Extrato de conta / cartão", "Confissão de dívida", "Outro"] },
+        { id: "cessao_c", label: "Houve cessão de crédito?", type: "radio", options: ["Sim — devedor foi notificado", "Sim — sem notificação ao devedor", "Não", "Não sei"] },
+      ]},
+      { group: "DADOS DO CONTRATO E ENCARGOS", fields: [
+        { id: "data_contrato_c", label: "Data da celebração do contrato", type: "date" },
+        { id: "taxa_juros_c", label: "Taxa de juros contratada (% a.m. ou a.a.)", type: "text" },
+        { id: "capitalizacao_c", label: "Há capitalização de juros expressamente pactuada?", type: "radio", options: ["Sim", "Não", "Não identificado"] },
+        { id: "tarifas_c", label: "Há cobrança de tarifas (TAC, TEC, cadastro etc.)?", type: "radio", options: ["Sim", "Não", "Não sei"] },
+        { id: "seguro_c", label: "Há seguro prestamista atrelado ao crédito?", type: "radio", options: ["Sim", "Não", "Não sei"] },
+        { id: "cet_c", label: "O CET foi informado ao consumidor?", type: "radio", options: ["Sim", "Não", "Não sei"] },
+        { id: "comissao_perm_c", label: "Há comissão de permanência cobrada?", type: "radio", options: ["Sim", "Não", "Não sei"] },
+      ]},
+      { group: "FASE E PRAZOS", fields: [
+        { id: "fase_c", label: "Fase atual", type: "radio", options: ["Citado — prazo de contestação/embargos em curso", "Contestação já apresentada", "Instrução processual", "Sentença proferida", "Fase recursal", "Mandado monitório convertido em título"] },
+        { id: "data_citacao_c", label: "Data da citação", type: "date" },
+        { id: "prazo_c", label: "Prazo de defesa ainda em curso?", type: "radio", options: ["Sim", "Não", "Não sei"] },
+        { id: "negativado_c", label: "Há negativação do nome do devedor?", type: "radio", options: ["Sim", "Não", "Não sei"] },
+      ]},
+      { group: "PRESCRIÇÃO E DEFESAS", fields: [
+        { id: "vencimento_c", label: "Data de vencimento da obrigação / inadimplência", type: "date" },
+        { id: "pagamentos_c", label: "Houve pagamentos parciais?", type: "radio", options: ["Sim", "Não", "Não sei"] },
+        { id: "defesas_c", label: "Defesas que pretende arguir", type: "checkbox", options: ["Prescrição", "Abusividade de juros", "Capitalização não pactuada", "Tarifas indevidas (TAC/TEC pós-2008)", "Seguro compulsório / venda casada", "Comissão de permanência cumulada", "Ilegitimidade do cessionário", "Nulidade da citação", "Incompetência do juízo", "Dano moral por negativação indevida"] },
+        { id: "contexto_c", label: "Contexto adicional / irregularidades identificadas", type: "textarea" },
+      ]},
+    ]
+  },
+  {
+    name: "Elaborar Embargos",
+    subtitle: "Embargos à execução (arts. 914-920) ou monitórios (art. 702) · CPC/2015",
+    promptKey: "EMBARGOS_PECA",
+    fields: [
+      { group: "DADOS DO PROCESSO", fields: [
+        { id: "num_proc_ep", label: "Número do processo", type: "text" },
+        { id: "vara_ep", label: "Vara / Comarca", type: "text" },
+        { id: "juiz_ep", label: "MM. Juiz(a) / Dr(a.) (se souber)", type: "text" },
+        { id: "embargante_ep", label: "Nome completo do embargante", type: "text" },
+        { id: "cpf_ep", label: "CPF / CNPJ do embargante", type: "text" },
+        { id: "advogado_ep", label: "Nome do advogado / OAB", type: "text" },
+        { id: "embargado_ep", label: "Nome do embargado (credor)", type: "text" },
+      ]},
+      { group: "TIPO DE EMBARGOS E TÍTULO", fields: [
+        { id: "tipo_emb_ep", label: "Tipo de embargos", type: "radio", options: ["Embargos à execução de título extrajudicial (art. 914 CPC)", "Embargos ao cumprimento de sentença (art. 525 CPC)", "Embargos monitórios (art. 702 CPC)", "Embargos à execução fiscal (Lei 6.830/80)"] },
+        { id: "tipo_titulo_ep", label: "Título que embasa a execução/cobrança", type: "radio", options: ["Contrato bancário / CCB", "Sentença / acórdão", "Nota promissória", "Cheque", "Duplicata", "CDA", "Contrato extrajudicial", "Outro"] },
+        { id: "data_citacao_ep", label: "Data da citação", type: "date" },
+        { id: "valor_ep", label: "Valor exigido (R$)", type: "text" },
+        { id: "penhora_ep", label: "Há penhora?", type: "radio", options: ["Sim", "Não", "SISBAJUD"] },
+        { id: "bem_penhorado_ep", label: "Bem penhorado (descrever)", type: "text" },
+      ]},
+      { group: "TESES DOS EMBARGOS", fields: [
+        { id: "teses_ep", label: "Matérias a serem alegadas", type: "checkbox", options: ["Excesso de execução (art. 917 CPC)", "Nulidade do título / inexigibilidade", "Prescrição / decadência", "Pagamento / quitação parcial ou total", "Impenhorabilidade do bem", "Bem de família (Lei 8.009/90)", "Abusividade de encargos / juros", "Capitalização de juros não pactuada", "Tarifas indevidas (TAC/TEC)", "Seguro compulsório indevido", "Ilegitimidade de parte", "Nulidade da citação", "Incompetência do juízo", "Teoria da imprevisão / revisão contratual"] },
+        { id: "valor_correto_ep", label: "Valor que o embargante entende correto (R$) — obrigatório se alegar excesso", type: "text" },
+        { id: "prescricao_ep", label: "Datas para cálculo de prescrição (vencimento / ajuizamento)", type: "text" },
+        { id: "efeito_suspensivo_ep", label: "Requer efeito suspensivo?", type: "radio", options: ["Sim — há urgência", "Não"] },
+        { id: "urgencia_ep", label: "Motivo da urgência / risco (leilão, bloqueio, etc.)", type: "text" },
+      ]},
+      { group: "FATOS E DOCUMENTOS", fields: [
+        { id: "fatos_ep", label: "Resumo dos fatos relevantes do caso", type: "textarea" },
+        { id: "docs_ep", label: "Documentos que serão juntados", type: "checkbox", options: ["Contrato / título", "Comprovantes de pagamento", "Extrato de cálculo do banco", "Auto de penhora / avaliação", "Matrícula do imóvel", "Certidão de andamento processual", "Laudo / perícia prévia"] },
+        { id: "analise_previa_ep", label: "Cole aqui a análise jurídica prévia (se tiver)", type: "textarea" },
+        { id: "gratuidade_ep", label: "Pedir gratuidade da justiça?", type: "radio", options: ["Sim", "Não"] },
+      ]},
+    ]
+  },
+  {
+    name: "Elaborar Exceção de Pré-Executividade",
+    subtitle: "Matérias de ordem pública cognoscíveis de ofício · Súmula 393/STJ",
+    promptKey: "EXCECAO_PECA",
+    fields: [
+      { group: "DADOS DO PROCESSO", fields: [
+        { id: "num_proc_exc", label: "Número do processo", type: "text" },
+        { id: "vara_exc2", label: "Vara / Comarca", type: "text" },
+        { id: "excipiente_exc", label: "Nome completo do excipiente (executado)", type: "text" },
+        { id: "cpf_exc2", label: "CPF / CNPJ do excipiente", type: "text" },
+        { id: "advogado_exc", label: "Nome do advogado / OAB", type: "text" },
+        { id: "excepta_exc", label: "Nome da excepta (credor / exequente)", type: "text" },
+        { id: "valor_exc2", label: "Valor cobrado na execução (R$)", type: "text" },
+      ]},
+      { group: "CONTEXTO PROCESSUAL", fields: [
+        { id: "prazo_emb_exc", label: "Prazo de embargos (art. 915 CPC — 15 dias)", type: "radio", options: ["Expirado — exceção é a única via", "Em curso — estratégia de cumulação", "N/A — ação de cobrança / monitória"] },
+        { id: "data_citacao_exc2", label: "Data da citação", type: "date" },
+        { id: "tipo_acao_exc", label: "Tipo de ação / execução", type: "radio", options: ["Execução de título extrajudicial", "Cumprimento de sentença", "Ação monitória", "Execução fiscal", "Ação de cobrança"] },
+        { id: "penhora_exc2", label: "Há penhora ou bloqueio?", type: "radio", options: ["Sim", "Não", "SISBAJUD"] },
+        { id: "leilao_exc2", label: "Há leilão designado?", type: "radio", options: ["Sim — data:", "Não"] },
+        { id: "data_leilao_exc2", label: "Data do leilão (se houver)", type: "date" },
+      ]},
+      { group: "MATÉRIA PRINCIPAL DA EXCEÇÃO", fields: [
+        { id: "materia_exc2", label: "Matéria de ordem pública a ser arguida", type: "radio", options: ["Prescrição originária", "Prescrição intercorrente (art. 921 CPC)", "Nulidade formal do título (vício documental)", "Ausência de liquidez / planilha discriminada", "Ilegitimidade de parte ativa", "Impenhorabilidade de bem de família", "Excesso de penhora manifesto", "Incompetência absoluta do juízo", "Outra matéria de ordem pública"] },
+        { id: "vencimento_exc2", label: "Data de vencimento da obrigação (para prescrição)", type: "date" },
+        { id: "ajuizamento_exc2", label: "Data de ajuizamento da execução", type: "date" },
+        { id: "prova_documental_exc", label: "A matéria é demonstrável apenas com documentos (sem instrução)?", type: "radio", options: ["Sim — documentalmente comprovável", "Parcialmente — exige alguma prova adicional", "Não sei"] },
+        { id: "bem_familia_exc", label: "Se alegar bem de família: comprovação é documental?", type: "radio", options: ["Sim (matrícula + ITR + declaração)", "Não — precisa de testemunha", "N/A"] },
+      ]},
+      { group: "FATOS E PEDIDOS", fields: [
+        { id: "fatos_exc2", label: "Resumo dos fatos / irregularidades identificadas", type: "textarea" },
+        { id: "pedido_exc2", label: "Pedido principal", type: "radio", options: ["Extinção da execução (prescrição)", "Declaração de inexigibilidade do título", "Levantamento da penhora (impenhorabilidade)", "Redução da penhora (excesso)", "Extinção por ilegitimidade", "Suspensão dos atos expropriatórios"] },
+        { id: "suspensao_exc", label: "Requer suspensão dos atos expropriatórios?", type: "radio", options: ["Sim — leilão iminente / risco grave", "Não é necessário", "Avaliar"] },
+        { id: "analise_previa_exc", label: "Cole aqui a análise jurídica prévia (se tiver)", type: "textarea" },
+      ]},
+    ]
+  },
+  {
+    name: "Analisador de Decisões Judiciais",
+    subtitle: "Vícios, recursos cabíveis e estratégia de impugnação — CPC/2015",
+    promptKey: "DECISOES",
+    fields: [
+      { group: "DADOS DA DECISÃO", fields: [
+        { id: "tipo_decisao", label: "Tipo do ato decisório", type: "radio", options: ["Despacho", "Decisão interlocutória", "Sentença", "Acórdão"] },
+        { id: "num_proc_d", label: "Número do processo", type: "text" },
+        { id: "vara_d", label: "Vara / Comarca / Tribunal", type: "text" },
+        { id: "data_publicacao", label: "Data de publicação da decisão", type: "date" },
+        { id: "prazo_recurso", label: "Prazo recursal ainda está em curso?", type: "radio", options: ["Sim", "Não", "Não sei"] },
+      ]},
+      { group: "CONTEÚDO DA DECISÃO", fields: [
+        { id: "texto_decisao", label: "Cole aqui o texto integral da decisão", type: "textarea" },
+        { id: "materia_decidida", label: "Principal matéria decidida", type: "radio", options: ["Extinção do processo (mérito)", "Extinção sem mérito", "Questão incidental / tutela", "Julgamento de embargos", "Julgamento de impugnação", "Outra"] },
+        { id: "favoravel", label: "A decisão foi favorável ao seu cliente?", type: "radio", options: ["Sim — totalmente", "Parcialmente", "Não"] },
+      ]},
+      { group: "VÍCIOS IDENTIFICADOS (OPCIONAL)", fields: [
+        { id: "vicios", label: "Vícios que suspeita existir", type: "checkbox", options: ["Omissão", "Contradição", "Obscuridade", "Erro material", "Ultra / extra / citra petita", "Cerceamento de defesa", "Ausência de fundamentação", "Violação ao contraditório"] },
+        { id: "objetivo_d", label: "Objetivo da análise", type: "radio", options: ["Identificar recursos cabíveis", "Verificar vícios para embargos de declaração", "Estratégia completa de impugnação", "Verificar se decisão está correta"] },
+        { id: "contexto_d", label: "Contexto do processo / informações adicionais", type: "textarea" },
+      ]},
+    ]
+  },
+  {
+    name: "Analisador de Acórdãos STJ/STF",
+    subtitle: "REsp, RE, AREsp e rotas aos tribunais superiores — CPC/2015",
+    promptKey: "ACORDAOS",
+    fields: [
+      { group: "DADOS DO ACÓRDÃO", fields: [
+        { id: "tipo_acordao", label: "Tipo de acórdão", type: "radio", options: ["Apelação", "Agravo de instrumento", "Agravo interno", "Embargos de declaração", "Mandado de segurança", "Ação rescisória", "Outro"] },
+        { id: "tribunal_a", label: "Tribunal que proferiu o acórdão", type: "text" },
+        { id: "num_proc_a", label: "Número do processo", type: "text" },
+        { id: "data_julgamento", label: "Data do julgamento", type: "date" },
+        { id: "unanime", label: "Decisão unânime ou por maioria?", type: "radio", options: ["Unânime", "Por maioria — há votos vencidos", "Voto médio"] },
+      ]},
+      { group: "CONTEÚDO DO ACÓRDÃO", fields: [
+        { id: "texto_acordao", label: "Cole aqui o texto do acórdão (ementa + fundamentos principais)", type: "textarea" },
+        { id: "resultado", label: "Resultado do julgamento", type: "radio", options: ["Provimento total", "Provimento parcial", "Desprovimento", "Não conhecido"] },
+        { id: "favoravel_a", label: "Favorável ao seu cliente?", type: "radio", options: ["Sim", "Parcialmente", "Não"] },
+      ]},
+      { group: "ESTRATÉGIA RECURSAL", fields: [
+        { id: "recursos_cogitados", label: "Recursos que cogita interpor", type: "checkbox", options: ["Embargos de declaração", "Agravo interno", "Recurso Especial (STJ)", "Recurso Extraordinário (STF)", "AREsp / ARE", "Reclamação constitucional"] },
+        { id: "prequestionamento", label: "Há prequestionamento das matérias relevantes?", type: "radio", options: ["Sim — todas as matérias", "Parcialmente", "Não", "Não sei"] },
+        { id: "teses_fed", label: "Há violação a lei federal ou à Constituição?", type: "radio", options: ["Sim — lei federal (REsp)", "Sim — Constituição (RE)", "Ambas", "Não identificada"] },
+        { id: "contexto_a", label: "Contexto / matérias principais do processo", type: "textarea" },
+      ]},
+    ]
+  },
+  {
+    name: "Desbloqueio SISBAJUD",
+    subtitle: "Impugnação ao bloqueio de ativos financeiros · art. 854 CPC · impenhorabilidade salarial e poupança",
+    promptKey: "SISBAJUD_DESBLOQUEIO",
+    fields: [
+      { group: "DADOS DO PROCESSO E DO BLOQUEIO", fields: [
+        { id: "num_proc_sb", label: "Número do processo", type: "text" },
+        { id: "vara_sb", label: "Vara / Comarca / Tribunal", type: "text" },
+        { id: "executado_sb", label: "Nome do executado", type: "text" },
+        { id: "exequente_sb", label: "Nome do exequente", type: "text" },
+        { id: "valor_execucao_sb", label: "Valor total da execução (R$)", type: "text" },
+        { id: "valor_bloqueado", label: "Valor total bloqueado via SISBAJUD (R$)", type: "text" },
+        { id: "data_bloqueio", label: "Data do bloqueio", type: "date" },
+        { id: "instituicao_sb", label: "Instituição(ões) financeira(s) com bloqueio", type: "text" },
+      ]},
+      { group: "FASE PROCESSUAL", fields: [
+        { id: "fase_sb", label: "Em qual fase está o bloqueio?", type: "radio", options: ["Juiz intimou para manifestar em 5 dias (art. 854 §2º) — ainda não convertido", "Juiz já converteu em penhora por inércia do executado", "Já passou prazo e foi convertido — usar impugnação à penhora ou exceção"] },
+        { id: "prazo_embargos_sb", label: "Prazo de embargos à execução (15 dias)", type: "radio", options: ["Em curso", "Expirado", "Não sei"] },
+        { id: "especie_exec_sb", label: "Espécie de execução", type: "radio", options: ["Título extrajudicial (art. 783 CPC)", "Cumprimento de sentença (art. 513 CPC)", "Execução fiscal (Lei 6.830/80)", "Outra"] },
+      ]},
+      { group: "NATUREZA DOS VALORES BLOQUEADOS", fields: [
+        { id: "natureza_valores", label: "Natureza dos valores bloqueados", type: "checkbox", options: ["Salário / vencimento / subsídio", "Honorários profissionais (médico, advogado, etc.)", "Proventos de aposentadoria / pensão", "Ganhos de autônomo / profissional liberal", "Reserva / poupança para emergências (até 40 SM)", "Misto — parte salário, parte poupança", "Não identificado ainda"] },
+        { id: "valor_salario_bloq", label: "Valor correspondente a salário / honorários (R$)", type: "text" },
+        { id: "valor_poupanca_bloq", label: "Valor correspondente a poupança / reserva (R$)", type: "text" },
+        { id: "salario_mensal", label: "Salário / renda mensal líquida do executado (R$)", type: "text" },
+        { id: "excesso_bloqueio", label: "Valor bloqueado supera o valor da execução?", type: "radio", options: ["Sim — há excesso", "Não", "Não sei"] },
+      ]},
+      { group: "IMPENHORABILIDADE DO SALÁRIO", fields: [
+        { id: "valor_acima_50sm", label: "O salário mensal supera 50 salários mínimos?", type: "radio", options: ["Sim — acima de 50 SM", "Não — abaixo de 50 SM", "Não sei"] },
+        { id: "natureza_divida", label: "A dívida exequenda tem natureza alimentar (alimentos familiares)?", type: "radio", options: ["Sim — alimentos familiares/indenizatórios", "Não — dívida comum/bancária/fiscal", "Honorários advocatícios sucumbenciais"] },
+        { id: "min_existencial", label: "O bloqueio compromete o mínimo existencial do executado?", type: "radio", options: ["Sim — salário é integralmente absorvido por despesas básicas", "Parcialmente", "Não sei"] },
+        { id: "despesas_mensais", label: "Despesas mensais fixas do executado (aluguel, saúde, escola, alimentação, etc.)", type: "textarea" },
+      ]},
+      { group: "IMPENHORABILIDADE DA POUPANÇA / RESERVA (até 40 SM)", fields: [
+        { id: "valor_reserva", label: "Valor da reserva bloqueada (R$)", type: "text" },
+        { id: "tipo_conta_reserva", label: "Tipo de conta onde estava a reserva", type: "radio", options: ["Conta poupança", "Conta corrente", "Fundo de investimento / CDB / LCI / LCA", "Tesouro Direto", "Misto"] },
+        { id: "origem_reserva", label: "Origem dos valores da reserva", type: "radio", options: ["Sobras mensais poupadas ao longo do tempo", "Recebimento de salário/honorários acumulados", "Venda de bem (pode ser penhorável)", "Herança / doação (pode ser penhorável)", "Misto — parte poupada, parte outra origem"] },
+        { id: "finalidade_reserva", label: "Finalidade da reserva", type: "text" },
+        { id: "extratos_disponiveis", label: "Há extratos bancários dos meses anteriores disponíveis?", type: "radio", options: ["Sim — comprovam acúmulo mensal", "Não — precisa obter", "Parcialmente"] },
+      ]},
+      { group: "PROVAS DISPONÍVEIS", fields: [
+        { id: "docs_sb", label: "Documentos disponíveis para instruir a defesa", type: "checkbox", options: ["Holerite / contracheque", "Declaração do empregador / órgão pagador", "Extrato conta salário", "Extratos bancários dos meses anteriores", "Comprovantes de despesas mensais (aluguel, saúde, escola)", "Recibos de honorários / nota fiscal de serviços", "Comprovante de aposentadoria / INSS"] },
+        { id: "outros_vicios_sb", label: "Há outros vícios na execução que pretende arguir?", type: "text" },
+        { id: "contexto_sb", label: "Contexto adicional do caso", type: "textarea" },
+      ]},
+    ]
+  },
+  {
+    name: "Defesa — Quebra de Sigilo Bancário",
+    subtitle: "Impugnação incidental · STJ REsp 1.951.176-SP · direito fundamental à privacidade",
+    promptKey: "SIGILO_BANCARIO",
+    fields: [
+      { group: "DADOS DO PROCESSO", fields: [
+        { id: "num_proc_sig", label: "Número do processo", type: "text" },
+        { id: "vara_sig", label: "Vara / Comarca / Tribunal", type: "text" },
+        { id: "executado_sig", label: "Nome do executado", type: "text" },
+        { id: "exequente_sig", label: "Nome do exequente", type: "text" },
+        { id: "valor_exec_sig", label: "Valor da execução (R$)", type: "text" },
+      ]},
+      { group: "O PEDIDO DO EXEQUENTE", fields: [
+        { id: "tipo_pedido_sig", label: "O que o exequente está pedindo?", type: "checkbox", options: ["Extratos bancários via SISBAJUD (movimentação financeira)", "Extratos de cartão de crédito", "Histórico de transferências / PIX", "Dados do CCS-BACEN (contas e procurações bancárias)", "Dados do SIMBA (movimentação bancária)", "Dados do SNIPER / CCS", "Acesso a dados de sócios para desconsideração (IDPJ)", "Outro acesso a dados bancários"] },
+        { id: "fundamento_pedido", label: "Fundamento alegado pelo exequente para o pedido", type: "radio", options: ["Localizar bens para penhora", "Investigar confusão patrimonial / IDPJ", "Suspeita de fraude à execução", "Execução de longa duração sem resultado", "Medida atípica do art. 139, IV, CPC", "Não especificado"] },
+        { id: "ja_deferido", label: "O pedido já foi deferido pelo juiz?", type: "radio", options: ["Sim — já há decisão deferindo", "Não — ainda em análise / juiz abriu prazo", "Não sei"] },
+        { id: "data_decisao_sig", label: "Data da decisão (se já deferida)", type: "date" },
+        { id: "prazo_manifestar", label: "Há prazo para manifestar?", type: "radio", options: ["Sim — prazo em curso", "Não", "Não sei"] },
+      ]},
+      { group: "CONTEXTO DA EXECUÇÃO", fields: [
+        { id: "dilig_realizadas", label: "Diligências patrimoniais já realizadas pelo exequente", type: "checkbox", options: ["SISBAJUD bloqueio — infrutífero", "RENAJUD — sem veículos", "Pesquisa de imóveis — sem resultado", "Averbação premonitória realizada", "SISBAJUD extratos — este é o pedido atual"] },
+        { id: "bens_encontrados_sig", label: "Foram encontrados bens penhoráveis até agora?", type: "radio", options: ["Não — nenhum bem encontrado", "Sim — já há penhora de bens", "Parcialmente"] },
+        { id: "tempo_exec", label: "Há quanto tempo tramita a execução?", type: "text" },
+        { id: "natureza_credito", label: "Natureza do crédito exequendo", type: "radio", options: ["Dívida bancária / financiamento", "Honorários advocatícios", "Indenização por danos", "Crédito fiscal / tributário", "Alimentos", "Outro crédito privado"] },
+      ]},
+      { group: "PEDIDO E ESTRATÉGIA DE DEFESA", fields: [
+        { id: "objetivo_defesa_sig", label: "Objetivo da defesa", type: "radio", options: ["Impedir o deferimento do pedido (ainda não deferido)", "Declarar ilícita a prova já produzida (já deferido e executado)", "Interpor agravo de instrumento contra decisão que deferiu"] },
+        { id: "contexto_sig", label: "Contexto adicional / irregularidades / fatos relevantes", type: "textarea" },
+      ]},
+    ]
+  }
+];
+
+const PROMPTS = {
+  EXECUTADO: `PROMPT — ANÁLISE TÉCNICA DE AUTOS DE EXECUÇÃO (PERSPECTIVA DO EXECUTADO)
+
+Você é um especialista em processo civil brasileiro com profundo conhecimento em direito executivo, direito material aplicável e jurisprudência dos tribunais estaduais, federais e superiores. Sua função é realizar uma análise técnica, objetiva e exaustiva dos autos de execução descritos, orientando exclusivamente o executado. A análise deve ser estritamente técnica, sem viés favorável ao executado além do que o ordenamento jurídico efetivamente autoriza. Não busque concordar com o executado nem minimizar situações desfavoráveis. Apresente apenas possibilidades reais e juridicamente sustentáveis, indicando expressamente o grau de viabilidade de cada uma.
+
+BASE DE CONHECIMENTO TÉCNICO — use como referência ao analisar o caso:
+
+NULIDADES FREQUENTES NA EXECUÇÃO (art. 803 CPC — rol exemplificativo):
+ABSOLUTAS (insanáveis, cognoscíveis de ofício): título inexigível/ilíquido, falta do título executivo, violação de competência absoluta, penhora de bens inalienáveis (art. 833), nulidade ou inexistência de citação, não intimação do cônjuge do executado, não nomeação de curador especial ao citado por edital.
+RELATIVAS (sanáveis se não causar prejuízo — alegar na primeira oportunidade + provar prejuízo): vícios no demonstrativo de débito (art. 798 §único), falta de sucessão processual por morte da parte.
+ATENÇÃO — "nulidade de algibeira": não guardar a alegação para momento conveniente; alegar na primeira oportunidade, pois STJ rechaça preclusão deliberada (art. 278 CPC).
+
+NULIDADES ESPECÍFICAS MAIS COMUNS:
+1. VÍCIOS DE CITAÇÃO: pessoa física por carta AR — assinatura deve ser do próprio citando (STJ REsp 1.840.466, 3ª Turma, 2020); citação em condomínio — válida se citando ainda reside lá; cônjuge do executado pode gerar presunção de conhecimento (TJSP); pessoa jurídica — carta deve ser recebida por funcionário com poderes de gerência ou recebimento (art. 248 §2º CPC); citação de PJ em endereço desatualizado = nulidade.
+2. EXECUTADO FALECIDO ANTES DO AJUIZAMENTO: nulidade absoluta; não cabe redirecionamento (art. 110 CPC não se aplica a falecimento pré-ajuizamento).
+3. CITAÇÃO POR EDITAL SEM CURADOR ESPECIAL: nulidade absoluta (art. 72, II, CPC) — todos os atos posteriores são nulos.
+4. CUMPRIMENTO DE SENTENÇA — FALTA DE INTIMAÇÃO PESSOAL: revel sem advogado ou representado pela Defensoria Pública deve ser intimado pessoalmente para pagar (art. 513 §2º, II, CPC) — STJ REsp 2.053.868-RS, 4ª Turma, 2023.
+5. NÃO INTIMAÇÃO DO CÔNJUGE DA PENHORA DE BEM IMÓVEL: art. 842 CPC — obrigatória para qualquer regime exceto separação convencional absoluta; nulidade absoluta contaminando todos os atos subsequentes (STJ AgInt no REsp 1.909.273-MS, 3ª Turma, 2024).
+6. NÃO INTIMAÇÃO DO CÔNJUGE DA HASTA PÚBLICA: mesmo fundamento — arrematação é nula.
+7. PUBLICAÇÃO DO EDITAL DE LEILÃO: antecedência mínima de 5 dias (art. 887 §§1º-3º CPC); ausência de menção a ônus/recursos/processos pendentes (art. 886, VI, CPC) — nulidade da arrematação.
+8. ARREMATAÇÃO POR PREÇO VIL: lance inferior a 50% da avaliação (art. 891 CPC) = preço vil objetivo.
+9. IMÓVEL EM CONDOMÍNIO: coproprietário deve ser intimado com 5 dias de antecedência (art. 889 CPC); direito de preferência (art. 843 §1º CPC).
+10. INTIMAÇÃO DE CREDORES HIPOTECÁRIOS: arts. 804 e 889, V, CPC — nulidade do leilão se omitida.
+11. CDA VICIADA (execução fiscal): nulidade se ausentes requisitos do art. 2º, §5º, Lei 6.830/80 — STJ AgInt no AgInt no AREsp 1.742.874/SP, 1ª Turma, 2023.
+
+SISTEMAS DE BUSCA DE BENS (referência para avaliar diligências do exequente e defesas disponíveis):
+- SISBAJUD: bloqueio de ativos financeiros; impenhorabilidade salarial (art. 833, IV) e poupança até 40 SM (art. 833, X — Tema 1235/STJ: deve ser arguida pelo executado na 1ª oportunidade); defesa: impugnação art. 854 §3º no prazo de 5 dias.
+- RENAJUD: penhora de veículos; defesa: impenhorabilidade de bem necessário à profissão (art. 833, V CPC); substituição por outro bem (arts. 847-848 CPC); fiança bancária/seguro garantia (art. 835, §2º CPC).
+- Imóveis: bem de família (Lei 8.009/90, Súmula 364/STJ) — atenção: garantia hipotecária prestada voluntariamente pelo próprio devedor afasta a proteção (art. 3º, V, Lei 8.009/90).
+
+FRAUDE À EXECUÇÃO (art. 792 CPC — para avaliar se exequente pode atingir bens alienados):
+- Hipóteses que exigem prevenção: averbação premonitória (art. 828 CPC), hipoteca judicial, anotação de ação real/reipersecutória na matrícula.
+- Hipótese mais comum (art. 792, IV): alienação após citação em ação capaz de reduzir o devedor à insolvência — boa-fé do terceiro adquirente: deve exibir certidão negativa de distribuição no domicílio do devedor (§2º art. 792 CPC); simples movimentação não caracteriza má-fé.
+- Fraude contra credores (arts. 158-163 CC): atos gratuitos do devedor insolvente; atos onerosos quando insolvência notória ou há motivos para o comprador conhecê-la — consilium fraudis não é exigido pelo STJ (REsp 1.294.462-GO).
+
+DADOS DO CASO:
+{{DADOS}}
+
+Siga rigorosamente a sequência abaixo, tratando cada item de forma individualizada e completa:
+
+1. IDENTIFICAÇÃO DA ESPÉCIE DE EXECUÇÃO — classifique a espécie, o rito aplicável e eventuais especialidades procedimentais.
+
+2. ANÁLISE DO TÍTULO EXECUTIVO — natureza jurídica, enquadramento no art. 784 CPC (se extrajudicial) ou arts. 515-516 (se judicial), regularidade formal e validade substancial.
+
+3. REQUISITOS DE CERTEZA, LIQUIDEZ E EXIGIBILIDADE — analise individualmente cada requisito do art. 783 CPC; identifique qualquer ausência ou questionabilidade.
+
+4. DEFESAS DISPONÍVEIS AO EXECUTADO CONFORME A FASE PROCESSUAL — embargos à execução (arts. 914-920), impugnação ao cumprimento (arts. 525-527), exceção de pré-executividade (Súmula 393/STJ), defesas supervenientes. Indique viabilidade de cada via e o que é inviável na fase atual.
+
+5. OPOSIÇÕES E EXCEÇÕES PROCESSUAIS — incompetência, suspeição/impedimento, nulidade da citação, embargos de terceiro.
+
+6. MARCOS PROCESSUAIS E MATERIAIS — citação, penhora, avaliação, expropriação, prescrição intercorrente, decadência. Para cada marco, indique consequências jurídicas favoráveis e desfavoráveis.
+
+7. POSSIBILIDADES PROCESSUAIS NO CURSO DA EXECUÇÃO — parcelamento (art. 916), substituição de penhora (art. 847), impenhorabilidade (art. 833 + Lei 8.009/90 + Súmula 364/STJ), remição (art. 826), suspensão e extinção.
+
+8. POSSIBILIDADES RECURSAIS — agravo de instrumento (art. 1.015, parágrafo único), apelação, REsp, RE, reclamação (art. 988), mandado de segurança. Para cada recurso: fundamento, prazo, órgão competente.
+
+9. NULIDADES PROCESSUAIS — absolutas e relativas, nulidade da citação, da penhora, de intimações, excesso de execução, cerceamento de defesa. Para cada nulidade: natureza, fundamento, momento de arguição, precedente relevante.
+
+10. JURISPRUDÊNCIA APLICÁVEL — cite precedentes qualificados (súmulas, repetitivos, IRDR, IAC). Não invente precedentes.
+
+11. SÍNTESE TÉCNICA E GRADAÇÃO DE VIABILIDADE — medidas com maior viabilidade (ordem de prioridade e urgência), medidas com viabilidade reduzida, medidas inviáveis, alertas de prazos peremptórios.
+
+Não invente fatos. Se dado essencial estiver ausente, registre a lacuna e indique o impacto.`,
+
+  EXEQUENTE: `PROMPT — ANÁLISE TÉCNICA DE AUTOS DE EXECUÇÃO (PERSPECTIVA DO EXEQUENTE)
+
+Você é um especialista em processo civil brasileiro com profundo conhecimento em direito executivo, direito material aplicável e jurisprudência dos tribunais estaduais, federais e superiores. Sua função é realizar uma análise técnica, objetiva e exaustiva dos autos de execução fornecidos, orientando exclusivamente o exequente. A análise deve ser estritamente técnica, sem viés favorável ao exequente além do que o ordenamento jurídico efetivamente autoriza. Apresente apenas possibilidades reais e juridicamente sustentáveis, indicando o grau de viabilidade de cada uma. Quando uma informação relevante não constar dos dados fornecidos, registre expressamente sua ausência e indique o impacto dessa lacuna para o exequente.
+
+DADOS DO CASO:
+{{DADOS}}
+
+Siga rigorosamente a sequência abaixo:
+
+1. IDENTIFICAÇÃO DA ESPÉCIE DE EXECUÇÃO E ADEQUAÇÃO DO RITO — verifique se o rito eleito é o adequado, identifique eventuais vícios na escolha do rito e as consequências para o exequente.
+
+2. ANÁLISE DO TÍTULO EXECUTIVO — natureza jurídica, enquadramento legal, regularidade formal, validade substancial, suficiência para embasar o valor perseguido. Antecipe fragilidades que o executado possa arguir.
+
+3. REQUISITOS DE CERTEZA, LIQUIDEZ E EXIGIBILIDADE — verificação preventiva sob perspectiva de blindar a execução. Indique argumentos que o executado provavelmente usará e como neutralizá-los.
+
+4. ANTECIPAÇÃO DAS DEFESAS DO EXECUTADO E ESTRATÉGIA DE RESPOSTA — embargos, impugnação, exceção de pré-executividade. Para cada defesa identificada: nível de risco (alto/médio/baixo) e medida de resposta recomendada.
+
+5. ANÁLISE DAS DILIGÊNCIAS PATRIMONIAIS REALIZADAS — analise cada sistema: (A) SISBAJUD — bloqueios, impenhorabilidade salarial, VGBL/PGBL (Tema 1.036/STJ); (B) RENAJUD — veículos; (C) Imóveis e direitos reais — bem de família (Súmula 364/STJ); (D) Participações societárias — art. 861 CPC; (E) Créditos e direitos; (F) Renda e remuneração (art. 833, §2º, Tema 1.140/STJ); (G) Averbação premonitória (art. 828); (H) Medidas atípicas (art. 139, IV); (I) Desconsideração da personalidade jurídica (art. 50 CC + arts. 133-137 CPC); (J) Fraude à execução (art. 792) e fraude contra credores; (K) Resultado global e risco de prescrição intercorrente.
+
+6. MARCOS PROCESSUAIS E MATERIAIS E CONSEQUÊNCIAS PARA O EXEQUENTE — citação, penhora, avaliação, expropriação, prescrição intercorrente.
+
+7. POSSIBILIDADES PROCESSUAIS NO CURSO DA EXECUÇÃO — renovação de pesquisas, substituição de penhora, suspensão e extinção, cumulação de execuções (art. 780), parcelamento pelo executado.
+
+8. POSSIBILIDADES RECURSAIS — agravo de instrumento, apelação, REsp, RE, reclamação, mandado de segurança. Prazo, fundamento, órgão.
+
+9. NULIDADES PROCESSUAIS — que podem ser exploradas pelo executado em desfavor do exequente, e que o próprio exequente deve arguir proativamente.
+
+10. HONORÁRIOS ADVOCATÍCIOS — percentual arbitrado, acréscimo de 10 pontos (art. 523), embargos, execução autônoma (art. 85, §14).
+
+11. JURISPRUDÊNCIA APLICÁVEL — precedentes qualificados. Não invente precedentes.
+
+12. SÍNTESE TÉCNICA E GRADAÇÃO DE VIABILIDADE — medidas com maior viabilidade para satisfação do crédito, medidas com viabilidade reduzida, medidas inviáveis, alertas de conduta omissiva que gere prescrição intercorrente ou extinção.
+
+13. ROTEIRO DE DILIGÊNCIAS EXTERNAS RECOMENDADAS — por prioridade: SISBAJUD (renovação), criptoativos (exchanges), VGBL/PGBL, RENAJUD ampliado, embarcações (SINARA), aeronaves (ANAC/RAB), imóveis nacional (ONR/CENSEC), terrenos de marinha (SPU), participações societárias (Juntas/REDESIM), ações e valores mobiliários (B3/CVM), direitos autorais e PI (INPI), INFOJUD/SIMBA (Receita Federal), cartórios de RTD, investigação patrimonial privada, medidas atípicas (art. 139, IV).
+
+Não invente fatos. Registre lacunas e indique o impacto.`,
+
+  DECISOES: `PROMPT-MESTRE — ANALISADOR DE DECISÕES JUDICIAIS (CPC/2015)
+
+Você deve atuar como um jurista especializado na análise de decisões judiciais à luz do Código de Processo Civil de 2015. Com base no texto da decisão e nos dados do processo fornecidos, realize análise técnica, objetiva e fundamentada, sem inventar fatos. Sempre que possível, cite os dispositivos legais aplicáveis.
+
+DADOS E TEXTO DA DECISÃO:
+{{DADOS}}
+
+Siga os passos abaixo de forma organizada e técnica:
+
+1. IDENTIFICAÇÃO DO ATO DECISÓRIO — classifique o ato conforme art. 203 CPC (despacho, decisão interlocutória, sentença ou acórdão). Se sentença, indique tipologia: com resolução de mérito (art. 487) ou sem (art. 485). Verifique elementos essenciais do art. 489 e o dever de fundamentação (§1º). Verifique congruência entre pedido e decisão (arts. 141 e 492) — ultra, extra ou citra petita.
+
+2. ANÁLISE DA MOTIVAÇÃO E DAS PROVAS — contraditório e vedação à decisão surpresa (arts. 9º e 10); valoração da prova (arts. 370 e 371); julgamento antecipado (art. 355); ônus da prova (art. 373); observância de precedentes obrigatórios (arts. 926 e 927).
+
+3. ERROS MATERIAIS E VÍCIOS PROCESSUAIS — erros em cálculos, datas ou nomes (art. 494); ausência ou insuficiência de fundamentação; cerceamento de defesa; incongruência; intimação ou citação viciada; violação ao contraditório.
+
+INSTRUÇÃO ESSENCIAL: em cada ponto decisório relevante — (i) transcreva literalmente o trecho exato da decisão entre aspas; (ii) identifique o fundamento legal invocado pelo juiz; (iii) analise criticamente o trecho; (iv) vincule qualquer vício diretamente ao trecho transcrito.
+
+4. RECURSOS CABÍVEIS — embargos de declaração (art. 1.022 — prazo: 5 dias úteis); agravo de instrumento (art. 1.015 — prazo: 15 dias úteis); apelação (arts. 1.009-1.014 — prazo: 15 dias úteis); agravo interno (art. 1.021); REsp e RE (art. 1.029 e ss.). Para cada recurso: prazo em dias úteis (art. 219), fundamento e resultado esperado.
+
+5. PONTOS IMPUGNÁVEIS — para cada ponto: trecho problemático, base legal que o fragiliza, razão da impugnação, recurso ou medida cabível, pedido a ser formulado, resultado prático esperado.
+
+6. ESTRATÉGIA DE IMPUGNAÇÃO — trilha imediata (ex: embargos de declaração para suprir omissão) e trilha alternativa ou concorrente (ex: agravo de instrumento ou apelação). Antecipe os argumentos da parte contrária e como neutralizá-los.
+
+A análise deve ser entregue em relatório executivo em texto corrido, dividido em tópicos claros. Não invente fatos ou precedentes. Se faltar algum dado essencial, registre a ausência.`,
+
+  ACORDAOS: `PROMPT-MESTRE — ANALISADOR DE ACÓRDÃOS E ROTAS AOS TRIBUNAIS SUPERIORES (CPC/2015)
+
+Você atuará como jurista especializado em análise de acórdãos, à luz do CPC/2015, da Constituição Federal e das regras de admissibilidade recursal para STJ e STF. Com base no texto do acórdão e nos dados fornecidos, produza análise técnica, objetiva e fundamentada, sem inventar fatos. Cite dispositivos aplicáveis.
+
+DADOS E TEXTO DO ACÓRDÃO:
+{{DADOS}}
+
+Produza a análise na seguinte ordem:
+
+1. IDENTIFICAÇÃO DO ATO COLEGIADO — tipo de acórdão (apelação, agravo de instrumento, agravo interno, embargos de declaração, MS, AR, etc.); decisão unânime ou por maioria; votos vencidos (art. 941, §3º CPC); dados formais: órgão julgador, relatoria, data, número do processo.
+
+2. ELEMENTOS ESSENCIAIS E FUNDAMENTAÇÃO — presença de ementa, relatório, fundamentos e dispositivo (art. 489, §1º CPC; art. 93, IX CF/88); respeito ao contraditório e vedação à decisão surpresa (arts. 9º e 10 CPC); enfrentamento de todos os argumentos relevantes capazes de infirmar a conclusão (art. 489, §1º, IV CPC).
+
+3. VÍCIOS TÍPICOS SANÁVEIS E NÃO SANÁVEIS — omissões, contradições, obscuridades e erros materiais (art. 1.022 CPC); incongruência (ultra/extra/citra petita); violação a precedentes obrigatórios (arts. 926 e 927); desrespeito ao regime de repetitivos/repercussão geral (arts. 1.036-1.041 CPC).
+
+4. RECURSOS ORDINÁRIOS INTERNOS NO TRIBUNAL — embargos de declaração (art. 1.022 — prazo: 5 dias úteis — art. 1.023); agravo interno (art. 1.021 — prazo: 15 dias úteis).
+
+5. RECURSOS EXCEPCIONAIS — STJ E STF:
+5.1) Recurso Especial (STJ) — CF art. 105, III; CPC arts. 1.029 e ss. — fundamentos: violação a lei federal; dissídio jurisprudencial. Requisitos: prequestionamento; Súmulas 5, 7 e 83/STJ.
+5.2) Recurso Extraordinário (STF) — CF art. 102, III; CPC arts. 1.029 e ss. — repercussão geral (art. 1.035 CPC); Súmulas 279, 282, 284 e 356/STF.
+5.3) Agravo em REsp/RE (AREsp/ARE) — CPC art. 1.042 — prazo: 15 dias úteis.
+5.4) Juízo de admissibilidade — CPC art. 1.030; filtros de repetitivos e repercussão geral.
+
+6. PONTOS IMPUGNÁVEIS E CORRESPONDÊNCIA RECURSAL — para cada trecho atacável: problema identificado, base legal/constitucional e súmulas pertinentes, medida cabível (EDcl / REsp / RE / AREsp/ARE / agravo interno), objetivo prático e risco de inadmissibilidade.
+
+7. ESTRATÉGIA RECURSAL RECOMENDADA (ROTEIRO TÁTICO):
+1) Embargos de declaração para sanar vícios e/ou prequestionar matérias.
+2) Interposição de REsp e/ou RE conforme natureza da ofensa.
+3) Em caso de negativa de seguimento: AREsp/ARE (art. 1.042 CPC), enfrentando os fundamentos da inadmissão.
+4) Prever contrarrazões prováveis (ausência de prequestionamento; súmulas impeditivas; ausência de repercussão geral; revolvimento probatório) e contramedidas específicas.
+
+8. CHECKLIST DE PRAZOS E FORMAS — contagem em dias úteis (art. 219 CPC). EDcl: 5 dias (art. 1.023). RE/REsp/ARE/AREsp/Agravo interno: 15 dias (art. 1.003, §5º).
+
+Não invente fatos. Se algo faltar no acórdão, sinalize como dado ausente. Indique sempre o efeito prático de cada vício/recurso e o risco de inadmissibilidade.`,
+
+  COBRANCA: `PROMPT — ANÁLISE TÉCNICA DE AUTOS DE AÇÃO DE COBRANÇA COM ÊNFASE EM COBRANÇAS BANCÁRIAS (PERSPECTIVA DO DEVEDOR/RÉU)
+
+Você é um especialista em processo civil brasileiro e em direito bancário e do consumidor, com profundo conhecimento em contratos de crédito, regulação do sistema financeiro nacional, direito material aplicável (Código Civil, CDC, legislação bancária) e jurisprudência dos tribunais estaduais, federais e superiores (STJ e STF). Sua função é realizar uma análise técnica, objetiva e exaustiva dos autos fornecidos, orientando exclusivamente o réu/devedor. A análise deve ser estritamente técnica, sem viés favorável ao devedor além do que o ordenamento jurídico efetivamente autoriza. Apresente apenas possibilidades reais e juridicamente sustentáveis, indicando expressamente o grau de viabilidade de cada uma (alta, média, baixa ou inviável). Quando se tratar de cobrança promovida por instituição financeira, aplique profundidade específica nas particularidades do crédito bancário.
+
+DADOS DO CASO:
+{{DADOS}}
+
+Siga rigorosamente a sequência abaixo:
+
+1. IDENTIFICAÇÃO DA ESPÉCIE DE AÇÃO E ADEQUAÇÃO DO RITO — classifique a ação (cobrança ordinária art. 318 CPC, monitória art. 700 CPC, execução de título extrajudicial art. 783 CPC, busca e apreensão Dec.-Lei 911/69 ou outro rito). Verifique competência territorial (art. 53 CPC e art. 101 CDC — foro do domicílio do consumidor, Súmula 244/STJ). Qualifique o credor: banco originário, cessionário/FIDC, endossatário. Se cessionário: verifique se o contrato de cessão foi juntado e se o devedor foi notificado (art. 290 CC). Verifique configuração de relação de consumo (arts. 2º e 3º CDC, Súmula 297/STJ).
+
+2. ANÁLISE DO TÍTULO E DO CONTRATO — natureza e regularidade formal (CCB — requisitos art. 29 Lei 10.931/2004; contrato de adesão — art. 54 §3º CDC; contratos eletrônicos — certificação ICP-Brasil). Certeza, liquidez e exigibilidade (art. 783 CPC). Demonstrativo de cálculo: discriminação de principal, juros remuneratórios, juros moratórios, multa, encargos, comissão de permanência, correção monetária.
+
+3. ANÁLISE DAS CLÁUSULAS FINANCEIRAS E DOS ENCARGOS — (3.1) Juros remuneratórios: taxa contratada vs. média BACEN (Tema 25/STJ — REsp 1.061.530/RS); capitalização mensal — requisitos (Súmula 539/STJ, Tema 953/STJ); Tabela Price vs. SAC. (3.2) Encargos moratórios: juros de mora, multa moratória — limite 2% CDC (art. 52 §1º), comissão de permanência — vedação de cumulação (Súmulas 294, 296 e 472/STJ). (3.3) Tarifas: TAC e TEC vedadas pós-30/04/2008 (Tema 618/STJ); CET (Res. CMN 3.517/2007); seguros atrelados — venda casada (art. 39, I CDC). (3.4) Correção monetária: índice aplicado, vedação de dupla incidência com comissão de permanência.
+
+4. PRESCRIÇÃO E DECADÊNCIA — prazo prescricional aplicável: 5 anos instrumento particular (art. 206 §5º I CC); 3 anos cheque (art. 59 Lei 7.357/85); 3 anos NP (art. 70 LUG); 3 anos duplicata (art. 18 Lei 5.474/68). Dies a quo: parcelas individualmente (EREsp 1.255.167/MG). Causas interruptivas: citação, protesto, reconhecimento de dívida, pagamento parcial (Súmula 380/STJ). Prescrição parcial de parcelas. Nulidade de cláusulas abusivas: imprescritível (matéria de ordem pública CDC).
+
+5. DEFESAS DE MÉRITO — (5.1) Existência e validade: inexistência do contrato, vícios de consentimento, novação extintiva, pagamento, compensação (art. 368 CC). (5.2) Cobranças bancárias: abusividade (art. 51 CDC) — redução de juros excessivos, eliminação de capitalização não pactuada, vedação de comissão de permanência cumulada, limitação de multa a 2%, nulidade de tarifas não previstas, nulidade de seguros compulsórios; ilegitimidade ativa do cessionário (arts. 290 e 294 CC); exceção de contrato não cumprido (art. 476 CC); enriquecimento sem causa — devolução em dobro (art. 42 parágrafo único CDC); dano moral por cobrança abusiva (Súmula 385/STJ).
+
+6. DEFESAS PROCESSUAIS — preliminares art. 337 CPC: nulidade/inexistência da citação, incompetência (cláusula de eleição de foro abusiva — art. 51 IV CDC, Súmula 381/STJ), ilegitimidade de parte, litispendência/coisa julgada, falta de interesse de agir. Ação revisional como instrumento defensivo (reconvenção art. 343 CPC ou ação autônoma). Tutela de urgência para suspensão da negativação (arts. 294 e 305 CPC).
+
+7. NEGATIVAÇÃO E PROTEÇÃO AO CRÉDITO — prévia notificação (art. 43 §2º CDC, Súmula 359/STJ); prazo máximo 5 anos (art. 43 §1º CDC); negativação de valor em discussão judicial; dano moral in re ipsa (restrição Súmula 385/STJ).
+
+8. EXCESSO NA COBRANÇA E REPETIÇÃO DE INDÉBITO — perícia contábil: quesitos para verificação da Tabela Price, comparação taxa média BACEN, tarifas e previsão contratual, saldo devedor recalculado. Restituição simples vs. em dobro (art. 42 parágrafo único CDC; EREsp 1.413.542/RS — Tema 929/STJ — má-fé da instituição financeira). Compensação dos valores a restituir.
+
+9. AÇÃO MONITÓRIA (se aplicável) — cabimento (art. 700 CPC — prova escrita sem eficácia de título executivo); embargos monitórios (art. 702 CPC — prazo 15 dias, efeito suspensivo automático, toda matéria de defesa); conversão do mandado em título executivo (art. 701 §2º CPC); impugnação via ação anulatória (art. 966 CPC).
+
+10. BUSCA E APREENSÃO (se alienação fiduciária) — mora: notificação por carta registrada ou protesto (art. 2º Dec.-Lei 911/69); prazo de cura 5 dias; purgação da mora (art. 3º §2º Dec.-Lei 911/69 — Lei 13.043/2014: todas as parcelas vencidas); saldo devedor após venda extrajudicial.
+
+11. POSSIBILIDADES RECURSAIS — agravo de instrumento (art. 1.015 CPC — Tema 988/STJ taxatividade mitigada); apelação (art. 1.009 CPC — 15 dias); REsp (Temas 25, 618, 953, 929); RE; reclamação (art. 988 CPC).
+
+12. NULIDADES PROCESSUAIS — citação, cerceamento de defesa (indeferimento injustificado de perícia contábil), julgamento antecipado indevido (art. 355 CPC), fundamentação deficiente (art. 489 §1º IV CPC).
+
+13. JURISPRUDÊNCIA QUALIFICADA — Temas STJ: 25, 26, 29, 246, 541, 618, 929, 953, 988. Súmulas STJ: 294, 296, 297, 359, 381, 385, 472, 539. Súmula STF: 596. Não invente precedentes.
+
+14. SÍNTESE TÉCNICA E GRADAÇÃO DE VIABILIDADE — (14.1) medidas com alta viabilidade em ordem de prioridade; (14.2) medidas com viabilidade reduzida/incerta com riscos; (14.3) medidas inviáveis; (14.4) ALERTAS DE PRAZO urgentes; (14.5) resultado estimado do litígio.
+
+15. ROTEIRO DE DOCUMENTOS E DILIGÊNCIAS — extrato completo e documentos contratuais (art. 6º II CDC); pesquisa de taxas médias BACEN/SGS; reclamação BACEN Consumidor / Registrato; verificação PROCON e cadastros de proteção ao crédito; negociação extrajudicial e portabilidade (art. 2º Res. CMN 4.292/2013).
+
+Não invente fatos. Registre expressamente quando informação necessária não constar dos autos.`,
+
+  EMBARGOS_PECA: `PROMPT — ELABORAÇÃO DE EMBARGOS À EXECUÇÃO / EMBARGOS MONITÓRIOS (CPC/2015)
+
+Você atuará como advogado especializado em processo civil brasileiro, com domínio das regras de execução (arts. 771-925 CPC), cumprimento de sentença (arts. 513-538 CPC), ação monitória (arts. 700-702 CPC) e da jurisprudência do STJ. Sua função é elaborar a peça de embargos de forma técnica, completa e estratégica, com base nos dados e fatos fornecidos. Não invente fatos, normativos ou precedentes que não estejam sustentados pelos dados fornecidos. Utilize marcadores [DADO PENDENTE] para informações ausentes.
+
+BASE DE CONHECIMENTO TÉCNICO — use como referência ao construir as teses dos embargos:
+
+NULIDADES ARGUÍVEIS NOS EMBARGOS:
+- Nulidade de citação: pessoa física — assinatura deve ser do próprio citando (STJ REsp 1.840.466); PJ — recebimento por funcionário habilitado (art. 248, §2º CPC); condomínio — apenas válida se citando ainda reside lá; citado por edital sem curador especial = nulidade absoluta (art. 72, II, CPC).
+- Falta de intimação do cônjuge da penhora de bem imóvel: art. 842 CPC — nulidade absoluta contaminando leilão (STJ AgInt no REsp 1.909.273-MS, 2024).
+- Falta de intimação do cônjuge da hasta pública: mesmo fundamento.
+- Edital de leilão: mínimo 5 dias de antecedência (art. 887 CPC); ausência de ônus/processos pendentes (art. 886, VI) = nulidade da arrematação.
+- Arrematação por preço vil: abaixo de 50% da avaliação (art. 891 CPC).
+- CDA viciada (execução fiscal): requisitos art. 2º, §5º, Lei 6.830/80.
+- Cumprimento de sentença: falta de intimação pessoal do revel (art. 513 §2º, II, CPC — STJ REsp 2.053.868-RS, 2023).
+
+EXCESSO DE EXECUÇÃO (art. 917, §§2º-3º CPC — ATENÇÃO CRÍTICA):
+Os embargos por excesso DEVEM indicar expressamente o valor que o embargante entende correto, sob pena de rejeição liminar. Sem o valor correto indicado, os embargos por excesso são inadmissíveis.
+- Encargos bancários abusivos: taxa acima da média BACEN (Tema 25/STJ); capitalização não pactuada (Súmula 539/STJ, Tema 953/STJ); comissão de permanência cumulada (Súmulas 294, 296, 472/STJ); TAC/TEC pós-30/04/2008 (Tema 618/STJ); multa moratória acima de 2% (art. 52 §1º CDC); seguros compulsórios (art. 39, I, CDC).
+- Se não for possível calcular com precisão: indicar parâmetros e pedir perícia contábil com quesitos mínimos.
+
+IMPENHORABILIDADE:
+- Bem de família (Lei 8.009/90, Súmula 364/STJ) — exceção: garantia hipotecária voluntária do devedor (art. 3º, V, Lei 8.009/90).
+- Bens indispensáveis à profissão (art. 833, V, CPC).
+- Salário (art. 833, IV, CPC) — exceções: alimentos familiares e importâncias acima de 50 SM (art. 833, §2º).
+- Poupança/reserva até 40 SM (art. 833, X, CPC — Tema 1235/STJ: deve ser arguida tempestivamente pelo executado).
+
+FRAUDE À EXECUÇÃO (para defesa quando exequente alega que bem alienado deve ser atingido):
+- Art. 792, IV CPC: boa-fé do terceiro adquirente comprovada por certidões negativas no domicílio do devedor → bem não pode ser alcançado.
+- Art. 792, §2º CPC: para bens não sujeitos a registro, terceiro deve exibir certidões pertinentes.
+
+DADOS DO CASO:
+{{DADOS}}
+
+Elabore os embargos observando rigorosamente a seguinte estrutura:
+
+ETAPA 1 — VERIFICAÇÃO DE ADMISSIBILIDADE (PRIORIDADE ABSOLUTA)
+Confirme: (a) o prazo do art. 915 CPC (15 dias da citação) está em curso? Se expirado, interrompa e indique alternativas (exceção de pré-executividade, ação autônoma). (b) Para embargos monitórios (art. 702 CPC): prazo de 15 dias da citação, independem de penhora, efeito suspensivo automático. (c) Há necessidade de garantia do juízo? Na execução de título extrajudicial, os embargos independem de penhora (art. 914 §1º CPC). No cumprimento de sentença, exige-se depósito integral, penhora ou caução (art. 525 CPC).
+
+ETAPA 2 — DEFINIÇÃO EXPRESSA DE TESE PRINCIPAL E SUBSIDIÁRIAS (OBRIGATÓRIA)
+Defina: TESE PRINCIPAL (maior impacto e probabilidade de êxito — toda a peça deve orbitar em torno dela); TESES SUBSIDIÁRIAS (em ordem de prioridade: reforço da principal, teses independentes, teses de segurança); TESES EXCLUÍDAS (registre expressamente a razão da exclusão de qualquer tese viável). Hierarquia padrão: prescrição → nulidade/inexigibilidade → excesso → impenhorabilidade → abusividade de encargos → revisão contratual.
+
+ETAPA 3 — EFEITO SUSPENSIVO (quando cabível)
+Fundamente conforme o risco: risco alto de expropriação (leilão designado / penhora sobre bem essencial) → pedido de suspensão total com fundamentação robusta e demonstração de dano irreparável; risco médio (bloqueio de contas, penhora sobre bens não essenciais) → suspensão parcial ou tutela específica; risco baixo → avaliar pertinência; se não houver fundamento concreto, não formular o pedido.
+
+ETAPA 4 — ANÁLISE FORMAL DO TÍTULO (OBRIGATÓRIA)
+Examine o título sem presumir validade. Se cédula de crédito bancário (CCB): verificar requisitos do art. 29 Lei 10.931/2004. Se título extrajudicial: enquadrar no art. 784 CPC. Se judicial: arts. 515-516 CPC. Verificar certeza, liquidez e exigibilidade (art. 783 CPC). Ausência de planilha discriminada → vício de liquidez (art. 783 CPC).
+
+ETAPA 5 — EXCESSO DE EXECUÇÃO E ENCARGOS (quando aplicável)
+ATENÇÃO — art. 917 §§2º-3º CPC: os embargos por excesso DEVEM indicar o valor que o embargante entende correto, sob pena de rejeição liminar. Examinar cada encargo: juros remuneratórios (taxa média BACEN — Tema 25/STJ); capitalização (Súmula 539/STJ, Tema 953/STJ); comissão de permanência cumulada (Súmulas 294, 296 e 472/STJ); tarifas TAC/TEC pós-2008 (Tema 618/STJ); multa moratória acima de 2% (art. 52 §1º CDC); seguros compulsórios (art. 39, I CDC).
+
+ETAPA 6 — PRESCRIÇÃO (quando aplicável)
+Calcular prescrição originária (prazos específicos por tipo de título) e intercorrente (art. 921 §§1º-5º CPC). Verificar causas interruptivas. Se configurada: é a tese mais forte — desenvolver como principal com precedentes qualificados.
+
+ETAPA 7 — IMPENHORABILIDADE E PENHORA
+Bem de família (Lei 8.009/90, Súmula 364/STJ — atenção à exceção do art. 3º V para hipoteca). Bens indispensáveis (art. 833 V CPC). Excesso de penhora. Vício formal do auto de penhora.
+
+ETAPA 8 — NARRATIVA DOS FATOS
+Redação em ordem cronológica: apresentação do embargante; origem da obrigação; circunstâncias da inadimplência (se relevantes); comportamento contratual anterior; tentativas de regularização; atos da execução. Incluir dados econômicos quando relevantes para fundamentar tutela ou tese de revisão.
+
+ETAPA 9 — FUNDAMENTOS JURÍDICOS (com hierarquia de teses)
+Tese principal primeiro — maior desenvolvimento argumentativo, precedentes mais fortes, demonstração mais detalhada. Teses subsidiárias em sequência. Cada tese deve: nascer de fato concreto narrado; citar dispositivo legal e precedente qualificado do STJ; estimar impacto quantitativo quando possível. Nunca inventar referências.
+
+ETAPA 10 — PEDIDOS (vinculados às teses)
+Pedido de recebimento com efeito suspensivo (quando cabível); citação do embargado; pedidos principais por tese (extinção da execução por prescrição / nulidade / inexigibilidade; recálculo com valor correto indicado; levantamento de penhora por impenhorabilidade; nulidade de atos processuais); pedidos subsidiários; perícia contábil com quesitos mínimos (quando houver excesso); honorários; gratuidade da justiça (se cabível). Verificar correlação entre cada pedido e causa de pedir.
+
+ETAPA 11 — CONTROLE DE COERÊNCIA INTERNA (OBRIGATÓRIO)
+Antes de finalizar: (1) toda tese tem suporte em fato narrado? (2) toda tese tem prova correspondente? (3) toda tese desemboca em pedido específico? (4) todo pedido tem causa de pedir? (5) o valor correto está indicado se há excesso? (6) a tutela está proporcional ao risco?
+
+ETAPA 12 — MINUTA FINAL
+Elaborar peça completa em linguagem forense: endereçamento ao juízo; qualificação do embargante; identificação do processo embargado; preliminar de tempestividade; efeito suspensivo (quando cabível); fatos; fundamentos jurídicos (hierarquia de teses); pedidos; provas (com quesitos periciais quando pertinente); valor da causa; local, data e espaço para assinatura. Marcadores [DADO PENDENTE] para campos não fornecidos.
+
+Não invente dispositivos ou precedentes. A minuta é instrumento de trabalho sujeito à revisão do advogado.`,
+
+  EXCECAO_PECA: `PROMPT — ELABORAÇÃO DE EXCEÇÃO DE PRÉ-EXECUTIVIDADE (CPC/2015)
+
+Você atuará como advogado especializado em processo civil brasileiro, com domínio da Súmula 393/STJ e da jurisprudência sobre cabimento da exceção de pré-executividade. Sua função é elaborar a peça de exceção de forma técnica e estratégica. REGRA ABSOLUTA: a exceção de pré-executividade é petição incidental nos autos da execução — não é ação autônoma, não tem distribuição por dependência, não tem citação, não tem custas e não tem prazo legal. Mas SOMENTE admite matérias de ordem pública, cognoscíveis de ofício, que dispensem dilação probatória (Súmula 393/STJ). Incluir matéria que exige instrução compromete a credibilidade da peça e pode levar à rejeição integral.
+
+DADOS DO CASO:
+{{DADOS}}
+
+Elabore a exceção observando rigorosamente a seguinte estrutura:
+
+ETAPA 1 — FILTRO DE ADMISSIBILIDADE (PRIORIDADE ABSOLUTA)
+Para cada matéria identificada, aplicar o teste de três etapas:
+1. É matéria de ordem pública? (prescrição, nulidade absoluta do título, ilegitimidade de parte, incompetência absoluta, impenhorabilidade de bem de família, excesso de penhora manifesto — SIM; excesso de execução que dependa de cálculo complexo, teoria da imprevisão, revisão de encargos que exija perícia — NÃO)
+2. É cognoscível de ofício? O juiz poderia reconhecê-la sem provocação?
+3. Dispensa dilação probatória? A demonstração é possível exclusivamente com documentos já nos autos ou a juntar com a exceção?
+Classificar: ADMISSÍVEL / LIMÍTROFE INCLUÍVEL (risco moderado) / LIMÍTROFE NÃO RECOMENDADA / INADMISSÍVEL (redirecionar para embargos).
+VEDAÇÃO: não converter discussão revisional de encargos ou excesso que dependa de cálculo complexo em matéria de ordem pública por mera requalificação retórica.
+
+ETAPA 2 — DEFINIÇÃO DE TESE PRINCIPAL E SUBSIDIÁRIAS (OBRIGATÓRIA)
+TESE PRINCIPAL: a matéria com maior impacto e maior probabilidade de acolhimento — a exceção deve ser construída em torno dela.
+TESES SUBSIDIÁRIAS: outras matérias admissíveis em ordem de prioridade.
+MATÉRIAS RESERVADAS: indicar ao final as matérias excluídas por exigirem dilação probatória e a via em que serão veiculadas (embargos / ação autônoma).
+REGRA DE PRIORIDADE: se houver mais de duas teses admissíveis, desenvolver em profundidade apenas a tese dominante e uma subsidiária principal. As demais: menção sintética (fundamento legal + pedido).
+
+ETAPA 3 — CABIMENTO DA EXCEÇÃO (fundamentação obrigatória)
+A exceção deve começar demonstrando seu próprio cabimento com base na Súmula 393/STJ, provando que as matérias arguidas são de ordem pública, cognoscíveis de ofício e não demandam dilação probatória. Citar precedentes qualificados do STJ para cada tipo de matéria arguida. Se o prazo de embargos expirou: indicar que a exceção é a única via disponível. Se o prazo ainda está em curso: justificar a escolha estratégica.
+
+ETAPA 4 — BREVE SÍNTESE FÁTICA
+A exceção não comporta narrativa extensa. Máximo 5-7 parágrafos objetivos: identificação do excipiente e da execução, origem da obrigação, e circunstância que fundamenta a matéria de ordem pública. Todos os fatos devem ser comprováveis documentalmente.
+
+ETAPA 5 — FUNDAMENTOS JURÍDICOS (hierarquia de teses)
+Para a tese dominante e a subsidiária principal: demonstrar que é matéria de ordem pública; citar dispositivo legal e precedentes qualificados do STJ; demonstrar com prova documental específica (citar o documento: "conforme contrato às fls. ___"); indicar o resultado pretendido. Para as demais teses admissíveis: parágrafo único com fundamento e pedido. VEDAÇÃO: não incluir argumentos que dependam de perícia, testemunha ou qualquer produção de prova.
+
+ETAPA 6 — PEDIDO DE SUSPENSÃO (quando cabível)
+A exceção não tem efeito suspensivo automático. Se a matriz de risco indicar risco alto (leilão iminente, penhora sobre bem essencial): formular pedido incidental de suspensão dos atos expropriatórios, fundamentando na relevância da matéria de ordem pública e no risco de dano irreparável. Se a exceção sozinha for insuficiente (leilão em poucos dias): indicar ao advogado a necessidade de medida complementar (tutela antecipada em ação autônoma ou mandado de segurança).
+
+ETAPA 7 — PEDIDOS
+Pedido de intimação da parte contrária para manifestação (não é citação); pedido principal conforme a matéria (extinção por prescrição / reconhecimento de nulidade/inexigibilidade / levantamento da penhora por impenhorabilidade / redução por excesso manifesto); suspensão dos atos expropriatórios (quando cabível); condenação em honorários (quando acolhida — jurisprudência do STJ). Verificar correlação entre cada pedido e a causa de pedir.
+
+ETAPA 8 — INDICAÇÃO DE MATÉRIAS RESERVADAS (OBRIGATÓRIO)
+Ao final da peça, indicar expressamente as matérias não incluídas por exigirem dilação probatória e a via em que serão veiculadas. Isso demonstra boa-fé processual e que o excipiente não está tentando converter a exceção em sucedâneo de embargos.
+
+ETAPA 9 — CONTROLE DE COERÊNCIA INTERNA (OBRIGATÓRIO)
+Antes de finalizar: (1) toda matéria incluída passou no teste de três etapas? (2) toda matéria é demonstrada exclusivamente com documento disponível? (3) todo pedido tem causa de pedir correspondente? (4) o cabimento está fundamentado com Súmula 393/STJ? (5) as matérias que exigem instrução foram listadas como reservadas?
+
+ETAPA 10 — MINUTA FINAL
+Elaborar a exceção como petição incidental dirigida ao juízo da execução (mesmo juízo, mesmos autos). Estrutura: endereçamento; qualificação do excipiente como executado nos autos do processo nº [NÚMERO]; fundamentação do cabimento (Súmula 393/STJ); breve síntese fática; fundamentos jurídicos (hierarquia de teses); pedidos; indicação de matérias reservadas; documentos juntados; fechamento. Não incluir valor da causa. Marcadores [DADO PENDENTE] para dados ausentes.
+
+ETAPA 11 — PLANO PROCESSUAL COMPLEMENTAR
+Indicar ao advogado: se acolhida integralmente → consequências e como evitar recurso do exequente com efeito suspensivo; se acolhida parcialmente → matérias remanescentes e vias disponíveis; se rejeitada → agravo de instrumento (especialmente em prescrição e impenhorabilidade — matérias de ordem pública cognoscíveis a qualquer tempo); negociação: a exceção pendente pode ser instrumento de pressão para composição.
+
+Não invente dispositivos ou precedentes. A exceção deve ser objetiva, concisa e focada exclusivamente em matérias de ordem pública. A minuta é instrumento de trabalho sujeito à revisão do advogado.`,
+
+  SISBAJUD_DESBLOQUEIO: `PROMPT — ELABORAÇÃO DE IMPUGNAÇÃO AO BLOQUEIO SISBAJUD / DEFESA DA IMPENHORABILIDADE (CPC/2015)
+
+Você atuará como advogado especializado em processo civil brasileiro, com domínio do art. 854 do CPC/2015, da jurisprudência do STJ sobre impenhorabilidade salarial e do Tema Repetitivo 1235/STJ. Sua função é elaborar a petição de impugnação ao bloqueio SISBAJUD ou ao pedido de penhora de salário/poupança, de forma técnica, completa e estratégica.
+
+BASE DE CONHECIMENTO TÉCNICO OBRIGATÓRIA — aplique este conhecimento ao caso concreto:
+
+PROCEDIMENTO DO ART. 854 CPC:
+- Juiz determina bloqueio via SISBAJUD → executado é intimado em 5 dias para provar impenhorabilidade ou excesso → se não manifesta: bloqueio converte em penhora automaticamente (§5º).
+- Se já convertido em penhora: meio de defesa passa a ser impugnação à penhora ou exceção de pré-executividade.
+
+IMPENHORABILIDADE DO SALÁRIO (art. 833, IV, CPC):
+- São impenhoráveis: vencimentos, subsídios, soldos, salários, remunerações, proventos de aposentadoria, pensões, ganhos de autônomo, honorários de profissional liberal — todos destinados à subsistência.
+- EXCEÇÕES que permitem penhora salarial:
+  1. Prestação alimentícia (alimentos familiares/indenizatórios/voluntários — REsp 1.815.055/SP, Corte Especial) — NÃO inclui honorários sucumbenciais (Tema Repetitivo STJ — REsp 1.954.380/SP e 1.954.382/SP: "a verba honorária sucumbencial não se enquadra na exceção do §2º do art. 833").
+  2. Importâncias excedentes a 50 salários mínimos mensais (art. 833, §2º CPC).
+- FLEXIBILIZAÇÃO STJ (EREsp 1.874.222-DF, Corte Especial, 19.04.2023): penhora de salário é possível em caráter excepcional, desde que: (a) seja medida subsidiária após esgotamento de outras tentativas; (b) não comprometa o mínimo existencial do devedor; (c) seja avaliado concretamente o impacto na subsistência. STJ admite até 20-30% do salário líquido nesses casos excepcionais.
+
+IMPENHORABILIDADE DA POUPANÇA / RESERVA (art. 833, X, CPC):
+- Impenhorável: quantia em caderneta de poupança até 40 salários mínimos.
+- STJ AMPLIOU (REsp 1.340.120-SP, 4ª Turma, 2014): impenhorabilidade se estende a QUALQUER reserva financeira — conta corrente, fundos de investimento, papel moeda — desde que sejam valores POUPADOS/RESERVADOS, não aplicações especulativas ou de alto risco (Tema Repetitivo 1285 — pendente definição sobre quais fundos são excluídos).
+- O que importa não é o TIPO da conta, mas a FINALIDADE: reserva para emergências, despesas extraordinárias ou imprevistos. Simples movimentação atípica NÃO caracteriza má-fé (STJ, AgInt no REsp 2.137.346-MG, 2024).
+- TEMA REPETITIVO 1235/STJ (02.10.2024 — REsp 2.061.973-PR, Rel. Min. Nancy Andrighi): ATENÇÃO CRÍTICA — a impenhorabilidade de até 40 SM NÃO é matéria de ordem pública e NÃO pode ser reconhecida de ofício pelo juiz. Deve ser arguida pelo executado na PRIMEIRA OPORTUNIDADE, sob pena de PRECLUSÃO. O ônus da prova é do executado.
+- Para pessoa jurídica: o STJ entende que a impenhorabilidade da poupança não se aplica — defesa deve se basear na função social da empresa e comprometimento da atividade empresarial.
+
+COMO PROVAR:
+- Salário: holerite/contracheque, declaração do empregador, extrato da conta salário.
+- Autônomo/liberal: recibos de clientes, declaração do tomador, extratos bancários com comprovação de origem.
+- Poupança: extratos dos meses anteriores mostrando acúmulo gradual mês a mês; comprovante de obrigação futura a ser quitada com o valor; declaração de que serve como reserva de emergência.
+- Mínimo existencial: planilha detalhada de despesas mensais fixas (aluguel/financiamento, luz, água, internet, alimentação, saúde, escola) com documentos comprobatórios, demonstrando que o salário é integralmente absorvido pelas despesas básicas.
+
+DADOS DO CASO:
+{{DADOS}}
+
+Elabore a defesa na seguinte ordem:
+
+ETAPA 1 — IDENTIFICAÇÃO DO MEIO DE DEFESA ADEQUADO
+Com base na fase processual informada, identificar: (a) impugnação art. 854 §3º CPC (5 dias após bloqueio); (b) impugnação à penhora (após conversão); (c) exceção de pré-executividade (após prazo de embargos). Justificar a escolha.
+
+ETAPA 2 — MAPEAMENTO DAS IMPENHORABILIDADES APLICÁVEIS
+Com base nos dados fornecidos, identificar quais impenhorabilidades se aplicam ao caso: salarial (art. 833, IV), poupança (art. 833, X), excesso de bloqueio. Analisar se há exceções aplicáveis (dívida alimentar? acima de 50 SM?). Verificar se a dívida é de honorários sucumbenciais (Tema Repetitivo STJ — impenhorabilidade se aplica).
+
+ETAPA 3 — ESTRATÉGIA PROBATÓRIA
+Especificar com precisão quais documentos devem ser juntados para cada tese, e como argumentar a impenhorabilidade considerando o Tema 1235/STJ (ônus do executado). Montar a planilha de despesas mensais para demonstração do mínimo existencial quando pertinente.
+
+ETAPA 4 — ANÁLISE DE OUTROS VÍCIOS PROCESSUAIS
+Verificar se há outras matérias de defesa aplicáveis ao caso (nulidade de citação, prescrição intercorrente, excesso de execução, etc.) que possam ser cumuladas.
+
+ETAPA 5 — MINUTA COMPLETA DA PETIÇÃO
+Elaborar petição incidental em linguagem forense: endereçamento ao juízo da execução; qualificação do executado; identificação do processo e do bloqueio; fundamentos jurídicos estruturados (impenhorabilidade salarial + impenhorabilidade da poupança + excesso, conforme o caso); demonstração probatória; pedidos específicos (cancelamento total ou parcial do bloqueio; desbloqueio dos valores impenhoráveis; manutenção de eventual parcela penhorável). Atenção ao recurso cabível se rejeitada: agravo de instrumento (art. 1.015, parágrafo único, CPC).
+
+ETAPA 6 — ALERTAS ESTRATÉGICOS
+Indicar: risco de preclusão do Tema 1235/STJ se não arguido tempestivamente; possibilidade de negociação com exequente; eventual cláusula de negócio processual sobre penhora salarial (art. 190 CPC).
+
+Não invente precedentes. Marcadores [DADO PENDENTE] para informações ausentes. A minuta é instrumento de trabalho sujeito à revisão do advogado.`,
+
+  SIGILO_BANCARIO: `PROMPT — ELABORAÇÃO DE IMPUGNAÇÃO AO PEDIDO DE QUEBRA DE SIGILO BANCÁRIO DO EXECUTADO
+
+Você atuará como advogado especializado em processo civil brasileiro e em direito constitucional, com domínio do STJ REsp 1.951.176-SP (3ª Turma, Rel. Min. Marco Aurélio Bellizze, 19.10.2021), da Lei Complementar 105/2001 e da jurisprudência consolidada sobre proteção do sigilo bancário em execuções. Sua função é elaborar a petição de impugnação ao pedido de quebra de sigilo bancário do executado, de forma técnica, completa e estratégica.
+
+BASE DE CONHECIMENTO TÉCNICO OBRIGATÓRIA — aplique ao caso concreto:
+
+FUNDAMENTO CONSTITUCIONAL:
+- Sigilo bancário = direito fundamental implícito, derivado da inviolabilidade da intimidade (art. 5º, X, CF) e do sigilo de dados (art. 5º, XII, CF) → integra os direitos da personalidade.
+- Somente passível de mitigação quando dotada de proporcionalidade (STJ REsp 1.951.176-SP).
+
+LC 105/2001 — HIPÓTESES LEGAIS DE AFASTAMENTO DO SIGILO:
+O sigilo bancário SÓ pode ser afastado para: (1) apuração de ilícito criminal (art. 1º, §4º); (2) infrações administrativas (art. 7º); (3) procedimento administrativo fiscal (art. 6º).
+→ Quando NÃO destinado a essas finalidades, a violação do sigilo, mesmo por decisão judicial, é ABUSIVA e pode configurar crime (art. 10 da LC 105/2001).
+
+TESE CENTRAL DO STJ (REsp 1.951.176-SP):
+"A quebra de sigilo bancário destinada tão somente à satisfação do crédito exequendo (visando à tutela de um direito patrimonial disponível, interesse eminentemente privado) constitui mitigação desproporcional desse direito fundamental, mostrando-se descabida sua utilização como medida executiva atípica" (art. 139, IV, CPC).
+
+ARGUMENTOS ESPECÍFICOS A DESENVOLVER:
+1. Sigilo bancário é direito fundamental implícito — só mitigável com proporcionalidade.
+2. LC 105/2001 restringe o afastamento a finalidades de interesse público, não satisfação de crédito privado.
+3. A medida NÃO é útil para satisfazer a obrigação — apenas expõe movimentação bancária sem constrição de valores.
+4. Exequente tem meio adequado: SISBAJUD (art. 854 CPC) para bloqueio de valores existentes — torna desnecessária e desproporcional a quebra de sigilo.
+5. Simples tentativas frustradas ou longa tramitação da execução NÃO justificam a quebra — são meras alegações de interesse privado.
+6. Mesmo que o executado seja inadimplente, NÃO perde o direito ao sigilo — não há renúncia tácita ao direito da personalidade.
+7. Para desconsideração da personalidade jurídica: exige elementos indiciários concretos de confusão patrimonial, não mera suspeita.
+
+DISTINÇÃO IMPORTANTE (para IDPJ/fraude):
+- Dados cadastrais (nome, CPF, endereço, número de conta) → NÃO têm proteção do sigilo bancário.
+- Extratos, movimentação, histórico de transações → TÊM proteção e não podem ser obtidos sem autorização legal.
+- Ação de produção antecipada de provas NÃO pode ser usada para quebra de sigilo bancário de terceiros (STJ Tema 648; TJSP reiterado em 2024-2025).
+
+SE JÁ DEFERIDA A QUEBRA → PROVA ILÍCITA:
+Art. 5º, LVI, CF: "são inadmissíveis no processo as provas obtidas por meios ilícitos". Requerer declaração de ilicitude da prova e seu desentranhamento dos autos, sem produção de qualquer efeito probatório. Recurso: agravo de instrumento (art. 1.015, parágrafo único, CPC).
+
+JURISPRUDÊNCIA DE APOIO:
+- STJ REsp 1.285.437-MS (3ª Turma, 2017): satisfação do crédito bancário não pode se sobrepor ao sigilo bancário.
+- STJ AgInt no REsp 2.032.295-SP (3ª Turma, 2023): mitigação do sigilo não é plausível para satisfação de direito patrimonial disponível.
+- STJ AgInt no AREsp 2.376.904-SP (4ª Turma, 2024): reafirma REsp 1.951.176-SP como orientação dominante.
+- TJSP (2025, várias câmaras): requisição de extratos via SISBAJUD = quebra de sigilo, inadmissível para interesses patrimoniais privados.
+- TJPR 2021 e 2024: indeferimento de quebra de sigilo confirmado em execução.
+
+DADOS DO CASO:
+{{DADOS}}
+
+Elabore a defesa na seguinte ordem:
+
+ETAPA 1 — IDENTIFICAÇÃO DO MEIO DE DEFESA E PRAZO
+Identificar se é: petição incidental de impugnação (pedido ainda não deferido ou juiz abriu prazo); arguição de ilicitude da prova (já deferido e executado); agravo de instrumento (contra decisão que deferiu). Alertar sobre prazo do agravo de instrumento (15 dias úteis — art. 1.003, §5º, CPC).
+
+ETAPA 2 — ANÁLISE DO PEDIDO DO EXEQUENTE
+Identificar com precisão o que está sendo pedido (extratos SISBAJUD, CCS-BACEN, SIMBA, cartão de crédito, dados para IDPJ) e o fundamento alegado pelo exequente. Verificar se há fundamento jurídico legítimo (investigação de confusão patrimonial com indícios concretos) ou se é mera satisfação de crédito privado.
+
+ETAPA 3 — FUNDAMENTOS JURÍDICOS DA DEFESA
+Estruturar os argumentos na seguinte ordem: (1) direito fundamental ao sigilo bancário — CF art. 5º, X e XII; (2) LC 105/2001 — hipóteses taxativas de afastamento; (3) STJ REsp 1.951.176-SP — tese central; (4) desproporcionalidade — exequente tem SISBAJUD disponível; (5) inutilidade da medida para satisfação do crédito; (6) se IDPJ: ausência de elementos indiciários concretos de confusão patrimonial. Cada argumento com fundamentação legal e precedente qualificado.
+
+ETAPA 4 — SE JÁ DEFERIDA: ARGUIÇÃO DE PROVA ILÍCITA
+Estruturar pedido de declaração de ilicitude e desentranhamento, com base no art. 5º, LVI, CF.
+
+ETAPA 5 — MINUTA COMPLETA DA PETIÇÃO
+Elaborar petição incidental em linguagem forense: endereçamento; qualificação do executado; identificação do processo e do pedido impugnado; fundamentos jurídicos estruturados conforme etapa 3; pedido principal (indeferimento do pedido ou declaração de prova ilícita); pedido de agravo de instrumento se necessário; fechamento. Utilizar marcadores [DADO PENDENTE] para campos ausentes.
+
+ETAPA 6 — PLANO SE A RESISTÊNCIA NÃO FOR ACOLHIDA
+Indicar: interposição de agravo de instrumento (art. 1.015, parágrafo único, CPC — 15 dias úteis); fundamentos do agravo; precedentes favoráveis a destacar na peça recursal.
+
+Não invente precedentes. A minuta é instrumento de trabalho sujeito à revisão do advogado.`
+};
+
+/* ============================================================
+   LEX EXECUTIO — RUNTIME JS
+   Tab + Queue + Auto-Continue system
+   ============================================================ */
+
+// ─── STATE ───────────────────────────────────────────────────
+let apiKey = '';
+let currentWorkflow = 0;
+let currentMode    = 'form';
+let pdfFiles       = [];
+let formPdfFiles   = [];
+let queueRunning   = false;
+
+// Process sessions: each tab = one session object
+// { id, label, workflowIndex, mode, formData, pasteText, pasteCtx,
+//   pdfTabFiles, pdfTabCtx, history, allText, status, domContent }
+let sessions     = [];
+let activeSession = null;
+
+const MAX_SESSIONS = 8;
+
+// ─── API KEY ─────────────────────────────────────────────────
+function loadApiKey() {
+  try { apiKey = sanitizeApiKey(localStorage.getItem('lex_executio_api_key') || ''); } catch(e) {}
+  updateKeyBtn();
+  if (!apiKey) openApiModal();
+}
+function updateKeyBtn() {
+  const btn = document.getElementById('keyBtn');
+  const lbl = document.getElementById('keyBtnLabel');
+  if (apiKey) { btn.className='key-btn configured'; lbl.textContent='API Key configurada'; }
+  else { btn.className='key-btn'; lbl.textContent='Configurar API Key'; }
+}
+function openApiModal() {
+  document.getElementById('apiModal').classList.remove('hidden');
+  const inp = document.getElementById('apiKeyInput');
+  inp.value = apiKey || '';
+  document.getElementById('skipBtn').style.display = apiKey ? 'block' : 'none';
+  setTimeout(() => inp.focus(), 100);
+}
+function closeApiModal() { document.getElementById('apiModal').classList.add('hidden'); }
+function toggleKeyVisibility() {
+  const inp = document.getElementById('apiKeyInput');
+  inp.type = inp.type === 'password' ? 'text' : 'password';
+  event.target.textContent = inp.type === 'password' ? 'mostrar' : 'ocultar';
+}
+function sanitizeApiKey(raw) {
+  // Strip ALL non-printable ASCII and non-ASCII chars (hidden Unicode, BOM, smart quotes, zero-width spaces)
+  return (raw || '').replace(/[^\x20-\x7E]/g, '').trim();
+}
+
+function saveApiKey() {
+  const raw = document.getElementById('apiKeyInput').value;
+  const val = sanitizeApiKey(raw);
+  if (raw !== val) document.getElementById('apiKeyInput').value = val; // show cleaned version
+  if (!val) { alert('Por favor insira uma API Key válida.'); return; }
+  if (!val.startsWith('sk-ant-') && !val.startsWith('sk-')) {
+    document.getElementById('apiKeyInput').style.borderColor = 'var(--red2)';
+    setTimeout(() => { document.getElementById('apiKeyInput').style.borderColor = ''; }, 1500);
+    return;
+  }
+  apiKey = val;
+  try { localStorage.setItem('lex_executio_api_key', val); } catch(e) {}
+  updateKeyBtn();
+  closeApiModal();
+}
+
+// ─── SESSION / TAB MANAGEMENT ────────────────────────────────
+function createSession(workflowIndex) {
+  const id = Date.now();
+  const wf = WORKFLOWS[workflowIndex];
+  const s = {
+    id, workflowIndex,
+    label: `P${sessions.length + 1} — ${wf.name.substring(0, 22)}`,
+    mode: 'form',
+    formData: {},
+    pasteText: '', pasteCtx: '',
+    pdfTabFiles: [], pdfTabCtx: '',
+    formPdfs: [],
+    history: [],
+    allText: '',
+    status: 'idle', // idle | running | done | error
+    domContent: ''
+  };
+  sessions.push(s);
+  return s;
+}
+
+function addProcess() {
+  if (sessions.length >= MAX_SESSIONS) { alert(`Máximo de ${MAX_SESSIONS} processos simultâneos.`); return; }
+  // Save current session state before adding new one
+  if (activeSession) saveSessionState(activeSession);
+  const s = createSession(currentWorkflow);
+  renderTabs();
+  activateSession(s);
+  updateRunAllBtn();
+}
+
+function activateSession(s) {
+  if (activeSession && activeSession.id !== s.id) {
+    saveSessionState(activeSession);
+    // Snapshot outgoing session's output before leaving
+    if ((activeSession.status === 'done' || activeSession.status === 'running')
+        && document.getElementById('outputContent').style.display !== 'none') {
+      activeSession.domContent = document.getElementById('outputContent').innerHTML;
+    }
+  }
+  activeSession = s;
+  currentWorkflow = s.workflowIndex;
+  currentMode = s.mode;
+  renderTabs();
+  loadSessionState(s);
+  renderForm();
+  switchMode(s.mode);
+
+  const outEl   = document.getElementById('outputContent');
+  const emptyEl = document.getElementById('emptyState');
+
+  if (s.status === 'idle') {
+    emptyEl.style.display = 'flex';
+    outEl.style.display   = 'none';
+    outEl.innerHTML       = '';
+  } else {
+    // done, running, or error — show stored domContent
+    emptyEl.style.display = 'none';
+    outEl.style.display   = 'block';
+    outEl.innerHTML       = s.domContent || '';
+    outEl.scrollTop       = 99999;
+  }
+  setStatusUI(s);
+}
+
+function saveSessionState(s) {
+  if (!s) return;
+  s.mode = currentMode;
+  // NOTE: do NOT overwrite s.workflowIndex here — it is set only by selectWorkflow
+  // Using currentWorkflow here would corrupt the session when switching tabs
+  const wf = WORKFLOWS[s.workflowIndex];
+  s.formData = {};
+  wf.fields.forEach(group => {
+    group.fields.forEach(f => {
+      if (f.type === 'text' || f.type === 'date') {
+        const el = document.getElementById(f.id);
+        if (el) s.formData[f.id] = el.value;
+      } else if (f.type === 'textarea') {
+        const el = document.getElementById(f.id);
+        if (el) s.formData[f.id] = el.value;
+      } else if (f.type === 'radio') {
+        const ch = document.querySelector(`input[name="${f.id}"]:checked`);
+        if (ch) s.formData[f.id] = ch.value;
+      } else if (f.type === 'checkbox') {
+        const checked = document.querySelectorAll(`input[name="${f.id}"]:checked`);
+        s.formData[f.id] = Array.from(checked).map(c => c.value);
+      }
+    });
+  });
+  s.pasteText = (document.getElementById('pasteText') || {}).value || '';
+  s.pasteCtx  = (document.getElementById('pasteContext') || {}).value || '';
+  s.pdfTabCtx = (document.getElementById('pdfContext') || {}).value || '';
+  s.formPdfs  = [...formPdfFiles];
+  s.pdfTabFiles = [...pdfFiles];
+  // Save DOM snapshot of output
+  s.domContent = document.getElementById('outputContent').innerHTML;
+}
+
+function loadSessionState(s) {
+  // Restore form fields after renderForm() is called
+  setTimeout(() => {
+    const wf = WORKFLOWS[s.workflowIndex];
+    wf.fields.forEach(group => {
+      group.fields.forEach(f => {
+        const val = s.formData[f.id];
+        if (val === undefined || val === null) return;
+        if (f.type === 'text' || f.type === 'date' || f.type === 'textarea') {
+          const el = document.getElementById(f.id); if (el) el.value = val;
+        } else if (f.type === 'radio') {
+          const inp = document.querySelector(`input[name="${f.id}"][value="${val.replace(/"/g,'&quot;').replace(/'/g,"\\'").replace(/\\/g,'\\\\')}"]`);
+          if (inp) { inp.checked = true; inp.parentElement.classList.add('selected'); }
+        } else if (f.type === 'checkbox' && Array.isArray(val)) {
+          val.forEach(v => {
+            const inp = document.querySelector(`input[name="${f.id}"][value="${v.replace(/"/g,'&quot;').replace(/'/g,"\\'").replace(/\\/g,'\\\\')}"]`);
+            if (inp) { inp.checked = true; inp.parentElement.classList.add('selected'); }
+          });
+        }
+      });
+    });
+    const pt = document.getElementById('pasteText'); if (pt) pt.value = s.pasteText || '';
+    const pc = document.getElementById('pasteContext'); if (pc) pc.value = s.pasteCtx || '';
+    const pdfc = document.getElementById('pdfContext'); if (pdfc) pdfc.value = s.pdfTabCtx || '';
+    formPdfFiles = [...(s.formPdfs || [])];
+    pdfFiles = [...(s.pdfTabFiles || [])];
+    renderFormPdfList();
+    renderPdfList();
+  }, 0);
+}
+
+function renderTabs() {
+  const container = document.getElementById('processTabs');
+  container.innerHTML = sessions.map((s, i) => {
+    const isActive = activeSession && s.id === activeSession.id;
+    const statusIcon = s.status === 'running' ? '⟳ ' :
+                       s.status === 'done'    ? '✓ ' :
+                       s.status === 'error'   ? '✕ ' : '';
+    const statusColor = s.status === 'done'  ? 'var(--green2)' :
+                        s.status === 'error' ? 'var(--red2)'   :
+                        s.status === 'running' ? 'var(--blue2)' : 'var(--text2)';
+    return `<div onclick="activateSession(sessions[${i}])" style="
+      display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:7px;
+      cursor:pointer;white-space:nowrap;font-size:12px;max-width:180px;
+      background:${isActive ? 'var(--bg3)' : 'transparent'};
+      border:1px solid ${isActive ? 'var(--border2)' : 'transparent'};
+      color:${isActive ? 'var(--text)' : 'var(--text2)'};
+      transition:all 0.15s;">
+      <span style="color:${statusColor};font-size:10px;">${statusIcon}</span>
+      <span style="overflow:hidden;text-overflow:ellipsis;">${s.label}</span>
+      ${sessions.length > 1 ? `<span onclick="event.stopPropagation();removeSession(${i})" style="margin-left:2px;opacity:0.4;font-size:10px;cursor:pointer;" title="Fechar">✕</span>` : ''}
+    </div>`;
+  }).join('');
+}
+
+function removeSession(index) {
+  const s = sessions[index];
+  if (s.status === 'running') { alert('Aguarde a análise terminar antes de fechar.'); return; }
+  sessions.splice(index, 1);
+  if (sessions.length === 0) {
+    const ns = createSession(currentWorkflow);
+    activateSession(ns);
+  } else {
+    const next = sessions[Math.min(index, sessions.length - 1)];
+    activateSession(next);
+  }
+  renderTabs();
+  updateRunAllBtn();
+}
+
+function updateRunAllBtn() {
+  const btn = document.getElementById('btnRunAll');
+  const idleCount = sessions.filter(s => s.status === 'idle').length;
+  btn.style.display = sessions.length > 1 && idleCount > 0 ? 'inline-block' : 'none';
+}
+
+// ─── WORKFLOW SELECTION ───────────────────────────────────────
+function selectWorkflow(index) {
+  currentWorkflow = index;
+  if (activeSession) {
+    // Save current form state before changing workflow
+    saveSessionState(activeSession);
+    activeSession.workflowIndex = index;
+    activeSession.formData = {}; // reset form data — workflow changed
+    activeSession.formPdfs = [];
+    activeSession.label = `P${sessions.indexOf(activeSession) + 1} — ${WORKFLOWS[index].name.substring(0, 22)}`;
+    formPdfFiles = [];
+  }
+  document.querySelectorAll('.workflow-item').forEach(el => {
+    const match = el.getAttribute('onclick')?.match(/selectWorkflow\((\d+)\)/);
+    const elIndex = match ? parseInt(match[1]) : -1;
+    el.classList.toggle('active', elIndex === index);
+  });
+  renderForm();
+  renderTabs();
+}
+
+// ─── MODE SWITCH ──────────────────────────────────────────────
+function switchMode(mode) {
+  currentMode = mode;
+  if (activeSession) activeSession.mode = mode;
+  ['form','paste','pdf'].forEach(m => {
+    document.getElementById('tab-' + m)?.classList.toggle('active', m === mode);
+  });
+  document.getElementById('formBody').style.display  = mode === 'form'  ? 'block' : 'none';
+  document.getElementById('pasteBody').style.display = mode === 'paste' ? 'flex'  : 'none';
+  document.getElementById('pdfBody').style.display   = mode === 'pdf'   ? 'flex'  : 'none';
+}
+
+// ─── FORM PDF HANDLING ────────────────────────────────────────
+function onFormDragOver(e) { e.preventDefault(); document.getElementById('formPdfDrop').classList.add('drag-over'); }
+function onFormDragLeave(e) { document.getElementById('formPdfDrop').classList.remove('drag-over'); }
+function onFormDrop(e) {
+  e.preventDefault();
+  document.getElementById('formPdfDrop').classList.remove('drag-over');
+  processFormFiles(Array.from(e.dataTransfer.files).filter(f => f.type === 'application/pdf'));
+}
+function onFormFileSelect(e) { processFormFiles(Array.from(e.target.files)); e.target.value = ''; }
+
+async function processFormFiles(files) {
+  if (!files.length) return;
+  const prog = document.getElementById('formPdfProgress');
+  if (prog) prog.style.display = 'block';
+  for (const file of files) {
+    const entry = { name: file.name, text: '', status: 'loading' };
+    formPdfFiles.push(entry);
+    renderFormPdfList();
+    try {
+      const text = await extractPdfText(file);
+      entry.text = text; entry.status = text.trim().length > 50 ? 'ok' : 'empty';
+    } catch(e) { entry.status = 'error'; }
+    renderFormPdfList();
+  }
+  if (prog) prog.style.display = 'none';
+}
+
+function renderFormPdfList() {
+  const list = document.getElementById('formPdfList');
+  if (!list) return;
+  list.innerHTML = formPdfFiles.map((f, i) => {
+    const statusText = f.status === 'loading' ? 'Extraindo...' :
+      f.status === 'ok' ? `✓ ${f.text.length.toLocaleString()} chars` :
+      f.status === 'empty' ? '⚠ Pouco texto' : '✕ Erro';
+    const cls = f.status === 'ok' ? 'ok' : f.status !== 'loading' ? 'err' : '';
+    return `<div class="pdf-file-item">
+      <div class="pdf-file-icon">📄</div>
+      <div class="pdf-file-info">
+        <div class="pdf-file-name">${f.name}</div>
+        <div class="pdf-file-status ${cls}">${statusText}</div>
+      </div>
+      <button class="pdf-file-remove" onclick="removeFormPdf(${i})">✕</button>
+    </div>`;
+  }).join('');
+}
+function removeFormPdf(i) { formPdfFiles.splice(i, 1); renderFormPdfList(); }
+function getFormPdfText() {
+  return formPdfFiles.filter(f => f.text.trim().length > 0)
+    .map(f => `=== ${f.name} ===\n${f.text}`).join('\n\n');
+}
+
+// ─── TAB PDF HANDLING ─────────────────────────────────────────
+function onDragOver(e) { e.preventDefault(); document.getElementById('pdfDropZone').classList.add('drag-over'); }
+function onDragLeave(e) { document.getElementById('pdfDropZone').classList.remove('drag-over'); }
+function onDrop(e) {
+  e.preventDefault();
+  document.getElementById('pdfDropZone').classList.remove('drag-over');
+  processFiles(Array.from(e.dataTransfer.files).filter(f => f.type === 'application/pdf'));
+}
+function onFileSelect(e) { processFiles(Array.from(e.target.files)); e.target.value = ''; }
+
+async function processFiles(files) {
+  if (!files.length) return;
+  document.getElementById('pdfProgress').style.display = 'block';
+  for (const file of files) {
+    const entry = { name: file.name, text: '', status: 'loading' };
+    pdfFiles.push(entry); renderPdfList();
+    try {
+      const text = await extractPdfText(file);
+      entry.text = text; entry.status = text.trim().length > 50 ? 'ok' : 'empty';
+    } catch(e) { entry.status = 'error'; }
+    renderPdfList();
+    renderPdfSizeBar('pdfSizeBar', pdfFiles);
+  }
+  document.getElementById('pdfProgress').style.display = 'none';
+}
+
+async function extractPdfText(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const typedarray = new Uint8Array(e.target.result);
+        const pdf = await pdfjsLib.getDocument({ data: typedarray }).promise;
+        let fullText = '';
+        for (let i = 1; i <= pdf.numPages; i++) {
+          const page = await pdf.getPage(i);
+          const content = await page.getTextContent();
+          fullText += `\n[Página ${i}]\n` + content.items.map(it => it.str).join(' ') + '\n';
+        }
+        resolve(fullText);
+      } catch(err) { reject(err); }
+    };
+    reader.onerror = reject;
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+
+// ── PDF SIZE MANAGEMENT ───────────────────────────────────────────────────────
+const PDF_CHAR_WARN  = 300000;  // ~75k tokens — warn user
+const PDF_CHAR_LIMIT = 400000;  // ~100k tokens — hard truncate with notice
+
+function estimateTokens(chars) { return Math.round(chars / 4); }
+
+function getTotalPdfChars(files) {
+  return (files || []).filter(f => f.text && f.text.trim().length > 0)
+                      .reduce((sum, f) => sum + f.text.length, 0);
+}
+
+function renderPdfSizeBar(containerId, files) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  const total = getTotalPdfChars(files);
+  const tokens = estimateTokens(total);
+  const pct = Math.min(100, (total / PDF_CHAR_LIMIT) * 100);
+  const state = total > PDF_CHAR_LIMIT ? 'over' : total > PDF_CHAR_WARN ? 'warn' : 'ok';
+  const msg = state === 'over'
+    ? `⚠ Volume muito alto — o texto será truncado automaticamente para caber no limite da API. Remova PDFs ou use "Colar texto" com trecho selecionado.`
+    : state === 'warn'
+    ? `⚠ Volume elevado — próximo do limite. A análise pode ficar incompleta se houver histórico de turnos anteriores.`
+    : `✓ Volume adequado para análise completa.`;
+  const color = state === 'over' ? 'var(--red2)' : state === 'warn' ? '#c9a84c' : 'var(--green2)';
+  container.innerHTML = files.length === 0 ? '' : `
+    <div class="pdf-token-bar ${state}">
+      <div class="pdf-token-label">
+        <span style="color:var(--text2)">Volume dos PDFs</span>
+        <span style="color:${color};font-weight:600">~${tokens.toLocaleString()} tokens &nbsp;(${(total/1000).toFixed(0)}k chars)</span>
+      </div>
+      <div style="background:var(--border2);border-radius:2px;height:4px;">
+        <div class="pdf-token-fill ${state}" style="width:${pct}%"></div>
+      </div>
+      <div class="pdf-token-msg" style="color:${color}">${msg}</div>
+    </div>`;
+}
+
+function truncatePdfText(text, maxChars, filename) {
+  if (text.length <= maxChars) return text;
+  const kept = text.substring(0, maxChars);
+  const omitted = text.length - maxChars;
+  return kept + `\n\n[... TRUNCADO: mais ${omitted.toLocaleString()} caracteres omitidos de "${filename}" por exceder o limite de contexto da API. Anexe menos PDFs ou cole apenas os trechos relevantes ...]`;
+}
+
+function applyPdfSizeLimit(files) {
+  // Distribute the budget proportionally across files
+  const total = getTotalPdfChars(files);
+  if (total <= PDF_CHAR_LIMIT) return files.map(f => ({ ...f }));
+  const scale = PDF_CHAR_LIMIT / total;
+  return files.map(f => {
+    if (!f.text || f.text.trim().length === 0) return { ...f };
+    const budget = Math.floor(f.text.length * scale);
+    return { ...f, text: truncatePdfText(f.text, budget, f.name) };
+  });
+}
+
+function renderPdfList() {
+  const list = document.getElementById('pdfFilesList');
+  list.innerHTML = pdfFiles.map((f, i) => {
+    const statusText = f.status === 'loading' ? 'Extraindo texto...' :
+      f.status === 'ok' ? `✓ ${f.text.length.toLocaleString()} caracteres extraídos` :
+      f.status === 'empty' ? '⚠ Pouco texto encontrado — PDF pode ser imagem' :
+      '✕ Erro na extração — tente colar o texto manualmente';
+    const cls = f.status === 'ok' ? 'ok' : f.status !== 'loading' ? 'err' : '';
+    return `<div class="pdf-file-item">
+      <div class="pdf-file-icon">📄</div>
+      <div class="pdf-file-info">
+        <div class="pdf-file-name">${f.name}</div>
+        <div class="pdf-file-status ${cls}">${statusText}</div>
+      </div>
+      <button class="pdf-file-remove" onclick="removePdf(${i})">✕</button>
+    </div>`;
+  }).join('');
+}
+function removePdf(i) { pdfFiles.splice(i, 1); renderPdfList(); renderPdfSizeBar('pdfSizeBar', pdfFiles); }
+function getPdfText() {
+  return pdfFiles.filter(f => f.text.trim().length > 0)
+    .map(f => `=== ${f.name} ===\n${f.text}`).join('\n\n');
+}
+
+// ─── FORM RENDERING ───────────────────────────────────────────
+function renderForm() {
+  const wf = WORKFLOWS[currentWorkflow];
+  document.getElementById('panelTitle').textContent    = wf.name;
+  document.getElementById('panelSubtitle').textContent = wf.subtitle;
+  document.querySelectorAll('.workflow-item').forEach(el => {
+    const match = el.getAttribute('onclick')?.match(/selectWorkflow\((\d+)\)/);
+    const elIndex = match ? parseInt(match[1]) : -1;
+    el.classList.toggle('active', elIndex === currentWorkflow);
+  });
+
+  const body = document.getElementById('formBody');
+  body.innerHTML = '';
+
+  wf.fields.forEach(group => {
+    const gDiv = document.createElement('div');
+    gDiv.className = 'field-group';
+    gDiv.innerHTML = `<div class="field-group-title">${group.group}</div>`;
+    group.fields.forEach(f => {
+      const fDiv = document.createElement('div');
+      fDiv.className = 'field';
+      if (f.type === 'text')
+        fDiv.innerHTML = `<label>${f.label}</label><input type="text" id="${f.id}" placeholder="Preencher...">`;
+      else if (f.type === 'date')
+        fDiv.innerHTML = `<label>${f.label}</label><input type="date" id="${f.id}">`;
+      else if (f.type === 'textarea')
+        fDiv.innerHTML = `<label>${f.label}</label><textarea id="${f.id}" placeholder="Preencher..."></textarea>`;
+      else if (f.type === 'radio')
+        fDiv.innerHTML = `<label>${f.label}</label><div class="radio-group">${f.options.map(o=>`<label class="radio-btn" onclick="toggleRadio(this)"><input type="radio" name="${f.id}" value="${o}">${o}</label>`).join('')}</div>`;
+      else if (f.type === 'checkbox')
+        fDiv.innerHTML = `<label>${f.label}</label><div class="checkbox-group">${f.options.map(o=>`<label class="check-btn" onclick="handleCheck(event,this)"><input type="checkbox" name="${f.id}" value="${o}">${o}</label>`).join('')}</div>`;
+      gDiv.appendChild(fDiv);
+    });
+    body.appendChild(gDiv);
+  });
+
+  // PDF attachment section at bottom of form
+  const pdfSec = document.createElement('div');
+  pdfSec.className = 'field-group';
+  pdfSec.id = 'formPdfSection';
+  pdfSec.innerHTML = `
+    <div class="field-group-title">DOCUMENTOS ANEXADOS (opcional)</div>
+    <div style="font-size:11.5px;color:var(--text3);margin-bottom:10px;line-height:1.6;">
+      Anexe PDFs relevantes ao caso — planilha de cálculo, auto de penhora, petição inicial, decisões, edital de leilão etc.
+    </div>
+    <div class="pdf-drop-zone" id="formPdfDrop" style="padding:16px;" onclick="document.getElementById('formPdfInput').click()" ondragover="onFormDragOver(event)" ondragleave="onFormDragLeave(event)" ondrop="onFormDrop(event)">
+      <input type="file" id="formPdfInput" accept=".pdf" multiple onchange="onFormFileSelect(event)">
+      <div class="pdf-drop-icon" style="font-size:20px;margin-bottom:6px;">📎</div>
+      <div class="pdf-drop-label" style="font-size:12px;">Arraste PDFs ou <span onclick="event.stopPropagation();document.getElementById('formPdfInput').click()">clique para selecionar</span></div>
+      <div class="pdf-drop-sub">Múltiplos arquivos suportados</div>
+    </div>
+    <div class="pdf-progress" id="formPdfProgress" style="display:none">Extraindo texto dos PDFs...</div>
+    <div class="pdf-files-list" id="formPdfList" style="margin-top:8px;"></div>
+  `;
+  body.appendChild(pdfSec);
+}
+
+function toggleRadio(label) {
+  const name = label.querySelector('input').name;
+  document.querySelectorAll(`[name="${name}"]`).forEach(inp => inp.parentElement.classList.remove('selected'));
+  label.classList.add('selected');
+  label.querySelector('input').checked = true;
+}
+function handleCheck(event, label) {
+  event.preventDefault();
+  const input = label.querySelector('input');
+  input.checked = !input.checked;
+  label.classList.toggle('selected', input.checked);
+}
+
+// ─── COLLECT DATA ─────────────────────────────────────────────
+function collectData() {
+  if (currentMode === 'paste') {
+    const txt = (document.getElementById('pasteText') || {}).value?.trim() || '';
+    const ctx = (document.getElementById('pasteContext') || {}).value?.trim() || '';
+    return (txt ? `TEXTO DOS AUTOS:\n${txt}` : '') + (ctx ? `\n\nCONTEXTO ADICIONAL:\n${ctx}` : '');
+  }
+  if (currentMode === 'pdf') {
+    const pdfText = getPdfText();
+    const ctx = (document.getElementById('pdfContext') || {}).value?.trim() || '';
+    return (pdfText ? `CONTEÚDO EXTRAÍDO DOS AUTOS (PDF):\n${pdfText}` : '') + (ctx ? `\n\nCONTEXTO ADICIONAL:\n${ctx}` : '');
+  }
+  // form mode
+  const wf = WORKFLOWS[currentWorkflow];
+  const lines = [];
+  wf.fields.forEach(group => {
+    lines.push(`\n${group.group}:`);
+    group.fields.forEach(f => {
+      let value = '';
+      if (f.type === 'text' || f.type === 'date') {
+        const el = document.getElementById(f.id); value = el ? el.value : '';
+      } else if (f.type === 'textarea') {
+        const el = document.getElementById(f.id); value = el ? el.value : '';
+      } else if (f.type === 'radio') {
+        const ch = document.querySelector(`input[name="${f.id}"]:checked`);
+        value = ch ? ch.value : '';
+      } else if (f.type === 'checkbox') {
+        const chs = document.querySelectorAll(`input[name="${f.id}"]:checked`);
+        value = chs.length ? Array.from(chs).map(c => c.value).join(', ') : '';
+      }
+      if (value) lines.push(`  ${f.label}: ${value}`);
+    });
+  });
+  let result = lines.join('\n');
+  const fp = getFormPdfText();
+  if (fp) result += `\n\nDOCUMENTOS ANEXADOS (extraídos de PDF):\n${fp}`;
+  return result;
+}
+
+function buildPromptFromSession(session) {
+  const wf   = WORKFLOWS[session.workflowIndex];
+  const data = collectDataFromSession(session);
+  const tmpl = PROMPTS[wf.promptKey] || '';
+  return tmpl.replace('{{DADOS}}', data || '[Dados não fornecidos]')
+    + '\n\nIMPORTANTE: Ao concluir TODA a análise/peça, escreva exatamente na última linha: [ANÁLISE CONCLUÍDA]';
+}
+
+function collectDataFromSession(session) {
+  const mode = session.mode;
+
+  if (mode === 'paste') {
+    const txt = (session.pasteText || '').trim();
+    const ctx = (session.pasteCtx  || '').trim();
+    return (txt ? `TEXTO DOS AUTOS:\n${txt}` : '') + (ctx ? `\n\nCONTEXTO ADICIONAL:\n${ctx}` : '');
+  }
+
+  if (mode === 'pdf') {
+    const pdfText = (session.pdfTabFiles || [])
+      .filter(f => f.text && f.text.trim().length > 0)
+      .map(f => `=== ${f.name} ===\n${f.text}`).join('\n\n');
+    const ctx = (session.pdfTabCtx || '').trim();
+    return (pdfText ? `CONTEÚDO EXTRAÍDO DOS AUTOS (PDF):\n${pdfText}` : '') + (ctx ? `\n\nCONTEXTO ADICIONAL:\n${ctx}` : '');
+  }
+
+  // form mode — read from saved formData object
+  const wf = WORKFLOWS[session.workflowIndex];
+  const lines = [];
+  wf.fields.forEach(group => {
+    lines.push(`\n${group.group}:`);
+    group.fields.forEach(f => {
+      const val = session.formData?.[f.id];
+      if (!val || (Array.isArray(val) && val.length === 0)) return;
+      const display = Array.isArray(val) ? val.join(', ') : val;
+      if (display) lines.push(`  ${f.label}: ${display}`);
+    });
+  });
+  let result = lines.join('\n');
+  // Append form PDFs
+  const formPdfText = (session.formPdfs || [])
+    .filter(f => f.text && f.text.trim().length > 0)
+    .map(f => `=== ${f.name} ===\n${f.text}`).join('\n\n');
+  if (formPdfText) result += `\n\nDOCUMENTOS ANEXADOS (extraídos de PDF):\n${formPdfText}`;
+  return result;
+}
+
+function buildPrompt() {
+  // Used only for single-session execute (active session)
+  if (activeSession) return buildPromptFromSession(activeSession);
+  const wf   = WORKFLOWS[currentWorkflow];
+  const data = collectData();
+  const tmpl = PROMPTS[wf.promptKey] || '';
+  return tmpl.replace('{{DADOS}}', data || '[Dados não fornecidos]')
+    + '\n\nIMPORTANTE: Ao concluir TODA a análise/peça, escreva exatamente na última linha: [ANÁLISE CONCLUÍDA]';
+}
+
+// ─── EXECUTION ENGINE (auto-continue loop) ───────────────────
+const MAX_TURNS   = 15; // safety cap
+const MAX_RETRIES = 4;       // retry on API error
+const RETRY_DELAY = 5000;    // base ms between retries
+const RATE_LIMIT_DELAY = 62000; // 62s wait on rate limit (resets per minute)
+
+async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+
+// ── PDF INTELIGENTE — PIPELINE DE PRÉ-PROCESSAMENTO ──────────────────────────
+// Ao invés de enviar o texto bruto (que estoura o limite),
+// o sistema resume cada PDF separadamente antes da análise principal.
+// Funciona com qualquer tamanho de documento.
+
+const MAX_CHARS_PER_PDF_CHUNK = 120000; // ~30k tokens por pedaço — seguro
+const MAX_CHARS_DIRECT        = 150000; // acima disso resume antes de analisar (~37k tokens)
+
+// Prompt de extração inteligente por fluxo
+function getExtractionPrompt(workflowIndex) {
+  const isExecutado = workflowIndex === 0;
+  const isExequente = workflowIndex === 1;
+  const isCobranca  = workflowIndex === 2;
+  const isEmbargos  = workflowIndex === 3;
+  const isExcecao   = workflowIndex === 4;
+  const isDecisoes  = workflowIndex === 5;
+  const isAcordaos  = workflowIndex === 6;
+  const isSisbajud  = workflowIndex === 7;
+  const isSigilo    = workflowIndex === 8;
+
+  const base = `Você é um advogado sênior especializado em direito bancário, execução civil e processo civil brasileiro. Está lendo parte de um documento jurídico extenso que será analisado em etapa posterior.
+
+Sua tarefa NÃO é fazer análise jurídica agora. Sua tarefa é produzir um EXTRATO ANALÍTICO FIEL do documento — um texto em prosa jurídica estruturada que preserva todo o conteúdo relevante com precisão suficiente para que outro advogado consiga fazer uma análise completa e profunda do caso sem precisar ler o original.
+
+REGRAS ABSOLUTAS:
+1. Transcreva LITERALMENTE cláusulas contratuais, taxas, valores, datas e dispositivos de decisões — não parafraseie dados numéricos nem texto normativo.
+2. Preserve o raciocínio jurídico presente no documento (argumento do autor, fundamento da decisão, tese da defesa) — não apenas o resultado.
+3. Mantenha a sequência cronológica dos fatos e das decisões.
+4. Registre explicitamente o que está AUSENTE ou ILEGÍVEL (ex: "planilha de débito não localizada nesta parte").
+5. Descarte apenas: capas, certidões de intimação, despachos de mero expediente, texto repetitivo de rodapés e carimbos.
+6. Escreva em prosa contínua organizada por seções temáticas — NÃO use listas com marcadores como formato principal.`;
+
+  if (isExecutado || isEmbargos || isExcecao) return `${base}
+
+FOCO — DEFESA DO EXECUTADO / EMBARGOS / EXCEÇÃO DE PRÉ-EXECUTIVIDADE:
+
+Produza um extrato analítico em prosa cobrindo obrigatoriamente:
+
+TÍTULO E PARTES: Identifique o tipo exato do título executivo (CCB, CDA, cheque, nota promissória, duplicata etc.), número, data de emissão, valor original, vencimento(s), credor original, eventual cessionário, devedor(es) e avalistas. Transcreva literalmente a cláusula de vencimento antecipado se presente.
+
+ENCARGOS CONTRATUAIS: Transcreva literalmente a cláusula de juros remuneratórios (taxa, base, periodicidade), a cláusula de capitalização (se houver pacto expresso), os encargos de mora (juros, multa percentual), a correção monetária (índice pactuado) e eventual comissão de permanência. Registre exatamente o que está escrito — incluindo ambiguidades.
+
+PLANILHA E SALDO: Descreva o que consta na planilha ou memória de cálculo: valor do principal, juros discriminados, multa, correção, total cobrado. Se a planilha não discriminar os componentes separadamente, registre isso explicitamente como vício de liquidez.
+
+SITUAÇÃO PROCESSUAL: Descreva a fase atual, data da citação, prazo de embargos (calcule se possível), penhoras realizadas (bem, valor, data), bloqueios SISBAJUD/RENAJUD ativos, leilões designados (data, bem, valor de avaliação).
+
+DECISÕES: Para cada decisão relevante, transcreva o dispositivo literalmente e resuma os fundamentos utilizados. Indique expressamente os efeitos práticos (suspensão, desbloqueio, penhora deferida/negada etc.).
+
+VÍCIOS IDENTIFICÁVEIS: Registre qualquer irregularidade formal visível no documento — assinatura ausente, representação sem procuração juntada, ausência de data, divergência entre valores, notificação de vencimento antecipado sem comprovante.
+
+HISTÓRICO DE PAGAMENTOS: Se houver extratos ou comprovantes, descreva os pagamentos realizados, datas e valores. Registre se há ou não discriminação adequada entre amortização de principal e juros.`;
+
+  if (isExequente) return `${base}
+
+FOCO — PERSPECTIVA DO EXEQUENTE / CREDOR:
+
+Produza um extrato analítico em prosa cobrindo:
+
+TÍTULO E CRÉDITO: Tipo do título, valor original, vencimento, devedores solidários e garantias reais ou fidejussórias. Transcreva literalmente as cláusulas de garantia.
+
+INADIMPLÊNCIA: Descreva a história da inadimplência — data do primeiro vencimento sem pagamento, tentativas extrajudiciais de cobrança, notificações enviadas, respostas recebidas.
+
+PATRIMÔNIO DO DEVEDOR: Registre todos os bens identificados nos autos — imóveis (matrícula, valor, localização), veículos (placa, valor), participações societárias, contas bancárias localizadas, outros ativos. Inclua resultado de pesquisas BACENJUD/SISBAJUD e RENAJUD.
+
+CONSTRIÇÕES: Descreva cada penhora ou bloqueio: bem constrito, data, valor, resultado da avaliação judicial, status atual (mantida, substituída, levantada).
+
+RESISTÊNCIAS DO DEVEDOR: Descreva embargos, exceções, impugnações ou outros incidentes opostos pelo devedor — fundamentos alegados e resultado.
+
+DECISÕES FAVORÁVEIS AO CREDOR: Transcreva dispositivo e fundamentos de cada decisão que beneficiou o exequente.`;
+
+  if (isCobranca) return `${base}
+
+FOCO — COBRANÇA / MONITÓRIA / RELAÇÃO DE CONSUMO:
+
+Produza um extrato analítico em prosa cobrindo:
+
+ORIGEM DO CRÉDITO: Natureza jurídica do contrato, data, partes, objeto, valor original, encargos. Transcreva literalmente as cláusulas de juros, multa e correção.
+
+HISTÓRICO CONTRATUAL: Descreva a relação entre as partes, pagamentos realizados, renegociações, histórico de inadimplência.
+
+DEFESAS: Registre todos os argumentos apresentados pelo devedor/réu — texto das contestações, embargos monitórios ou exceções, teses levantadas.
+
+DECISÕES: Transcreva o dispositivo de cada decisão relevante e resuma seus fundamentos.
+
+ELEMENTOS DE CONSUMO: Se houver relação de consumo, identifique cláusulas potencialmente abusivas, práticas vedadas pelo CDC e argumentos de hipossuficiência.`;
+
+  if (isDecisoes) return `${base}
+
+FOCO — ANÁLISE DE DECISÃO JUDICIAL:
+
+Produza um extrato analítico em prosa cobrindo:
+
+IDENTIFICAÇÃO: Tipo da decisão (despacho, decisão interlocutória, sentença, acórdão), data, juízo/tribunal, vara, juiz/relator, número do processo e fase processual.
+
+DISPOSITIVO COMPLETO: Transcreva literalmente o dispositivo da decisão — o que foi decidido, os pedidos deferidos e indeferidos, as determinações práticas.
+
+FUNDAMENTOS: Resuma o raciocínio jurídico utilizado — normas citadas, precedentes invocados, linha argumentativa principal e eventuais divergências entre fundamento e dispositivo.
+
+PEDIDOS ANALISADOS: Para cada pedido das partes, indique o resultado (deferido, indeferido, parcialmente deferido) e o fundamento específico.
+
+EFEITOS PRÁTICOS IMEDIATOS: Descreva o que muda concretamente após a decisão — prazo aberto, bloqueio determinado, penhora deferida, execução suspensa, bem liberado.
+
+RECURSOS: Identifique o recurso cabível, prazo e se houve interposição.`;
+
+  if (isAcordaos) return `${base}
+
+FOCO — ACÓRDÃO STJ/STF:
+
+Produza um extrato analítico em prosa cobrindo:
+
+IDENTIFICAÇÃO: Tribunal, turma/câmara, relator, revisor (se houver), data do julgamento, tipo de recurso (REsp, RE, AREsp, AgInt etc.), número, origem (estado/TJ de origem).
+
+EMENTA: Transcreva a ementa completa e literalmente. Se não estiver presente nesta parte do documento, registre a ausência.
+
+QUESTÃO JURÍDICA: Descreva com precisão a questão de direito central analisada — não apenas o resultado, mas o problema jurídico que o tribunal foi chamado a resolver.
+
+TESE FIXADA: Se for recurso repetitivo ou de repercussão geral, transcreva literalmente a tese fixada. Indique se há efeito vinculante e para quais tribunais.
+
+RATIO DECIDENDI: Descreva o raciocínio determinante — os fundamentos sem os quais o resultado seria diferente. Distinga do obiter dictum.
+
+VOTOS: Registre o placar (ex: unanimidade, 3x2), o sentido de cada voto e os fundamentos dos votos divergentes se presentes.
+
+APLICAÇÃO AO CASO: Se o acórdão vier acompanhado de acórdão recorrido ou peças do processo, identifique como a tese fixada se aplica aos fatos concretos.`;
+
+  if (isSisbajud) return `${base}
+
+FOCO — DESBLOQUEIO SISBAJUD / IMPENHORABILIDADE:
+
+Produza um extrato analítico em prosa cobrindo:
+
+BLOQUEIO: Valor total bloqueado, data do bloqueio, conta(s) afetada(s), banco(s), decisão que determinou o bloqueio (transcreva o dispositivo).
+
+NATUREZA DOS VALORES: Descreva o que os extratos e documentos indicam sobre a origem dos valores — salário, benefício previdenciário, poupança, outras transferências. Transcreva os lançamentos relevantes com datas e valores.
+
+COMPROVAÇÃO DE IMPENHORABILIDADE: Descreva os documentos de comprovação presentes — contracheques, holerites, declaração do empregador, telas de sistema, extrato bancário com identificação da origem.
+
+HISTÓRICO DE MOVIMENTAÇÃO: Descreva o padrão de entradas e saídas da conta — frequência, valores típicos, se há mistura com valores de outra natureza.
+
+PEDIDOS E DECISÕES ANTERIORES: Já houve pedido de desbloqueio? Qual foi a decisão e seu fundamento?
+
+PATRIMÔNIO TOTAL: Se houver informações sobre outros bens ou rendimentos do executado, registre para análise de proporcionalidade.`;
+
+  if (isSigilo) return `${base}
+
+FOCO — DEFESA CONTRA QUEBRA DE SIGILO BANCÁRIO:
+
+Produza um extrato analítico em prosa cobrindo:
+
+DECISÃO DE QUEBRA: Transcreva o dispositivo da decisão que determinou a quebra. Descreva os fundamentos utilizados — necessidade, proporcionalidade, subsidiarity.
+
+EXTENSÃO DA MEDIDA: Período abrangido, instituições incluídas, tipo de informações requisitadas (extratos, transferências, investimentos, outros).
+
+DADOS JÁ OBTIDOS: Descreva as informações que o credor já obteve e como estão sendo usadas no processo.
+
+ANÁLISE DE PROPORCIONALIDADE NO DOCUMENTO: Registre se o juiz ou o credor fundamentou a necessidade da medida e se há debate sobre alternativas menos invasivas.
+
+PRECEDENTES CITADOS: Transcreva as citações jurisprudenciais presentes na decisão.
+
+DIREITOS FUNDAMENTAIS: Identifique se há debate sobre art. 5º X e XII da CF, LC 105/2001 e precedentes do STJ sobre os limites da medida.`;
+
+  return `${base}
+
+EXTRATO GERAL:
+Produza um extrato analítico em prosa organizado em seções temáticas: Identificação das partes e do objeto, Histórico fático cronológico, Encargos e valores, Situação processual atual, Decisões relevantes (com dispositivo transcrito literalmente), Documentos presentes e ausentes.`;
+}
+
+async function summarizePdfChunk(chunkText, chunkNum, totalChunks, docName, workflowIndex) {
+  const extractionPrompt = getExtractionPrompt(workflowIndex);
+  const continuationNote = totalChunks > 1
+    ? (chunkNum < totalChunks
+        ? `\n\nATENÇÃO: Este é o trecho ${chunkNum} de ${totalChunks} do documento "${docName}". Produza o extrato deste trecho. Um próximo trecho será enviado na sequência — não conclua a análise do caso.`
+        : `\n\nATENÇÃO: Este é o trecho FINAL (${chunkNum}/${totalChunks}) do documento "${docName}". Produza o extrato deste trecho concluindo o conteúdo do documento.`)
+    : '';
+
+  const msg = `${extractionPrompt}${continuationNote}
+
+---
+DOCUMENTO: "${docName}"${totalChunks > 1 ? ` — PARTE ${chunkNum} DE ${totalChunks}` : ''}
+---
+
+${chunkText}`;
+
+  const resp = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': sanitizeApiKey(apiKey),
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true'
+    },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-5',  // Sonnet: preserva raciocínio jurídico e profundidade analítica
+      max_tokens: 8000,
+      messages: [{ role: 'user', content: msg }]
+    })
+  });
+
+  if (!resp.ok) {
+    const err = await resp.json();
+    throw new Error(`Erro ao processar PDF (${resp.status}): ${err.error?.message || 'Erro desconhecido'}`);
+  }
+  const data = await resp.json();
+  return data.content?.[0]?.text || '';
+}
+
+async function preprocessPdfs(session, onProgress) {
+  // Returns a summarized string of all PDFs, safe to send in one message
+  const mode = session.mode || 'form';
+  let files = [];
+  if (mode === 'pdf') files = (session.pdfTabFiles || []).filter(f => f.text?.trim().length > 0);
+  else files = (session.formPdfs || []).filter(f => f.text?.trim().length > 0);
+
+  if (!files.length) return '';
+
+  const totalChars = files.reduce((s, f) => s + f.text.length, 0);
+
+  // If total is small enough, send directly without summarizing
+  if (totalChars <= MAX_CHARS_DIRECT) {
+    return files.map(f => `=== ${f.name} ===\n${f.text}`).join('\n\n');
+  }
+
+  // Need pre-processing — summarize each file
+  const summaries = [];
+  for (let fi = 0; fi < files.length; fi++) {
+    const file = files[fi];
+    onProgress && onProgress(`📄 Pré-processando "${file.name}" (${fi+1}/${files.length})...`);
+
+    const text = file.text;
+    if (text.length <= MAX_CHARS_PER_PDF_CHUNK) {
+      // Single chunk
+      const summary = await summarizePdfChunk(text, 1, 1, file.name, session.workflowIndex);
+      summaries.push(`=== RESUMO EXTRAÍDO: ${file.name} ===\n${summary}`);
+    } else {
+      // Split into chunks and summarize each
+      const chunks = [];
+      for (let i = 0; i < text.length; i += MAX_CHARS_PER_PDF_CHUNK) {
+        chunks.push(text.substring(i, i + MAX_CHARS_PER_PDF_CHUNK));
+      }
+      const chunkSummaries = [];
+      for (let ci = 0; ci < chunks.length; ci++) {
+        onProgress && onProgress(`📄 Pré-processando "${file.name}" — parte ${ci+1}/${chunks.length}...`);
+        const s = await summarizePdfChunk(chunks[ci], ci+1, chunks.length, file.name, session.workflowIndex);
+        chunkSummaries.push(s);
+      }
+      summaries.push(`=== RESUMO EXTRAÍDO: ${file.name} (${chunks.length} partes consolidadas) ===\n${chunkSummaries.join('\n\n--- continuação ---\n\n')}`);
+    }
+  }
+
+  return summaries.join('\n\n');
+}
+
+function getPdfFullText(session) {
+  // Legacy — only used if chunking is explicitly requested
+  const mode = session.mode || 'form';
+  if (mode === 'pdf') {
+    return (session.pdfTabFiles || [])
+      .filter(f => f.text && f.text.trim().length > 0)
+      .map(f => `=== ${f.name} ===\n${f.text}`).join('\n\n');
+  }
+  return (session.formPdfs || [])
+    .filter(f => f.text && f.text.trim().length > 0)
+    .map(f => `=== ${f.name} ===\n${f.text}`).join('\n\n');
+}
+
+function buildChunkedMessages(session) {
+  // Kept for backward compat — now always returns null (preprocessing handles large docs)
+  return null;
+}
+
+async function runSession(session) {
+  if (!apiKey) { openApiModal(); return; }
+
+  session.status     = 'running';
+  session.history    = [];
+  session.allText    = '';
+  session.domContent = '';
+  session.lastError  = null;
+  session.lastErrorStatus = null;
+
+  const isVisible = () => activeSession && activeSession.id === session.id;
+
+  if (isVisible()) {
+    document.getElementById('emptyState').style.display    = 'none';
+    document.getElementById('outputContent').style.display = 'block';
+    document.getElementById('outputContent').innerHTML     = '';
+    setStatusUI(session);
+  }
+  renderTabs();
+
+  // Build prompt — preprocess PDFs if needed (handles any document size)
+
+  let pdfSummary = '';
+  const mode = session.mode || 'form';
+  const hasPdfs = mode === 'pdf'
+    ? (session.pdfTabFiles || []).some(f => f.text?.trim().length > 0)
+    : (session.formPdfs || []).some(f => f.text?.trim().length > 0);
+
+  if (hasPdfs) {
+    const totalChars = mode === 'pdf'
+      ? (session.pdfTabFiles || []).reduce((s,f) => s + (f.text||'').length, 0)
+      : (session.formPdfs || []).reduce((s,f) => s + (f.text||'').length, 0);
+
+    if (totalChars > MAX_CHARS_DIRECT) {
+      if (isVisible()) {
+        document.getElementById('outputContent').innerHTML +=
+          `<div class="api-error" style="color:var(--gold);border-color:rgba(201,168,76,.3);">` +
+          `📄 Documentos grandes detectados (${Math.round(totalChars/1000)}k caracteres). ` +
+          `Iniciando extração analítica com claude-sonnet — conteúdo jurídico extraído com profundidade antes da análise principal...</div>`;
+      }
+    }
+
+    try {
+      pdfSummary = await preprocessPdfs(session, (msg) => {
+        if (isVisible()) {
+          const el = document.getElementById('outputContent');
+          // Update last progress message or add new one
+          const lastProg = el.querySelector('.pdf-progress');
+          if (lastProg) lastProg.textContent = msg;
+          else {
+            const div = document.createElement('div');
+            div.className = 'pdf-progress api-error';
+            div.style.cssText = 'color:var(--gold);border-color:rgba(201,168,76,.3);font-size:11px;';
+            div.textContent = msg;
+            el.appendChild(div);
+          }
+        }
+      });
+      // Remove progress message
+      if (isVisible()) {
+        document.querySelectorAll('.pdf-progress').forEach(e => e.remove());
+        if (totalChars > MAX_CHARS_DIRECT) {
+          document.getElementById('outputContent').innerHTML +=
+            `<div class="api-error" style="color:var(--green2);border-color:rgba(74,124,89,.3);font-size:11px;">` +
+            `✓ Extração analítica concluída. Iniciando análise jurídica...</div>`;
+        }
+      }
+    } catch(err) {
+      session.status = 'error';
+      session.lastError = err.message;
+      if (isVisible()) {
+        document.getElementById('outputContent').innerHTML +=
+          `<div class="api-error">Erro no pré-processamento dos PDFs: ${err.message}</div>`;
+        setStatusUI(session);
+      }
+      renderTabs();
+      return;
+    }
+  }
+
+  // Build final prompt with preprocessed PDF summary
+  const wf = WORKFLOWS[session.workflowIndex];
+  const promptKey = wf.promptKey || wf.promptFile;
+  const template = PROMPTS[promptKey] || '';
+
+  let data = '';
+  if (mode === 'paste') {
+    const txt = (session.pasteText || '').trim();
+    const ctx = (session.pasteCtx  || '').trim();
+    data = (txt ? `TEXTO DOS AUTOS:\n${txt}` : '') + (ctx ? `\n\nCONTEXTO ADICIONAL:\n${ctx}` : '');
+  } else if (mode === 'pdf') {
+    const ctx = (session.pdfTabCtx || '').trim();
+    data = (pdfSummary ? `CONTEÚDO EXTRAÍDO DOS DOCUMENTOS:\n${pdfSummary}` : '') +
+           (ctx ? `\n\nCONTEXTO ADICIONAL:\n${ctx}` : '');
+  } else {
+    // form mode
+    const lines = [];
+    wf.fields.forEach(group => {
+      lines.push(`\n${group.group}:`);
+      group.fields.forEach(f => {
+        const val = session.formData?.[f.id];
+        if (!val || (Array.isArray(val) && val.length === 0)) return;
+        const display = Array.isArray(val) ? val.join(', ') : val;
+        if (display) lines.push(`  ${f.label}: ${display}`);
+      });
+    });
+    data = lines.join('\n');
+    if (pdfSummary) data += `\n\nDOCUMENTOS ANEXADOS:\n${pdfSummary}`;
+    const obs = (session.observacoes || '').trim();
+    if (obs) data += `\n\nOBSERVAÇÕES DO ADVOGADO:\n${obs}`;
+  }
+
+  const userPrompt = template.replace('{{DADOS}}', data || '[Dados não fornecidos]')
+    + '\n\nIMPORTANTE: Ao concluir TODA a análise/peça, escreva exatamente na última linha: [ANÁLISE CONCLUÍDA]';
+
+  session.history = [{ role: 'user', content: userPrompt }];
+
+  let turns    = 0;
+  let finished = false;
+
+  while (!finished && turns < MAX_TURNS) {
+    turns++;
+
+    // Attempt with retries
+    let turnText = null;
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      session.lastError = null;
+      session.lastErrorStatus = null;
+      turnText = await streamTurn(session, turns > 1, isVisible());
+      if (turnText !== null) break;
+
+      // Detect rate limit via HTTP 429 or error message keywords
+      const isRateLimit = session.lastErrorStatus === 429 || (session.lastError && (
+        session.lastError.includes('rate limit') ||
+        session.lastError.includes('rate_limit') ||
+        session.lastError.includes('overloaded') ||
+        session.lastError.includes('529')
+      ));
+
+      if (attempt < MAX_RETRIES) {
+        const waitMs = isRateLimit ? RATE_LIMIT_DELAY : RETRY_DELAY * attempt;
+        const waitSec = Math.round(waitMs / 1000);
+        if (isVisible()) {
+          document.getElementById('outputContent').innerHTML +=
+            `<div class="api-error" style="font-size:11px;opacity:0.7;">
+              ${isRateLimit
+                ? `⏳ Limite de tokens/min atingido. Aguardando ${waitSec}s e retomando de onde parou...`
+                : `Tentando novamente (${attempt}/${MAX_RETRIES})...`}
+            </div>`;
+        }
+        await sleep(waitMs);
+      }
+    }
+
+    if (turnText === null) {
+      session.status = 'error';
+      renderTabs();
+      if (isVisible()) setStatusUI(session);
+      return;
+    }
+    session.allText += (session.allText ? '\n\n' : '') + turnText;
+    session.history.push({ role: 'assistant', content: turnText });
+
+    if (turnText.includes('[ANÁLISE CONCLUÍDA]')) {
+      finished = true;
+    } else {
+      session.history.push({
+        role: 'user',
+        content: 'Continue exatamente de onde parou, sem repetir nenhum texto já escrito. Retome da última palavra e prossiga até concluir completamente. Ao terminar escreva [ANÁLISE CONCLUÍDA] na última linha.'
+      });
+    }
+  }
+
+  session.status = 'done';
+  if (isVisible()) {
+    session.domContent = document.getElementById('outputContent').innerHTML;
+    document.getElementById('btnSavePdf').style.display = 'inline-flex';
+    setStatusUI(session);
+  }
+  renderTabs();
+  updateRunAllBtn();
+}
+
+async function streamTurn(session, isContinuation, _ignored) {
+  // IMPORTANT: never cache isVisible — check it live on every DOM write
+  // so switching tabs mid-stream never corrupts another session's output
+  const amIVisible = () => activeSession && activeSession.id === session.id;
+
+  let turnText = '';
+
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': sanitizeApiKey(apiKey),
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-5',
+        max_tokens: 8000,
+        stream: true,
+        messages: session.history
+      })
+    });
+
+    if (!response.ok) {
+      const err = await response.json();
+      if (response.status === 401) {
+        apiKey = '';
+        try { localStorage.removeItem('lex_executio_api_key'); } catch(e) {}
+        updateKeyBtn(); openApiModal();
+      }
+      const errMsg = err.error?.message || 'Erro na API';
+      session.lastError = errMsg;
+      session.lastErrorStatus = response.status;
+      if (amIVisible()) appendError(errMsg);
+      return null;
+    }
+
+    const reader  = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer  = '';
+    // Each turn gets a unique DOM id so we can find/update it safely
+    const turnId = `turn-${session.id}-${Date.now()}`;
+
+    // If visible right now, create the turn block
+    if (amIVisible()) {
+      if (isContinuation) {
+        document.getElementById('outputContent').innerHTML +=
+          '<hr style="border:none;border-top:1px dashed var(--border2);margin:18px 0 14px;">';
+      }
+      const div = document.createElement('div');
+      div.className = 'turn-block';
+      div.id = turnId;
+      document.getElementById('outputContent').appendChild(div);
+    }
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop();
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        const data = line.slice(6);
+        if (data === '[DONE]') continue;
+        try {
+          const parsed = JSON.parse(data);
+          if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
+            turnText += parsed.delta.text;
+            // Only write to DOM if THIS session is currently visible
+            if (amIVisible()) {
+              let el = document.getElementById(turnId);
+              if (!el) {
+                // User just switched back to this tab mid-stream — recreate block
+                if (isContinuation && !document.getElementById(turnId)) {
+                  document.getElementById('outputContent').innerHTML +=
+                    '<hr style="border:none;border-top:1px dashed var(--border2);margin:18px 0 14px;">';
+                }
+                el = document.createElement('div');
+                el.className = 'turn-block';
+                el.id = turnId;
+                document.getElementById('outputContent').appendChild(el);
+              }
+              el.innerHTML = formatOutputText(turnText) + '<span class="streaming-cursor"></span>';
+              document.getElementById('outputContent').scrollTop = 99999;
+            }
+          }
+        } catch(e) {}
+      }
+    }
+
+    // Finalize: remove cursor if visible
+    if (amIVisible()) {
+      const el = document.getElementById(turnId);
+      if (el) el.innerHTML = formatOutputText(turnText);
+    }
+
+    // Always update session.domContent — build it from existing + new block
+    const existingDom = session.domContent || '';
+    const separator = (isContinuation && existingDom)
+      ? '<hr style="border:none;border-top:1px dashed rgba(255,255,255,0.13);margin:18px 0 14px;">'
+      : '';
+    const newBlock = `<div class="turn-block" id="${turnId}">${formatOutputText(turnText)}</div>`;
+
+    if (amIVisible()) {
+      // Snapshot the real DOM (most accurate)
+      session.domContent = document.getElementById('outputContent').innerHTML;
+    } else {
+      // Build snapshot from accumulated HTML
+      session.domContent = existingDom + (existingDom ? separator : '') + newBlock;
+    }
+
+    return turnText;
+
+  } catch(err) {
+    session.lastError = err.message;
+    if (amIVisible()) appendError(err.message);
+    return null;
+  }
+}
+
+function appendError(msg) {
+  document.getElementById('outputContent').innerHTML += `<div class="api-error">Erro: ${msg}</div>`;
+}
+
+// ─── SINGLE EXECUTE (current session only) ───────────────────
+async function executarPrompt() {
+  if (!apiKey) { openApiModal(); return; }
+  if (!activeSession) return;
+  if (activeSession.status === 'running') return;
+
+  saveSessionState(activeSession);
+  activeSession.formPdfs    = [...formPdfFiles];
+  activeSession.pdfTabFiles = [...pdfFiles];
+
+  const btn = document.getElementById('btnExecutar');
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spinner"></div><span>Analisando...</span>';
+  document.getElementById('btnSavePdf').style.display = 'none';
+
+  await runSession(activeSession);
+
+  btn.disabled = false;
+  btn.innerHTML = '<span>Executar Análise</span><span>→</span>';
+}
+
+// ─── QUEUE (run all idle sessions) ───────────────────────────
+async function runQueue() {
+  if (queueRunning) return;
+  if (!apiKey) { openApiModal(); return; }
+
+  // Save current active session state (captures current DOM form values + PDFs)
+  if (activeSession) {
+    saveSessionState(activeSession);
+    activeSession.formPdfs    = [...formPdfFiles];
+    activeSession.pdfTabFiles = [...pdfFiles];
+  }
+
+  queueRunning = true;
+  document.getElementById('btnRunAll').disabled = true;
+  document.getElementById('btnRunAll').textContent = '⟳ Executando...';
+
+  const idle = sessions.filter(s => s.status === 'idle');
+  for (const s of idle) {
+    activateSession(s);
+    await runSession(s);
+    // Pause between sessions to avoid rate limit (tokens/min resets)
+    if (idle.indexOf(s) < idle.length - 1) await sleep(15000);
+  }
+
+  queueRunning = false;
+  document.getElementById('btnRunAll').disabled = false;
+  document.getElementById('btnRunAll').textContent = '▶ Executar Todos';
+  updateRunAllBtn();
+}
+
+// ─── STATUS UI ────────────────────────────────────────────────
+function setStatusUI(session) {
+  const dot   = document.getElementById('statusDot');
+  const label = document.getElementById('outputLabel');
+  const savePdf = document.getElementById('btnSavePdf');
+  if (!session) {
+    dot.className = 'status-dot'; label.textContent = 'Aguardando execução';
+    savePdf.style.display = 'none'; return;
+  }
+  switch(session.status) {
+    case 'idle':
+      dot.className = 'status-dot'; label.textContent = 'Aguardando execução';
+      savePdf.style.display = 'none'; break;
+    case 'running':
+      dot.className = 'status-dot loading'; label.textContent = 'Gerando análise...';
+      savePdf.style.display = 'none'; break;
+    case 'done':
+      dot.className = 'status-dot done'; label.textContent = 'Análise concluída';
+      savePdf.style.display = 'inline-flex'; break;
+    case 'error':
+      dot.className = 'status-dot'; label.textContent = 'Erro na execução';
+      savePdf.style.display = 'none'; break;
+  }
+}
+
+// ─── OUTPUT ACTIONS ───────────────────────────────────────────
+function copyOutput() {
+  const text = activeSession?.allText || '';
+  if (!text) return;
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = event.target;
+    const orig = btn.textContent;
+    btn.textContent = 'Copiado!';
+    setTimeout(() => btn.textContent = orig, 2000);
+  });
+}
+
+function clearOutput() {
+  if (!activeSession) return;
+  activeSession.status = 'idle';
+  activeSession.history = [];
+  activeSession.allText = '';
+  activeSession.domContent = '';
+  document.getElementById('outputContent').style.display = 'none';
+  document.getElementById('outputContent').innerHTML = '';
+  document.getElementById('emptyState').style.display = 'flex';
+  document.getElementById('btnSavePdf').style.display = 'none';
+  setStatusUI(activeSession);
+  renderTabs();
+  updateRunAllBtn();
+}
+
+function saveCurrentPdf() {
+  if (!activeSession || !activeSession.allText) return;
+  const wf    = WORKFLOWS[activeSession.workflowIndex];
+  const title = wf.name;
+  const date  = new Date().toLocaleDateString('pt-BR');
+  const label = activeSession.label;
+
+  const rawContent = (activeSession.domContent || document.getElementById('outputContent').innerHTML)
+    .replace(/<span[^>]*streaming-cursor[^>]*><\/span>/g, '')
+    .replace(/\[ANÁLISE CONCLUÍDA\]/g, '')
+    .replace(/<hr[^>]*>/g, '<hr style="border:none;border-top:1px dashed #ccc;margin:20px 0;">');
+
+  const html = `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>${title}</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600&family=Inter:wght@400;500;600&display=swap');
+  * { box-sizing:border-box;margin:0;padding:0; }
+  body { font-family:'Inter',Georgia,serif;font-size:11pt;color:#1a1a1a;background:#fff; }
+  .page { max-width:780px;margin:0 auto;padding:40px 48px; }
+  .header { border-bottom:2px solid #1a3a5c;padding-bottom:16px;margin-bottom:28px; }
+  .header-top { display:flex;justify-content:space-between;align-items:flex-start; }
+  .logo { font-family:'Playfair Display',serif;font-size:18pt;font-weight:600;color:#1a3a5c; }
+  .logo-sub { font-size:8pt;color:#666;text-transform:uppercase;letter-spacing:0.1em;margin-top:2px; }
+  .doc-title { font-family:'Playfair Display',serif;font-size:13pt;font-weight:600;color:#1a3a5c;margin-top:14px; }
+  .doc-label { font-size:9pt;color:#666;margin-top:4px; }
+  .doc-date { font-size:9pt;color:#888;text-align:right; }
+  .disclaimer { background:#f5f7fa;border-left:3px solid #1a3a5c;padding:8px 12px;font-size:8.5pt;color:#555;margin-bottom:24px;border-radius:0 4px 4px 0; }
+  .turn-block { margin-bottom:0; }
+  .turn-block h1,.content h1 { font-family:'Playfair Display',serif;font-size:14pt;font-weight:600;color:#1a3a5c;margin:24px 0 10px;padding-bottom:6px;border-bottom:1px solid #dde3ea; }
+  .turn-block h2,.content h2 { font-size:8pt;font-weight:700;color:#1a3a5c;margin:20px 0 6px;text-transform:uppercase;letter-spacing:0.1em; }
+  .turn-block h3,.content h3 { font-size:11pt;font-weight:600;color:#1a1a1a;margin:14px 0 6px; }
+  .turn-block p,.content p { margin-bottom:9px;text-align:justify; }
+  .turn-block strong,.content strong { font-weight:600;color:#1a3a5c; }
+  .turn-block ul,.turn-block ol,.content ul,.content ol { padding-left:20px;margin-bottom:9px; }
+  .turn-block li,.content li { margin-bottom:4px; }
+  .api-error { display:none; }
+  .footer { margin-top:40px;padding-top:12px;border-top:1px solid #dde3ea;display:flex;justify-content:space-between;font-size:8pt;color:#aaa; }
+  @media print { body{-webkit-print-color-adjust:exact;print-color-adjust:exact;} .page{padding:24px 32px;} }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="header">
+    <div class="header-top">
+      <div><div class="logo">Lex Executio</div><div class="logo-sub">Assistente Jurídico · Análise de Execuções</div></div>
+      <div class="doc-date">Gerado em ${date}</div>
+    </div>
+    <div class="doc-title">${title}</div>
+    <div class="doc-label">${label}</div>
+  </div>
+  <div class="disclaimer"><strong>Instrumento de trabalho:</strong> Análise gerada por inteligência artificial (Claude · Anthropic). Não substitui o juízo técnico do advogado responsável. Verifique todos os precedentes antes de utilizar em peça processual.</div>
+  <div class="content">${rawContent}</div>
+  <div class="footer"><span>Lex Executio · Assistente Jurídico</span><span>${title} · ${date}</span></div>
+</div>
+` + '<scr' + `ipt>
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(function(){ window.print(); });
+  } else { setTimeout(function(){ window.print(); }, 800); }
+` + '</scr' + `ipt>
+</body>
+</html>`;
+
+  const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+  const url  = URL.createObjectURL(blob);
+  const win  = window.open(url, '_blank');
+  if (!win) {
+    const a = document.createElement('a');
+    a.href = url; a.download = label.replace(/[^\w\- ]/g,'').trim() + '.html'; a.click();
+  }
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+}
+// ─── HELPERS ─────────────────────────────────────────────────
+function formatOutputText(text) {
+  // Remove [ANÁLISE CONCLUÍDA] marker from display
+  text = text.replace(/\[ANÁLISE CONCLUÍDA\]\s*$/,'').trim();
+  return '<p>' + text
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/\*\*\*(.+?)\*\*\*/g,'<strong>$1</strong>')
+    .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+    .replace(/^# (.+)$/gm,'<h1>$1</h1>')
+    .replace(/^## (.+)$/gm,'<h2>$1</h2>')
+    .replace(/^### (.+)$/gm,'<h3>$1</h3>')
+    .replace(/^(\d+\. [A-ZÀÁÂÃÉÍÓÔÕÚ ]+)$/gm,'<h2>$1</h2>')
+    .replace(/\[DADO AUSENTE\]/g,'<span style="background:rgba(139,58,58,0.2);color:#c05050;padding:1px 6px;border-radius:4px;font-size:11px;font-weight:600">DADO AUSENTE</span>')
+    .replace(/\n\n/g,'</p><p>')
+    .replace(/\n/g,'<br>') + '</p>';
+}
+
+function limpar() {
+  document.querySelectorAll('input[type="text"],input[type="date"],textarea').forEach(el => el.value = '');
+  document.querySelectorAll('.radio-btn,.check-btn').forEach(el => el.classList.remove('selected'));
+  document.querySelectorAll('input[type="radio"],input[type="checkbox"]').forEach(el => el.checked = false);
+  formPdfFiles = []; renderFormPdfList();
+  pdfFiles = []; renderPdfList();
+  if (activeSession) {
+    activeSession.pasteText = ''; activeSession.pasteCtx = '';
+    activeSession.pdfTabCtx = ''; activeSession.formPdfs = [];
+    activeSession.pdfTabFiles = [];
+  }
+}
+
+// ─── INIT ────────────────────────────────────────────────────
+// Create first session automatically
+const firstSession = createSession(0);
+activateSession(firstSession);
+renderTabs();
+renderForm();
+loadApiKey();
+
+</script>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
+  if (typeof pdfjsLib !== 'undefined') {
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  }
+</script>
+</body>
+</html>

@@ -1,0 +1,3394 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lex Rural — Assistente Jurídico de Crédito Rural</title>
+<style>
+
+  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600&family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap');
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0f0f0d;
+    --bg2: #181815;
+    --bg3: #222220;
+    --border: rgba(255,255,255,0.08);
+    --border2: rgba(255,255,255,0.14);
+    --text: #f0ede6;
+    --text2: #a09d96;
+    --text3: #6a6760;
+    --gold: #c9a84c;
+    --gold2: #e8c96e;
+    --gold-bg: rgba(201,168,76,0.08);
+    --gold-border: rgba(201,168,76,0.25);
+    --green: #4a7c59;
+    --green2: #5a9a6e;
+    --green-bg: rgba(74,124,89,0.12);
+    --red: #8b3a3a;
+    --red2: #c05050;
+    --red-bg: rgba(139,58,58,0.12);
+    --radius: 10px;
+    --shadow: 0 2px 12px rgba(0,0,0,0.4);
+  }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* HEADER */
+  header {
+    border-bottom: 1px solid var(--border);
+    padding: 0 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 60px;
+    background: var(--bg);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .logo-icon {
+    width: 28px; height: 28px;
+    background: var(--gold-bg);
+    border: 1px solid var(--gold-border);
+    border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Playfair Display', serif;
+    font-size: 13px;
+    color: var(--gold);
+    font-weight: 600;
+  }
+
+  .logo-text {
+    font-family: 'Playfair Display', serif;
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--text);
+    letter-spacing: 0.01em;
+  }
+
+  .logo-sub {
+    font-size: 11px;
+    color: var(--text3);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+
+  .header-badge {
+    font-size: 11px;
+    color: var(--gold);
+    background: var(--gold-bg);
+    border: 1px solid var(--gold-border);
+    padding: 3px 10px;
+    border-radius: 20px;
+    letter-spacing: 0.04em;
+  }
+
+  /* LAYOUT */
+  .app {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+    height: calc(100vh - 60px);
+  }
+
+  /* SIDEBAR */
+  .sidebar {
+    width: 260px;
+    min-width: 260px;
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    background: var(--bg2);
+    overflow-y: auto;
+  }
+
+  .sidebar-section {
+    padding: 20px 16px 12px;
+  }
+
+  .sidebar-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text3);
+    margin-bottom: 10px;
+    padding: 0 4px;
+  }
+
+  .workflow-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.15s;
+    margin-bottom: 2px;
+    border: 1px solid transparent;
+  }
+
+  .workflow-item:hover { background: var(--bg3); }
+
+  .workflow-item.active {
+    background: var(--gold-bg);
+    border-color: var(--gold-border);
+  }
+
+  .workflow-num {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    color: var(--text3);
+    min-width: 16px;
+    padding-top: 2px;
+  }
+
+  .workflow-item.active .workflow-num { color: var(--gold); }
+
+  .workflow-info { flex: 1; }
+
+  .workflow-name {
+    font-size: 12.5px;
+    font-weight: 500;
+    color: var(--text);
+    line-height: 1.3;
+    margin-bottom: 2px;
+  }
+
+  .workflow-item.active .workflow-name { color: var(--gold2); }
+
+  .workflow-desc {
+    font-size: 11px;
+    color: var(--text3);
+    line-height: 1.4;
+  }
+
+  .divider {
+    height: 1px;
+    background: var(--border);
+    margin: 8px 16px;
+  }
+
+  /* MAIN CONTENT */
+  .main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--bg);
+  }
+
+  /* STEPS BAR */
+  .steps-bar {
+    border-bottom: 1px solid var(--border);
+    padding: 0 32px;
+    display: flex;
+    align-items: center;
+    gap: 0;
+    background: var(--bg2);
+    overflow-x: auto;
+    min-height: 48px;
+  }
+
+  .step-tab {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 14px 20px;
+    cursor: pointer;
+    font-size: 12.5px;
+    color: var(--text3);
+    border-bottom: 2px solid transparent;
+    white-space: nowrap;
+    transition: all 0.15s;
+    user-select: none;
+  }
+
+  .step-tab:hover { color: var(--text2); }
+
+  .step-tab.active {
+    color: var(--gold);
+    border-bottom-color: var(--gold);
+  }
+
+  .step-tab.done { color: var(--green2); }
+
+  .step-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+    opacity: 0.5;
+  }
+
+  .step-tab.active .step-dot { opacity: 1; background: var(--gold); }
+  .step-tab.done .step-dot { opacity: 1; background: var(--green2); }
+
+  /* CONTENT AREA */
+  .content {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+  }
+
+  /* FORM PANEL */
+  .form-panel {
+    width: 420px;
+    min-width: 420px;
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .form-header {
+    padding: 24px 28px 16px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+
+  .form-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 18px;
+    font-weight: 500;
+    color: var(--text);
+    margin-bottom: 6px;
+  }
+
+  .form-subtitle {
+    font-size: 12px;
+    color: var(--text3);
+    line-height: 1.5;
+  }
+
+  .form-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px 28px;
+  }
+
+  .field-group {
+    margin-bottom: 20px;
+  }
+
+  .field-group-title {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--gold);
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--gold-border);
+    font-weight: 500;
+  }
+
+  .field {
+    margin-bottom: 14px;
+  }
+
+  label {
+    display: block;
+    font-size: 11.5px;
+    color: var(--text2);
+    margin-bottom: 5px;
+    font-weight: 500;
+  }
+
+  input[type="text"], input[type="date"], select, textarea {
+    width: 100%;
+    background: var(--bg3);
+    border: 1px solid var(--border2);
+    border-radius: 7px;
+    padding: 8px 12px;
+    font-size: 13px;
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    transition: border-color 0.15s;
+    outline: none;
+  }
+
+  input[type="text"]:focus, input[type="date"]:focus, select:focus, textarea:focus {
+    border-color: var(--gold);
+    background: rgba(201,168,76,0.04);
+  }
+
+  select option { background: var(--bg3); }
+
+  textarea { resize: vertical; min-height: 72px; }
+
+  .radio-group, .checkbox-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .radio-btn, .check-btn {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 10px;
+    border: 1px solid var(--border2);
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+    color: var(--text2);
+    transition: all 0.12s;
+    user-select: none;
+  }
+
+  .radio-btn:hover, .check-btn:hover { border-color: var(--text3); color: var(--text); }
+
+  .radio-btn.selected, .check-btn.selected {
+    border-color: var(--gold);
+    background: var(--gold-bg);
+    color: var(--gold2);
+  }
+
+  .radio-btn input, .check-btn input { display: none; }
+
+  .form-footer {
+    padding: 16px 28px;
+    border-top: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+
+  .btn-primary {
+    width: 100%;
+    padding: 11px 20px;
+    background: var(--gold);
+    color: #0f0f0d;
+    border: none;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: 'Inter', sans-serif;
+    letter-spacing: 0.01em;
+    transition: background 0.15s, transform 0.1s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  .btn-primary:hover { background: var(--gold2); }
+  .btn-primary:active { transform: scale(0.99); }
+  .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .btn-secondary {
+    width: 100%;
+    padding: 9px 20px;
+    background: transparent;
+    color: var(--text2);
+    border: 1px solid var(--border2);
+    border-radius: 8px;
+    font-size: 12.5px;
+    cursor: pointer;
+    font-family: 'Inter', sans-serif;
+    transition: all 0.15s;
+    margin-top: 8px;
+  }
+
+  .btn-secondary:hover { color: var(--text); border-color: var(--text3); }
+
+  /* OUTPUT PANEL */
+  .output-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .output-header {
+    padding: 20px 28px 14px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .output-title {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text2);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .status-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--text3);
+  }
+
+  .status-dot.loading {
+    background: var(--gold);
+    animation: pulse 1s infinite;
+  }
+
+  .status-dot.done { background: var(--green2); }
+
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+  .output-actions {
+    display: flex;
+    gap: 8px;
+  }
+
+  .action-btn {
+    padding: 5px 12px;
+    border: 1px solid var(--border2);
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text2);
+    font-size: 11.5px;
+    cursor: pointer;
+    font-family: 'Inter', sans-serif;
+    transition: all 0.12s;
+  }
+
+  .action-btn:hover { color: var(--text); border-color: var(--text3); }
+
+  .output-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 28px;
+  }
+
+  /* WELCOME / EMPTY STATE */
+  .empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    text-align: center;
+    gap: 16px;
+    padding: 40px;
+  }
+
+  .empty-icon {
+    width: 56px; height: 56px;
+    border: 1px solid var(--gold-border);
+    border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--gold-bg);
+    font-family: 'Playfair Display', serif;
+    font-size: 22px;
+    color: var(--gold);
+  }
+
+  .empty-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 20px;
+    font-weight: 500;
+    color: var(--text);
+  }
+
+  .empty-text {
+    font-size: 13px;
+    color: var(--text3);
+    max-width: 360px;
+    line-height: 1.6;
+  }
+
+  /* OUTPUT CONTENT */
+  .output-content {
+    font-size: 14px;
+    line-height: 1.8;
+    color: var(--text);
+  }
+
+  .output-content h1 {
+    font-family: 'Playfair Display', serif;
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--text);
+    margin: 0 0 20px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .output-content h2 {
+    font-family: 'Playfair Display', serif;
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--gold2);
+    margin: 24px 0 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-size: 11px;
+  }
+
+  .output-content h3 {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+    margin: 16px 0 8px;
+  }
+
+  .output-content p { margin-bottom: 12px; }
+
+  .output-content strong { color: var(--gold2); font-weight: 600; }
+
+  .output-content ul, .output-content ol {
+    padding-left: 20px;
+    margin-bottom: 12px;
+  }
+
+  .output-content li { margin-bottom: 6px; color: var(--text2); }
+
+  .output-content .highlight {
+    background: var(--gold-bg);
+    border: 1px solid var(--gold-border);
+    border-radius: 8px;
+    padding: 14px 16px;
+    margin: 14px 0;
+  }
+
+  .output-content .warning {
+    background: var(--red-bg);
+    border: 1px solid rgba(139,58,58,0.3);
+    border-radius: 8px;
+    padding: 14px 16px;
+    margin: 14px 0;
+    color: var(--text2);
+  }
+
+  .output-content .info {
+    background: var(--green-bg);
+    border: 1px solid rgba(74,124,89,0.3);
+    border-radius: 8px;
+    padding: 14px 16px;
+    margin: 14px 0;
+    color: var(--text2);
+  }
+
+  .streaming-cursor {
+    display: inline-block;
+    width: 2px;
+    height: 14px;
+    background: var(--gold);
+    vertical-align: middle;
+    animation: blink 0.8s infinite;
+  }
+
+  @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0; } }
+
+  /* SCROLLBAR */
+  ::-webkit-scrollbar { width: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 10px; }
+
+  /* LOADING SPINNER */
+  .spinner {
+    display: inline-block;
+    width: 14px; height: 14px;
+    border: 2px solid rgba(201,168,76,0.3);
+    border-top-color: var(--gold);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .tag {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin-left: 8px;
+  }
+
+  .tag-gold { background: var(--gold-bg); color: var(--gold); border: 1px solid var(--gold-border); }
+  .tag-green { background: var(--green-bg); color: var(--green2); border: 1px solid rgba(74,124,89,0.3); }
+
+  .api-error {
+    background: var(--red-bg);
+    border: 1px solid rgba(139,58,58,0.3);
+    border-radius: 8px;
+    padding: 16px;
+    color: var(--red2);
+    font-size: 13px;
+    margin-top: 20px;
+  }
+
+  /* API KEY MODAL */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.75);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+  }
+
+  .modal-overlay.hidden { display: none; }
+  .form-section.hidden { display: none; }
+
+  .modal {
+    background: var(--bg2);
+    border: 1px solid var(--border2);
+    border-radius: 14px;
+    padding: 32px;
+    width: 440px;
+    max-width: 90vw;
+  }
+
+  .modal-icon {
+    width: 44px; height: 44px;
+    background: var(--gold-bg);
+    border: 1px solid var(--gold-border);
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Playfair Display', serif;
+    font-size: 18px;
+    color: var(--gold);
+    margin-bottom: 20px;
+  }
+
+  .modal-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 19px;
+    font-weight: 500;
+    color: var(--text);
+    margin-bottom: 8px;
+  }
+
+  .modal-text {
+    font-size: 13px;
+    color: var(--text3);
+    line-height: 1.6;
+    margin-bottom: 24px;
+  }
+
+  .modal-text a {
+    color: var(--gold);
+    text-decoration: none;
+  }
+
+  .modal-text a:hover { text-decoration: underline; }
+
+  .key-input-wrap {
+    position: relative;
+    margin-bottom: 16px;
+  }
+
+  .key-input-wrap input {
+    width: 100%;
+    background: var(--bg3);
+    border: 1px solid var(--border2);
+    border-radius: 8px;
+    padding: 10px 44px 10px 14px;
+    font-size: 13px;
+    color: var(--text);
+    font-family: 'IBM Plex Mono', monospace;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+
+  .key-input-wrap input:focus { border-color: var(--gold); }
+
+  .key-toggle {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    color: var(--text3);
+    cursor: pointer;
+    font-size: 12px;
+    padding: 2px 4px;
+  }
+
+  .key-toggle:hover { color: var(--text2); }
+
+  .modal-hint {
+    font-size: 11px;
+    color: var(--text3);
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .hint-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--green2);
+    flex-shrink: 0;
+  }
+
+  /* API KEY BUTTON IN HEADER */
+  .key-btn {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 5px 12px;
+    border: 1px solid var(--border2);
+    border-radius: 20px;
+    background: transparent;
+    color: var(--text3);
+    font-size: 11.5px;
+    cursor: pointer;
+    font-family: 'Inter', sans-serif;
+    transition: all 0.15s;
+  }
+
+  .key-btn:hover { color: var(--text2); border-color: var(--text3); }
+
+  .key-btn.configured { color: var(--green2); border-color: rgba(74,124,89,0.4); background: var(--green-bg); }
+
+  .key-indicator {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+  }
+
+
+  /* MODE BAR */
+  .mode-bar{display:flex;border-bottom:1px solid var(--border);background:var(--bg2);flex-shrink:0;}
+  .mode-tab{padding:11px 18px;font-size:12.5px;font-weight:500;color:var(--text3);cursor:pointer;border-bottom:2px solid transparent;transition:all .15s;white-space:nowrap;}
+  .mode-tab:hover{color:var(--text2);}
+  .mode-tab.active{color:var(--gold2);border-bottom-color:var(--gold2);}
+  /* PDF zones */
+  .pdf-drop-zone{border:1.5px dashed var(--border2);border-radius:9px;padding:28px 20px;text-align:center;cursor:pointer;transition:all .15s;margin-bottom:12px;}
+  .pdf-drop-zone:hover,.pdf-drop-zone.drag-over{border-color:var(--gold);background:var(--gold-bg);}
+  .pdf-drop-icon{font-size:28px;margin-bottom:6px;}
+  .pdf-drop-label{font-size:13px;color:var(--text2);margin-bottom:4px;}
+  .pdf-drop-sub{font-size:11px;color:var(--text3);}
+  .pdf-files-list{margin-top:6px;display:flex;flex-direction:column;gap:6px;}
+  .pdf-file-item{display:flex;align-items:center;gap:10px;background:var(--bg3);border:1px solid var(--border);border-radius:7px;padding:8px 10px;}
+  .pdf-file-icon{font-size:16px;flex-shrink:0;}
+  .pdf-file-info{flex:1;min-width:0;}
+  .pdf-file-name{font-size:12px;font-weight:500;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .pdf-file-status{font-size:11px;color:var(--text3);margin-top:2px;}
+  .pdf-file-status.ok{color:var(--green2);}
+  .pdf-file-status.err{color:var(--red2);}
+  .pdf-file-remove{background:transparent;border:none;color:var(--text3);cursor:pointer;font-size:13px;padding:2px 5px;border-radius:4px;}
+  .pdf-file-remove:hover{color:var(--red2);background:var(--red-bg);}
+  #pdfProgress{display:none;font-size:11px;color:var(--gold);padding:6px 0;}
+  .paste-area{display:flex;flex-direction:column;gap:10px;padding:16px;overflow-y:auto;flex:1;}
+  .paste-hint{background:var(--gold-bg);border:1px solid var(--gold-border);border-radius:7px;padding:10px 14px;font-size:12px;color:var(--text2);line-height:1.5;}
+  .big-textarea{flex:1;min-height:200px;width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:7px;padding:10px 12px;font-size:12.5px;color:var(--text);font-family:Inter,sans-serif;outline:none;resize:vertical;}
+  .big-textarea:focus{border-color:var(--gold-border);}
+  .paste-ctx-label{font-size:12px;color:var(--text2);margin-bottom:4px;}
+  .paste-ctx-ta{width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:7px;padding:8px 11px;font-size:12px;color:var(--text);font-family:Inter,sans-serif;outline:none;resize:vertical;}
+  /* TABS */
+  .tabs-bar{display:flex;align-items:center;gap:6px;padding:10px 16px 0;border-bottom:1px solid var(--border);background:var(--bg2);flex-wrap:wrap;}
+  .tabs-bar{display:flex;align-items:center;gap:6px;padding:10px 16px 0;border-bottom:1px solid var(--border);background:var(--bg2);flex-wrap:wrap;}
+  .process-tab{display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:6px 6px 0 0;font-size:12px;font-weight:500;cursor:pointer;border:1px solid transparent;border-bottom:none;color:var(--text2);background:transparent;transition:all .15s;white-space:nowrap;}
+  .process-tab.active{background:var(--bg3);border-color:var(--border2);color:var(--text);}
+  .process-tab.running{color:var(--gold);}
+  .process-tab.done{color:var(--green2);}
+  .process-tab.error{color:var(--red2);}
+  .tab-close{opacity:.5;font-size:10px;margin-left:2px;padding:1px 4px;border-radius:3px;}
+  .tab-close:hover{opacity:1;background:var(--border2);}
+  .tab-add{font-size:12px;color:var(--text3);padding:4px 10px;border-radius:6px;border:1px dashed var(--border2);cursor:pointer;margin-left:2px;}
+  .tab-add:hover{color:var(--text2);}
+  .run-all-btn{margin-left:auto;font-size:11px;padding:4px 14px;border-radius:6px;border:1px solid var(--gold-border);color:var(--gold);background:var(--gold-bg);cursor:pointer;white-space:nowrap;}
+  .run-all-btn:hover{background:rgba(201,168,76,.15);}
+  .run-all-btn:disabled{opacity:.4;cursor:not-allowed;}
+  .save-pdf-btn{font-size:11px;padding:4px 10px;border-radius:6px;border:1px solid var(--border2);color:var(--text2);background:transparent;cursor:pointer;}
+  .save-pdf-btn:hover{color:var(--text);border-color:var(--border);}
+  .api-error{background:var(--red-bg);border:1px solid var(--red);border-radius:6px;padding:10px 14px;font-size:12px;color:var(--red2);margin-top:10px;}
+  /* PDF token counter */
+  .pdf-token-bar { margin-top:8px; padding:8px 10px; border-radius:6px; background:var(--bg3); border:1px solid var(--border); font-size:11px; }
+  .pdf-token-bar.ok   { border-color:var(--border); }
+  .pdf-token-bar.warn { border-color:#c9a84c; background:rgba(201,168,76,0.08); }
+  .pdf-token-bar.over { border-color:var(--red); background:var(--red-bg); }
+  .pdf-token-label { display:flex; justify-content:space-between; margin-bottom:5px; }
+  .pdf-token-fill { height:4px; border-radius:2px; transition:width .3s; }
+  .pdf-token-fill.ok   { background:var(--green2); }
+  .pdf-token-fill.warn { background:#c9a84c; }
+  .pdf-token-fill.over { background:var(--red2); }
+  .pdf-token-msg { font-size:10.5px; margin-top:4px; }
+
+  /* MODE TABS */
+  .mode-tabs { display:flex; gap:0; border-bottom:1px solid var(--border2); margin-bottom:16px; }
+  .mode-tab { padding:7px 16px; font-size:12px; font-weight:500; color:var(--text3); cursor:pointer; border-bottom:2px solid transparent; transition:all .15s; }
+  .mode-tab:hover { color:var(--text2); }
+  .mode-tab.active { color:var(--gold); border-bottom-color:var(--gold); }
+  /* PASTE MODE */
+  .big-textarea { width:100%; min-height:180px; background:var(--bg3); border:1px solid var(--border2); border-radius:8px; padding:12px; font-size:12.5px; color:var(--text); font-family:Inter,sans-serif; outline:none; resize:vertical; }
+  .big-textarea:focus { border-color:var(--gold-border); }
+  .obs-label { font-size:11px; font-weight:600; color:var(--text3); text-transform:uppercase; letter-spacing:.05em; margin-bottom:6px; margin-top:14px; }
+  /* PDF UPLOAD */
+  .pdf-drop-zone { border:2px dashed var(--border2); border-radius:10px; padding:28px 20px; text-align:center; cursor:pointer; transition:all .15s; }
+  .pdf-drop-zone:hover, .pdf-drop-zone.drag-over { border-color:var(--gold-border); background:var(--gold-bg); }
+  .pdf-drop-zone input[type="file"] { display:none; }
+  .pdf-drop-icon { font-size:28px; margin-bottom:8px; opacity:.6; }
+  .pdf-drop-label { font-size:12.5px; color:var(--text2); margin-bottom:4px; font-weight:500; }
+  .pdf-drop-sub { font-size:11px; color:var(--text3); }
+  .pdf-drop-sub span { color:var(--gold); cursor:pointer; text-decoration:underline; }
+  .pdf-files-list { display:flex; flex-direction:column; gap:6px; margin-top:10px; }
+  .pdf-file-item { display:flex; align-items:center; gap:10px; background:var(--bg3); border:1px solid var(--border); border-radius:7px; padding:8px 10px; }
+  .pdf-file-icon { font-size:16px; opacity:.7; flex-shrink:0; }
+  .pdf-file-info { flex:1; min-width:0; }
+  .pdf-file-name { font-size:12px; color:var(--text); font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .pdf-file-status { font-size:10.5px; color:var(--text3); margin-top:2px; }
+  .pdf-file-status.ok { color:var(--green2); }
+  .pdf-file-status.err { color:var(--red2); }
+  .pdf-file-remove { background:none; border:none; color:var(--text3); cursor:pointer; font-size:14px; padding:2px 5px; border-radius:4px; flex-shrink:0; }
+  .pdf-file-remove:hover { color:var(--red2); }
+  /* FORM PDF SECTION (inside form mode) */
+  .form-pdf-section { margin-top:20px; padding-top:16px; border-top:1px dashed var(--border2); }
+  .form-pdf-title { font-size:11px; font-weight:600; color:var(--gold); text-transform:uppercase; letter-spacing:.06em; margin-bottom:10px; }
+  .form-pdf-drop { border:1px dashed var(--gold-border); border-radius:8px; padding:14px 16px; text-align:center; cursor:pointer; transition:all .15s; background:var(--gold-bg); }
+  .form-pdf-drop:hover, .form-pdf-drop.drag-over { border-color:var(--gold); background:rgba(201,168,76,.12); }
+  .form-pdf-drop input[type="file"] { display:none; }
+  .form-obs-area { width:100%; min-height:90px; background:var(--bg3); border:1px solid var(--border2); border-radius:8px; padding:10px 12px; font-size:12.5px; color:var(--text); font-family:Inter,sans-serif; outline:none; resize:vertical; margin-top:8px; }
+  .form-obs-area:focus { border-color:var(--gold-border); }
+  .mode-body { display:none; flex-direction:column; gap:12px; padding:4px 0; }
+  .mode-body.active { display:flex; }
+
+  .turn-block{margin-bottom:0;}
+
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">L</div>
+    <div>
+      <div class="logo-text">Lex Rural</div>
+      <div class="logo-sub">Assistente Jurídico · Crédito Rural</div>
+    </div>
+  </div>
+  <div style="display:flex;align-items:center;gap:12px;">
+    <span class="header-badge">DL 167/67 · MCR · STJ · Agrário</span>
+    <button class="key-btn" id="keyBtn" onclick="openApiModal()">
+      <span class="key-icon">⚿</span>
+      <span id="keyBtnLabel">Configurar API Key</span>
+    </button>
+  </div>
+</header>
+
+
+<div class="modal-overlay hidden" id="apiModal">
+  <div class="modal">
+    <div class="modal-icon">⚿</div>
+    <div class="modal-title">Anthropic API Key</div>
+    <div class="modal-text">
+      Para usar o assistente, insira sua chave de API da Anthropic.<br><br>
+      Obtenha a sua em <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a> → <strong style="color:var(--text2)">API Keys</strong>.<br><br>
+      A chave fica salva apenas neste navegador e nunca é enviada a terceiros.
+    </div>
+    <div class="key-input-wrap">
+      <input type="password" id="apiKeyInput" placeholder="sk-ant-api03-..." autocomplete="off" onkeydown="if(event.key==='Enter')saveApiKey()">
+      <button class="key-toggle" onclick="toggleKeyVisibility()">mostrar</button>
+    </div>
+    <div class="modal-hint">
+      <div class="hint-dot"></div>
+      Sua chave começa com <code style="font-family:monospace;font-size:11px;color:var(--text2)">sk-ant-</code>
+    </div>
+    <button class="btn-primary" onclick="saveApiKey()">Salvar e continuar</button>
+    <button class="btn-secondary" id="skipBtn" onclick="closeApiModal()" style="display:none">Fechar</button>
+  </div>
+</div>
+
+  <div class="app">
+  <aside class="sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-label">Pré-Auditoria</div>
+      <div class="workflow-item" onclick="selectWorkflow(0)">
+        <div class="workflow-num">01</div>
+        <div class="workflow-info">
+          <div class="workflow-name">Pré-Auditoria — Alongamento</div>
+          <div class="workflow-desc">Diagnóstico estratégico antes do ajuizamento</div>
+        </div>
+      </div>
+      <div class="workflow-item" onclick="selectWorkflow(2)">
+        <div class="workflow-num">02</div>
+        <div class="workflow-info">
+          <div class="workflow-name">Pré-Auditoria — Embargos</div>
+          <div class="workflow-desc">Análise estratégica antes da oposição</div>
+        </div>
+      </div>
+      <div class="workflow-item" onclick="selectWorkflow(4)">
+        <div class="workflow-num">03</div>
+        <div class="workflow-info">
+          <div class="workflow-name">Pré-Auditoria — Exceção</div>
+          <div class="workflow-desc">Filtro de admissibilidade · Súmula 393/STJ</div>
+        </div>
+      </div>
+      <div class="workflow-item" onclick="selectWorkflow(6)">
+        <div class="workflow-num">04</div>
+        <div class="workflow-info">
+          <div class="workflow-name">AgroDefesa 360°</div>
+          <div class="workflow-desc">Auditoria completa · Revisional · Mandamental · Execução</div>
+        </div>
+      </div>
+      <div class="divider"></div>
+      <div class="sidebar-label">Elaborar Peças</div>
+      <div class="workflow-item" onclick="selectWorkflow(1)">
+        <div class="workflow-num">05</div>
+        <div class="workflow-info">
+          <div class="workflow-name">Petição — Alongamento</div>
+          <div class="workflow-desc">Ação de alongamento de dívida agrícola</div>
+        </div>
+      </div>
+      <div class="workflow-item" onclick="selectWorkflow(3)">
+        <div class="workflow-num">06</div>
+        <div class="workflow-info">
+          <div class="workflow-name">Embargos à Execução</div>
+          <div class="workflow-desc">Título de crédito rural · arts. 914–920 CPC</div>
+        </div>
+      </div>
+      <div class="workflow-item" onclick="selectWorkflow(5)">
+        <div class="workflow-num">07</div>
+        <div class="workflow-info">
+          <div class="workflow-name">Exceção de Pré-Executividade</div>
+          <div class="workflow-desc">Matérias de ordem pública · Súmula 393/STJ</div>
+        </div>
+      </div>
+      <div class="workflow-item" onclick="selectWorkflow(7)">
+        <div class="workflow-num">08</div>
+        <div class="workflow-info">
+          <div class="workflow-name">Ação Revisional</div>
+          <div class="workflow-desc">Revisão de encargos · CCB rural · Lei de Usura · Súmula 93/286</div>
+        </div>
+      </div>
+      <div class="workflow-item" onclick="selectWorkflow(8)">
+        <div class="workflow-num">09</div>
+        <div class="workflow-info">
+          <div class="workflow-name">Ação Mandamental</div>
+          <div class="workflow-desc">Obrigação de fazer · Súmula 298/STJ · MCR · Lei 9.138/95</div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="tabs-bar" id="tabsBar"></div>
+    <div class="mode-bar">
+      <div class="mode-tab active" id="mode-tab-form" onclick="switchMode('form')">Formulário guiado</div>
+      <div class="mode-tab" id="mode-tab-paste" onclick="switchMode('paste')">Colar texto</div>
+      <div class="mode-tab" id="mode-tab-pdf" onclick="switchMode('pdf')">Upload de PDF</div>
+    </div>
+    <div class="content">
+      <div class="form-panel">
+        <div class="form-header">
+          <div class="form-title" id="formTitle"></div>
+          <div class="form-subtitle" id="formSubtitle"></div>
+        </div>
+
+        <!-- FORM MODE -->
+        <div id="formArea">
+          <div class="steps-bar" id="stepsBar"></div>
+          <div class="form-body" id="formBody"></div>
+        </div>
+
+        <!-- PASTE MODE -->
+        <div class="paste-area" id="pasteArea" style="display:none">
+          <div class="paste-hint">
+            <strong>Cole aqui o texto dos autos</strong> — contrato, demonstrativo do banco, decisão judicial, laudo agronômico ou qualquer documento do caso.
+            Quanto mais completo, mais precisa a análise.<br><br>
+            Você pode combinar texto colado com observações na seção abaixo.
+          </div>
+          <textarea class="big-textarea" id="pasteText" placeholder="Cole aqui o conteúdo do contrato, autos, demonstrativo ou laudo..."></textarea>
+          <div>
+            <div class="paste-ctx-label">Contexto / objetivo da análise (Fase 2)</div>
+            <textarea class="paste-ctx-ta" id="pasteCtx" rows="3" placeholder="Ex: fase atual do processo, urgência, o que precisa identificar..."></textarea>
+          </div>
+        </div>
+
+        <!-- PDF MODE -->
+        <div class="paste-area" id="pdfArea" style="display:none">
+          <div class="paste-hint">
+            <strong>Carregue um ou mais PDFs</strong> — contrato de crédito rural, demonstrativo do banco, laudo agronômico, decisão judicial, autos da execução.
+            O texto será extraído automaticamente (Fase 2 da análise).<br><br>
+            PDFs digitalizados (imagem) podem não ter texto extraível — use "Colar texto" nesses casos.
+          </div>
+          <div class="pdf-drop-zone" id="pdfDropZone"
+               onclick="document.getElementById('pdfTabInput').click()"
+               ondragover="onPdfTabDragOver(event)" ondragleave="onPdfTabDragLeave()" ondrop="onPdfTabDrop(event)">
+            <input type="file" id="pdfTabInput" accept=".pdf" multiple onchange="onPdfTabSelect(event)" style="display:none">
+            <div class="pdf-drop-icon">📄</div>
+            <div class="pdf-drop-label">Arraste PDFs aqui ou clique para selecionar</div>
+            <div class="pdf-drop-sub">Múltiplos arquivos suportados · Máx. 50MB por arquivo</div>
+          </div>
+          <div id="pdfProgress" style="display:none;font-size:11px;color:var(--gold);padding:4px 0;">Extraindo texto dos PDFs...</div>
+          <div class="pdf-files-list" id="pdfTabList"></div>
+          <div>
+            <div class="paste-ctx-label" style="margin-top:8px;">Contexto / objetivo da análise</div>
+            <textarea class="paste-ctx-ta" id="pdfTabCtx" rows="3" placeholder="Ex: fase atual do processo, urgência, o que precisa identificar..."></textarea>
+          </div>
+        </div>
+
+        <!-- OBSERVAÇÕES COMPARTILHADAS (Fase 3) — sempre visível -->
+        <div style="padding:12px 16px 0;">
+          <div class="paste-ctx-label">💬 Observações do advogado — Fase 3 (qualquer modo)</div>
+          <textarea class="paste-ctx-ta" id="observacoes" rows="4"
+            placeholder="Dúvidas específicas, urgências, estratégias, questões a responder ou qualquer informação adicional que o assistente deve considerar..."></textarea>
+        </div>
+
+        <div class="form-footer">
+          <button class="btn-primary" id="btnExecutar" onclick="executarPrompt()">
+            <span>Executar Análise</span><span>→</span>
+          </button>
+          <button class="btn-secondary" onclick="limparFormulario()">Limpar campos</button>
+        </div>
+      </div>
+      <div class="output-panel">
+        <div class="output-header">
+          <div class="output-title">
+            <div class="status-dot" id="statusDot"></div>
+            <span id="outputLabel">Aguardando execução</span>
+          </div>
+          <div class="output-actions">
+            <button class="save-pdf-btn" onclick="saveCurrentPdf()">Salvar PDF</button>
+            <button class="action-btn" onclick="copyOutput()">Copiar</button>
+            <button class="action-btn" onclick="clearCurrentOutput()">Limpar</button>
+          </div>
+        </div>
+        <div class="output-body" id="outputBody">
+          <div class="empty-state" id="emptyState">
+            <div class="empty-icon">§</div>
+            <div class="empty-title">Pronto para análise</div>
+            <div class="empty-text">Preencha o formulário ao lado com os dados do caso e clique em "Executar Análise" para gerar o diagnóstico jurídico.</div>
+          </div>
+          <div class="output-content" id="outputContent" style="display:none"></div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
+
+const MAX_SESSIONS = 8;
+const MAX_TURNS = 15;
+const RATE_LIMIT_DELAY = 62000;
+const RETRY_DELAY = 5000;
+const MAX_RETRIES = 4;
+
+const WORKFLOWS = [
+  {
+    name: "Pré-Auditoria — Alongamento",
+    subtitle: "Diagnóstico estratégico completo antes do ajuizamento",
+    steps: ["Identificação", "Situação Processual", "Análise do Título", "Encargos", "Dados do Caso"],
+    promptFile: "PRE_AUDITORIA",
+    fields: [
+      { group: "BLOCO A — Identificação do Caso", fields: [
+        { id: "cliente", label: "Nome do cliente (autor pretendido)", type: "text" },
+        { id: "banco", label: "Instituição financeira credora", type: "text" },
+        { id: "contrato", label: "Número do contrato / cédula", type: "text" },
+        { id: "valor_original", label: "Valor original do contrato (R$)", type: "text" },
+        { id: "data_celebracao", label: "Data de celebração", type: "date" },
+        { id: "vencimento", label: "Data(s) de vencimento (se parcelado, informe todas: ex. 10/03/2024, 10/06/2024...)", type: "text" },
+        { id: "linha_credito", label: "Linha de crédito (Pronaf, custeio, investimento...)", type: "text" },
+        { id: "cedula", label: "Formalizado por cédula de crédito rural (DL 167/67)?", type: "radio", options: ["Sim", "Não", "Não sei"] },
+        { id: "valor_atual", label: "Valor atual do débito (R$)", type: "text" },
+        { id: "demonstrativo", label: "Demonstrativo fornecido com planilha detalhada?", type: "radio", options: ["Sim", "Não", "Sem detalhamento"] },
+      ]},
+      { group: "BLOCO B — Situação Processual", fields: [
+        { id: "acao_curso", label: "Há ação judicial em curso contra o cliente?", type: "radio", options: ["Sim", "Não"] },
+        { id: "prazo_embargos", label: "Prazo para embargos à execução?", type: "radio", options: ["Em curso", "Expirado", "N/A", "Não sei"] },
+        { id: "penhora", label: "Há penhora já realizada?", type: "radio", options: ["Sim", "Não"] },
+        { id: "bem_penhorado", label: "Bem penhorado (descrever se houver)", type: "text" },
+        { id: "leilao", label: "Há leilão designado?", type: "radio", options: ["Sim", "Não"] },
+        { id: "data_leilao", label: "Data do leilão (se houver)", type: "date" },
+        { id: "bloqueio", label: "Há bloqueio de contas ou safra?", type: "radio", options: ["Sim", "Não"] },
+      ]},
+      { group: "BLOCO C — Análise Formal do Título", fields: [
+        { id: "duas_testemunhas", label: "Assinatura de duas testemunhas no instrumento?", type: "radio", options: ["Sim", "Não", "Não sei"] },
+        { id: "capitalizacao", label: "Cláusula expressa de capitalização de juros?", type: "radio", options: ["Sim", "Não", "Não identificado"] },
+        { id: "planilha_discriminada", label: "Planilha separando principal, juros, multa e encargos?", type: "radio", options: ["Sim", "Não"] },
+        { id: "indice_correcao", label: "Índice de correção monetária indicado no contrato?", type: "radio", options: ["Sim", "Não"] },
+        { id: "vencimento_antecipado_notif", label: "Notificação prévia para vencimento antecipado?", type: "radio", options: ["Sim", "Não", "Não sei"] },
+        { id: "cessao_credito", label: "Houve cessão de crédito?", type: "radio", options: ["Sim", "Não", "Não sei"] },
+      ]},
+      { group: "BLOCO D — Encargos Financeiros", fields: [
+        { id: "taxa_juros", label: "Taxa de juros remuneratórios contratada (% a.a.)", type: "text" },
+        { id: "tipo_taxa", label: "Tipo de taxa", type: "radio", options: ["Prefixada", "Pós-fixada", "Variável"] },
+        { id: "indice_correcao_nome", label: "Índice de correção monetária contratado", type: "text" },
+        { id: "multa", label: "Multa por inadimplência prevista (%)", type: "text" },
+        { id: "juros_mora", label: "Juros de mora contratados (% a.m.)", type: "text" },
+      ]},
+      { group: "BLOCO E — Causa da Inadimplência", fields: [
+        { id: "motivo", label: "Motivos da dificuldade (pode marcar mais de um)", type: "checkbox", options: ["Seca", "Geada", "Enchente", "Granizo", "Praga", "Queda de preços", "Aumento de insumos", "Saúde", "Outro"] },
+        { id: "safra", label: "Safra/período afetado", type: "text" },
+        { id: "laudo_frustracao", label: "Laudo de frustração de safra?", type: "radio", options: ["Sim", "Não", "Em providência"] },
+        { id: "decreto_emergencia", label: "Decreto de emergência agropecuária?", type: "radio", options: ["Sim", "Não", "Não sei"] },
+        { id: "receita_historica", label: "Receita histórica média (R$ — últimas 3 safras)", type: "text" },
+        { id: "receita_afetada", label: "Receita na safra afetada (R$)", type: "text" },
+        { id: "quebra_percentual", label: "Percentual estimado de quebra (%)", type: "text" },
+        { id: "agricultor_familiar", label: "Agricultor familiar (Lei 11.326/2006)?", type: "radio", options: ["Sim", "Não", "Não sei"] },
+        { id: "imovel_moradia", label: "Imóvel rural serve de moradia?", type: "radio", options: ["Sim", "Não"] },
+        { id: "obs_auditoria", label: "Observações adicionais / contexto do caso", type: "textarea" },
+      ]},
+    ]
+  },
+  {
+    name: "Petição Inicial — Alongamento",
+    subtitle: "Ação de alongamento de dívida agrícola (MCR, CMN, legislação específica)",
+    steps: ["Produtor Rural", "Contrato", "Situação da Dívida", "Inadimplência", "Requerimento"],
+    promptFile: "PETICAO_INICIAL",
+    fields: [
+      { group: "BLOCO A — Dados do Produtor Rural (Autor)", fields: [
+        { id: "nome_autor", label: "Nome completo", type: "text" },
+        { id: "cpf_cnpj", label: "CPF/CNPJ", type: "text" },
+        { id: "estado_civil", label: "Estado civil", type: "text" },
+        { id: "profissao", label: "Profissão declarada", type: "text" },
+        { id: "endereco", label: "Endereço completo para correspondência", type: "text" },
+        { id: "imovel_nome", label: "Nome e localização do imóvel rural", type: "text" },
+        { id: "municipio_uf", label: "Município e estado do imóvel", type: "text" },
+        { id: "area_ha", label: "Área total (hectares)", type: "text" },
+        { id: "modulos_fiscais", label: "Número de módulos fiscais", type: "text" },
+        { id: "matricula_cri", label: "Matrícula no CRI", type: "text" },
+        { id: "agricultor_familiar_pi", label: "Agricultor familiar (Lei 11.326/2006)?", type: "radio", options: ["Sim", "Não", "Não sei"] },
+        { id: "dap_caf", label: "Possui DAP ou CAF?", type: "radio", options: ["Sim", "Não"] },
+        { id: "pronamp", label: "Enquadra-se no Pronamp?", type: "radio", options: ["Sim", "Não", "Não sei"] },
+      ]},
+      { group: "BLOCO B — Dados do Contrato de Crédito Rural", fields: [
+        { id: "banco_pi", label: "Nome da instituição financeira credora", type: "text" },
+        { id: "cnpj_banco", label: "CNPJ da instituição", type: "text" },
+        { id: "agencia", label: "Agência (município e estado)", type: "text" },
+        { id: "num_contrato", label: "Número do contrato", type: "text" },
+        { id: "data_celebracao_pi", label: "Data de celebração", type: "date" },
+        { id: "finalidade", label: "Finalidade do crédito", type: "radio", options: ["Custeio agrícola", "Custeio pecuário", "Investimento", "Comercialização", "Pronaf", "Pronamp", "Outra"] },
+        { id: "valor_original_pi", label: "Valor original do contrato (R$)", type: "text" },
+        { id: "taxa_juros_pi", label: "Taxa de juros (% a.a.)", type: "text" },
+        { id: "prazo_original", label: "Prazo original de pagamento", type: "text" },
+        { id: "vencimento_pi", label: "Data(s) de vencimento (parcelado: informe todas separadas por vírgula)", type: "text" },
+        { id: "tipo_cedula", label: "Tipo de cédula (se cédula rural)", type: "radio", options: ["Pignoratícia", "Hipotecária", "Pignoratícia e Hipotecária", "Rural Industrial", "Não é cédula"] },
+        { id: "garantias", label: "Garantias prestadas", type: "checkbox", options: ["Penhor agrícola", "Hipoteca rural", "Alienação fiduciária", "Aval pessoal", "Seguro rural"] },
+      ]},
+      { group: "BLOCO C — Situação Atual da Dívida", fields: [
+        { id: "valor_atual_pi", label: "Valor atual do débito (R$)", type: "text" },
+        { id: "demonstrativo_pi", label: "Demonstrativo fornecido pelo banco?", type: "radio", options: ["Sim — anexar", "Não foi fornecido", "Solicitado mas negado"] },
+        { id: "parcelas_vencidas", label: "Há parcelas vencidas e não pagas?", type: "radio", options: ["Sim", "Não"] },
+        { id: "desde_quando", label: "Inadimplência desde quando", type: "text" },
+        { id: "execucao_curso", label: "Há execução/monitória/cobrança em curso?", type: "radio", options: ["Sim", "Não"] },
+        { id: "num_processo_pi", label: "Número do processo (se houver)", type: "text" },
+        { id: "penhora_pi", label: "Há penhora, bloqueio ou leilão?", type: "radio", options: ["Sim", "Não"] },
+        { id: "bem_atingido", label: "Bem atingido (descrever)", type: "text" },
+      ]},
+      { group: "BLOCO D — Causa da Inadimplência", fields: [
+        { id: "motivo_pi", label: "Motivos (pode marcar mais de um)", type: "checkbox", options: ["Seca", "Geada", "Enchente", "Granizo", "Praga/doença", "Queda de preços", "Aumento de insumos", "Saúde do produtor", "Outro"] },
+        { id: "safra_pi", label: "Safra/período afetado", type: "text" },
+        { id: "laudo_pi", label: "Laudo de frustração de safra?", type: "radio", options: ["Sim", "Não", "Em providência"] },
+        { id: "decreto_pi", label: "Decreto de emergência agropecuária?", type: "radio", options: ["Sim", "Não", "Não sei"] },
+        { id: "culturas", label: "Culturas exploradas no imóvel", type: "text" },
+        { id: "receita_historica_pi", label: "Receita bruta média histórica (R$)", type: "text" },
+        { id: "receita_afetada_pi", label: "Receita bruta na safra afetada (R$)", type: "text" },
+        { id: "custo_producao", label: "Custo de produção estimado na safra (R$)", type: "text" },
+        { id: "quebra_safra", label: "Percentual de quebra de safra (%)", type: "text" },
+      ]},
+      { group: "BLOCO E — Pedido e Estratégia", fields: [
+        { id: "pedidos_pi", label: "O que o autor quer (marque os que se aplicam)", type: "checkbox", options: ["Alongamento do prazo", "Redução de juros", "Desconto de multas", "Revisão de cláusulas abusivas", "Recálculo do saldo", "Suspensão de execução", "Declaração de inexigibilidade parcial"] },
+        { id: "urgencia_pi", label: "Há urgência que justifique tutela provisória?", type: "radio", options: ["Sim", "Não", "Não sei"] },
+        { id: "requerimento_adm", label: "Já formulou pedido administrativo ao banco?", type: "radio", options: ["Sim", "Não"] },
+        { id: "custas_pi", label: "Tem condições de arcar com custas?", type: "radio", options: ["Sim", "Não — pedir gratuidade", "Parcialmente"] },
+        { id: "enquadramento", label: "Norma identificada", type: "radio", options: ["Lei 9.138/95", "Lei 11.322/2006", "Resolução CMN específica", "Pronaf", "FCO/FNE/FNO", "Outra", "Não identificada"] },
+        { id: "obs_peticao", label: "Contexto adicional / resultado da pré-auditoria", type: "textarea" },
+      ]},
+    ]
+  },
+  {
+    name: "Pré-Auditoria — Embargos",
+    subtitle: "Análise estratégica completa antes da oposição dos embargos",
+    steps: ["Partes e Processo", "Título Executivo", "Análise Formal", "Encargos", "Penhora e Riscos"],
+    promptFile: "PRE_AUDITORIA_EMBARGOS",
+    fields: [
+      { group: "BLOCO A — Identificação das Partes e do Processo", fields: [
+        { id: "executado", label: "Nome do executado (embargante)", type: "text" },
+        { id: "cpf_executado", label: "CPF/CNPJ do executado", type: "text" },
+        { id: "produtor_rural", label: "O executado é produtor rural?", type: "radio", options: ["Sim", "Não", "Parcialmente"] },
+        { id: "ag_familiar", label: "Agricultor familiar (Lei 11.326/2006)?", type: "radio", options: ["Sim", "Não", "Não sei"] },
+        { id: "exequente", label: "Nome da instituição financeira exequente", type: "text" },
+        { id: "cnpj_exequente", label: "CNPJ da instituição exequente", type: "text" },
+        { id: "empresa_publica", label: "A exequente é empresa pública federal?", type: "radio", options: ["Sim", "Não"] },
+        { id: "num_processo_emb", label: "Número do processo de execução", type: "text" },
+        { id: "vara_comarca", label: "Vara e comarca", type: "text" },
+        { id: "justica", label: "Justiça competente", type: "radio", options: ["Federal", "Estadual"] },
+      ]},
+      { group: "BLOCO B — Título Executivo", fields: [
+        { id: "tipo_titulo", label: "Tipo de título", type: "radio", options: ["Cédula rural pignoratícia", "Cédula rural hipotecária", "Cédula pignoratícia e hipotecária", "Rural industrial", "Nota de crédito rural", "Contrato ordinário", "NP vinculada", "Outro"] },
+        { id: "num_cedula", label: "Número do contrato ou cédula", type: "text" },
+        { id: "data_celebracao_emb", label: "Data de celebração", type: "date" },
+        { id: "vencimento_emb", label: "Data(s) de vencimento (parcelado: informe todas separadas por vírgula)", type: "text" },
+        { id: "valor_original_emb", label: "Valor original do contrato (R$)", type: "text" },
+        { id: "valor_cobrado", label: "Valor cobrado na execução (R$)", type: "text" },
+        { id: "linha_emb", label: "Linha de crédito", type: "text" },
+        { id: "finalidade_emb", label: "Finalidade", type: "radio", options: ["Custeio agrícola", "Custeio pecuário", "Investimento", "Comercialização", "Outra"] },
+        { id: "fundo_constitucional", label: "Recursos de fundo constitucional (FCO/FNE/FNO)?", type: "radio", options: ["Sim", "Não", "Não sei"] },
+      ]},
+      { group: "BLOCO C — Prazos (PRIORIDADE ABSOLUTA)", fields: [
+        { id: "data_citacao", label: "Data da citação", type: "date" },
+        { id: "prazo_emb", label: "Prazo de embargos (art. 915 CPC)", type: "radio", options: ["Em curso", "Expirado", "Dúvida sobre termo inicial"] },
+        { id: "dias_restantes", label: "Dias restantes (se em curso)", type: "text" },
+      ]},
+      { group: "BLOCO D — Análise Formal do Título", fields: [
+        { id: "testemunhas_emb", label: "Assinatura de duas testemunhas?", type: "radio", options: ["Sim", "Não", "Não sei"] },
+        { id: "requisitos_art14", label: "Requisitos do art. 14 DL 167/67 preenchidos?", type: "radio", options: ["Sim", "Não", "Não analisado", "N/A"] },
+        { id: "cap_juros", label: "Cláusula expressa de capitalização?", type: "radio", options: ["Sim", "Não", "Não identificado"] },
+        { id: "planilha_banco", label: "Banco juntou planilha discriminada?", type: "radio", options: ["Sim", "Não", "Parcialmente"] },
+        { id: "venc_antecipado", label: "Houve vencimento antecipado?", type: "radio", options: ["Sim", "Não", "Não sei"] },
+        { id: "notificacao_venc", label: "Banco notificou formalmente antes de executar?", type: "radio", options: ["Sim", "Não", "Não sei"] },
+        { id: "cessao_emb", label: "Houve cessão de crédito?", type: "radio", options: ["Sim", "Não", "Não sei"] },
+      ]},
+      { group: "BLOCO E — Penhora e Riscos", fields: [
+        { id: "penhora_emb", label: "Há penhora?", type: "radio", options: ["Sim", "Não", "SISBAJUD"] },
+        { id: "bem_penhorado_emb", label: "Bem(ns) penhorado(s)", type: "text" },
+        { id: "imovel_produtivo", label: "Imóvel produtivo?", type: "radio", options: ["Sim", "Não"] },
+        { id: "imovel_moradia_emb", label: "Imóvel é moradia?", type: "radio", options: ["Sim", "Não"] },
+        { id: "avaliacao", label: "Valor da avaliação (R$)", type: "text" },
+        { id: "leilao_emb", label: "Há leilão designado?", type: "radio", options: ["Sim", "Não"] },
+        { id: "data_leilao_emb", label: "Data 1ª praça (se houver)", type: "date" },
+        { id: "bloqueio_emb", label: "Há bloqueio de contas?", type: "radio", options: ["Sim", "Não"] },
+        { id: "valor_bloqueio", label: "Valor bloqueado (R$)", type: "text" },
+        { id: "taxa_emb", label: "Taxa de juros contratada (% a.a.)", type: "text" },
+        { id: "taxa_cobrada", label: "Taxa efetivamente cobrada na execução (% a.a.)", type: "text" },
+        { id: "obs_emb", label: "Motivo da inadimplência / contexto", type: "textarea" },
+      ]},
+    ]
+  },
+  {
+    name: "Embargos à Execução",
+    subtitle: "Título de crédito rural · arts. 914–920 CPC · Importação obrigatória da pré-auditoria",
+    steps: ["Embargante", "Execução", "Título", "Penhora", "Causa e Pedidos"],
+    promptFile: "EMBARGOS_EXECUCAO",
+    fields: [
+      { group: "BLOCO A — Dados do Executado (Embargante)", fields: [
+        { id: "nome_emb", label: "Nome completo do embargante", type: "text" },
+        { id: "cpf_emb", label: "CPF/CNPJ", type: "text" },
+        { id: "estado_civil_emb", label: "Estado civil", type: "text" },
+        { id: "profissao_emb", label: "Profissão", type: "text" },
+        { id: "endereco_emb", label: "Endereço", type: "text" },
+        { id: "imovel_rural_emb", label: "Imóvel rural (nome e localização)", type: "text" },
+        { id: "municipio_emb", label: "Município/UF", type: "text" },
+        { id: "area_emb", label: "Área (ha) / Módulos fiscais", type: "text" },
+        { id: "matricula_emb", label: "Matrícula CRI", type: "text" },
+        { id: "ag_familiar_emb", label: "Agricultor familiar?", type: "radio", options: ["Sim", "Não", "Não sei"] },
+        { id: "dap_emb", label: "DAP/CAF?", type: "radio", options: ["Sim", "Não"] },
+        { id: "litisconsorte", label: "Litisconsorte nos embargos?", type: "radio", options: ["Sim", "Não"] },
+      ]},
+      { group: "BLOCO B — Dados da Execução", fields: [
+        { id: "exequente_emb", label: "Exequente (embargada)", type: "text" },
+        { id: "cnpj_exeq_emb", label: "CNPJ da exequente", type: "text" },
+        { id: "num_proc_emb_b", label: "Número do processo", type: "text" },
+        { id: "vara_emb", label: "Vara/Comarca", type: "text" },
+        { id: "justica_emb", label: "Justiça", type: "radio", options: ["Federal", "Estadual"] },
+        { id: "rito_emb", label: "Rito processual", type: "radio", options: ["Exec. título extrajudicial", "Monitória", "Exec. hipotecária (DL 70/66)", "Outro"] },
+        { id: "data_citacao_emb", label: "Data da citação", type: "date" },
+        { id: "prazo_emb_b", label: "Prazo de embargos", type: "radio", options: ["Em curso", "Expirado"] },
+        { id: "valor_cobrado_emb", label: "Valor cobrado na execução (R$)", type: "text" },
+      ]},
+      { group: "BLOCO C — Dados do Título", fields: [
+        { id: "tipo_titulo_emb", label: "Tipo de título", type: "radio", options: ["Cédula rural", "Contrato ordinário", "NP vinculada", "Outro"] },
+        { id: "num_titulo_emb", label: "Número do título/contrato", type: "text" },
+        { id: "data_titulo_emb", label: "Data de celebração", type: "date" },
+        { id: "valor_titulo_emb", label: "Valor original (R$)", type: "text" },
+        { id: "venc_titulo_emb", label: "Data(s) de vencimento (parcelado: informe todas separadas por vírgula)", type: "text" },
+        { id: "linha_titulo_emb", label: "Linha de crédito", type: "text" },
+        { id: "finalidade_titulo_emb", label: "Finalidade", type: "radio", options: ["Custeio agrícola", "Custeio pecuário", "Investimento", "Comercialização"] },
+        { id: "taxa_titulo_emb", label: "Taxa de juros contratada (% a.a.)", type: "text" },
+      ]},
+      { group: "BLOCO F — Pedidos Pretendidos", fields: [
+        { id: "pedidos_emb", label: "Pedidos", type: "checkbox", options: ["Nulidade/inexigibilidade do título", "Prescrição", "Excesso de execução com recálculo", "Impenhorabilidade / bem de família", "Redução/substituição da penhora", "Revisão de encargos", "Efeito suspensivo", "Cancelamento de leilão", "Perícia contábil"] },
+        { id: "urgencia_emb", label: "Urgência para efeito suspensivo?", type: "radio", options: ["Sim", "Não"] },
+        { id: "causa_inadimplencia_emb", label: "Causas da inadimplência (pode marcar mais de um)", type: "checkbox", options: ["Seca", "Geada", "Enchente", "Praga", "Queda de preços", "Insumos", "Saúde", "Outro"] },
+        { id: "receita_emb", label: "Receita histórica (3 safras) / Receita afetada (R$)", type: "text" },
+        { id: "cap_pagamento_emb", label: "Capacidade de pagamento atual?", type: "radio", options: ["Sim", "Não", "Incerto"] },
+        { id: "pre_auditoria_emb", label: "Cole aqui a síntese da pré-auditoria de embargos", type: "textarea" },
+      ]},
+    ]
+  },
+  {
+    name: "Pré-Auditoria — Exceção",
+    subtitle: "Filtro de admissibilidade para exceção de pré-executividade",
+    steps: ["Identificação", "Contexto Processual", "Título", "Matérias", "Penhora e Risco"],
+    promptFile: "PRE_AUDITORIA_EXCECAO",
+    fields: [
+      { group: "BLOCO A — Identificação das Partes", fields: [
+        { id: "excipiente", label: "Nome do executado (excipiente)", type: "text" },
+        { id: "cpf_exc", label: "CPF/CNPJ", type: "text" },
+        { id: "produtor_exc", label: "O executado é produtor rural?", type: "radio", options: ["Sim", "Não", "Parcialmente"] },
+        { id: "ag_exc", label: "Agricultor familiar?", type: "radio", options: ["Sim", "Não", "Não sei"] },
+        { id: "exequente_exc", label: "Nome da instituição exequente (excepta)", type: "text" },
+        { id: "num_proc_exc", label: "Número do processo de execução", type: "text" },
+        { id: "vara_exc", label: "Vara e comarca", type: "text" },
+        { id: "justica_exc", label: "Justiça competente", type: "radio", options: ["Federal", "Estadual"] },
+      ]},
+      { group: "BLOCO B — Contexto Processual e Razão da Exceção", fields: [
+        { id: "prazo_expirado", label: "Prazo de 15 dias para embargos (art. 915 CPC) já expirou?", type: "radio", options: ["Sim", "Não — em curso", "Não sei"] },
+        { id: "data_citacao_exc", label: "Data da citação do executado", type: "date" },
+        { id: "razao_excecao", label: "Por que não opor embargos?", type: "radio", options: ["Matéria exclusivamente de ordem pública", "Estratégia de cumulação", "Prazo expirado", "Outro"] },
+        { id: "defesa_anterior", label: "O executado já apresentou alguma defesa?", type: "radio", options: ["Sim", "Não"] },
+      ]},
+      { group: "BLOCO C — Título Executivo", fields: [
+        { id: "tipo_titulo_exc", label: "Tipo de título", type: "radio", options: ["Cédula rural pignoratícia", "Cédula rural hipotecária", "Contrato ordinário", "NP vinculada", "Outro"] },
+        { id: "num_titulo_exc", label: "Número do contrato ou cédula", type: "text" },
+        { id: "data_titulo_exc", label: "Data de celebração", type: "date" },
+        { id: "venc_exc", label: "Data(s) de vencimento (parcelado: informe todas separadas por vírgula)", type: "text" },
+        { id: "valor_orig_exc", label: "Valor original (R$)", type: "text" },
+        { id: "valor_cobrado_exc", label: "Valor cobrado na execução (R$)", type: "text" },
+        { id: "linha_exc", label: "Linha de crédito", type: "text" },
+      ]},
+      { group: "BLOCO D — Matéria da Exceção (Filtro de Admissibilidade)", fields: [
+        { id: "materias_exc", label: "Matéria principal a ser arguida", type: "radio", options: ["Prescrição originária", "Prescrição intercorrente", "Nulidade formal do título", "Ausência de liquidez", "Ilegitimidade de parte", "Impenhorabilidade de bem de família", "Excesso de penhora", "Outra matéria de ordem pública"] },
+        { id: "venc_originario", label: "Data do primeiro vencimento (para cálculo de prescrição)", type: "date" },
+        { id: "ajuizamento", label: "Data de ajuizamento da execução", type: "date" },
+        { id: "testemunhas_exc", label: "Assinatura de duas testemunhas no título?", type: "radio", options: ["Sim", "Não", "Não sei"] },
+        { id: "planilha_exc", label: "Banco juntou planilha discriminada?", type: "radio", options: ["Sim", "Não", "Parcialmente"] },
+        { id: "cessao_exc", label: "Houve cessão de crédito sem notificação?", type: "radio", options: ["Sim", "Não", "Não sei"] },
+      ]},
+      { group: "BLOCO E — Penhora e Bem de Família", fields: [
+        { id: "penhora_exc", label: "Há penhora?", type: "radio", options: ["Sim", "Não"] },
+        { id: "bem_exc", label: "Bem penhorado", type: "text" },
+        { id: "unico_imovel", label: "É o único imóvel / moradia?", type: "radio", options: ["Sim", "Não"] },
+        { id: "valor_avaliacao_exc", label: "Valor da avaliação (R$)", type: "text" },
+        { id: "debito_exc", label: "Débito atual (R$)", type: "text" },
+        { id: "leilao_exc", label: "Há leilão designado?", type: "radio", options: ["Sim", "Não"] },
+        { id: "data_leilao_exc", label: "Data do leilão (se houver)", type: "date" },
+        { id: "comprovacao_bem_familia", label: "Comprovação de bem de família é possível documentalmente?", type: "radio", options: ["Sim (matrícula + ITR + DAP)", "Precisa de prova testemunhal", "Não sei"] },
+        { id: "obs_exc", label: "Observações adicionais", type: "textarea" },
+      ]},
+    ]
+  },
+  {
+    name: "Exceção de Pré-Executividade",
+    subtitle: "Matérias de ordem pública cognoscíveis de ofício · Súmula 393/STJ",
+    steps: ["Excipiente", "Execução", "Título", "Matéria Principal", "Penhora e Pedidos"],
+    promptFile: "EXCECAO_PRE_EXECUTIVIDADE",
+    fields: [
+      { group: "BLOCO A — Dados do Excipiente", fields: [
+        { id: "nome_exc2", label: "Nome completo", type: "text" },
+        { id: "cpf_exc2", label: "CPF/CNPJ", type: "text" },
+        { id: "estado_civil_exc2", label: "Estado civil", type: "text" },
+        { id: "endereco_exc2", label: "Endereço", type: "text" },
+        { id: "ag_exc2", label: "Agricultor familiar?", type: "radio", options: ["Sim", "Não", "Não sei"] },
+        { id: "dap_exc2", label: "DAP/CAF?", type: "radio", options: ["Sim", "Não"] },
+      ]},
+      { group: "BLOCO B — Dados da Execução", fields: [
+        { id: "exequente_exc2", label: "Exequente (excepta)", type: "text" },
+        { id: "cnpj_exc2", label: "CNPJ", type: "text" },
+        { id: "num_proc_exc2", label: "Número do processo", type: "text" },
+        { id: "vara_exc2", label: "Vara/Comarca", type: "text" },
+        { id: "justica_exc2", label: "Justiça", type: "radio", options: ["Federal", "Estadual"] },
+        { id: "valor_cobrado_exc2", label: "Valor cobrado (R$)", type: "text" },
+        { id: "prazo_emb_exc2", label: "Prazo de embargos", type: "radio", options: ["Expirado", "Em curso", "Não sei"] },
+        { id: "data_citacao_exc2", label: "Data da citação", type: "date" },
+      ]},
+      { group: "BLOCO C — Título Executivo", fields: [
+        { id: "tipo_titulo_exc2", label: "Tipo de título", type: "radio", options: ["Cédula rural pignoratícia", "Cédula rural hipotecária", "Contrato ordinário", "NP vinculada", "Outro"] },
+        { id: "num_titulo_exc2", label: "Número", type: "text" },
+        { id: "data_titulo_exc2", label: "Data de celebração", type: "date" },
+        { id: "valor_orig_exc2", label: "Valor original (R$)", type: "text" },
+        { id: "venc_exc2", label: "Data(s) de vencimento (parcelado: informe todas separadas por vírgula)", type: "text" },
+        { id: "linha_exc2", label: "Linha de crédito", type: "text" },
+      ]},
+      { group: "BLOCO D — Matéria da Exceção", fields: [
+        { id: "materia_exc2", label: "Matéria principal", type: "radio", options: ["Prescrição originária", "Prescrição intercorrente", "Nulidade formal do título", "Ausência de liquidez", "Ilegitimidade de parte", "Impenhorabilidade de bem de família", "Excesso de penhora", "Outra"] },
+        { id: "data_venc_exec", label: "Data do primeiro vencimento (para prescrição)", type: "date" },
+        { id: "data_ajuizamento", label: "Data de ajuizamento da execução", type: "date" },
+        { id: "testemunhas_exc2", label: "Há assinatura de duas testemunhas no título?", type: "radio", options: ["Sim", "Não", "Não sei"] },
+        { id: "planilha_exc2", label: "Banco juntou planilha discriminada?", type: "radio", options: ["Sim", "Não", "Parcialmente"] },
+        { id: "cessao_exc2", label: "Houve cessão de crédito sem notificação?", type: "radio", options: ["Sim", "Não", "Não sei"] },
+        { id: "pre_auditoria_exc", label: "Cole aqui o Bloco de Saída Padronizado da pré-auditoria", type: "textarea" },
+      ]},
+      { group: "BLOCO E — Penhora (se aplicável)", fields: [
+        { id: "penhora_exc2", label: "Há penhora?", type: "radio", options: ["Sim", "Não"] },
+        { id: "bem_exc2", label: "Bem penhorado", type: "text" },
+        { id: "imovel_moradia_exc2", label: "Imóvel produtivo/moradia?", type: "radio", options: ["Sim", "Não"] },
+        { id: "valor_aval_exc2", label: "Valor da avaliação (R$)", type: "text" },
+        { id: "debito_atual_exc2", label: "Débito atual (R$)", type: "text" },
+        { id: "leilao_exc2", label: "Leilão designado?", type: "radio", options: ["Sim", "Não"] },
+        { id: "data_leilao_exc2", label: "Data do leilão (se houver)", type: "date" },
+      ]},
+    ]
+  }
+];
+// Additional workflows (indexes 6, 7, 8)
+WORKFLOWS.push(...[
+  {
+    name: "AgroDefesa 360° — Auditoria Completa",
+    subtitle: "Revisional · Mandamental · Embargos · Exceção · Tutela · CCB Rural · CPR",
+    promptFile: "AGRODEFESA_360",
+    fields: [
+      { group: "IDENTIFICAÇÃO GERAL", fields: [
+        { id: "ag_cliente", label: "Nome do cliente", type: "text" },
+        { id: "ag_banco", label: "Banco / credor / cooperativa", type: "text" },
+        { id: "ag_tipo_titulo", label: "Tipo de título", type: "radio", options: ["Cédula Rural Pignoratícia (CRP)", "Cédula Rural Hipotecária (CRH)", "Cédula Rural Pign. e Hipotecária (CRPH)", "Nota de Crédito Rural (NCR)", "Nota Promissória Rural (NPR)", "Duplicata Rural (DR)", "CPR Física", "CPR Financeira", "CCB — Cédula de Crédito Bancário", "Confissão de Dívida", "Contrato Bancário", "Outro"] },
+        { id: "ag_especie", label: "Espécie exata do instrumento (descrever)", type: "text" },
+        { id: "ag_num_contrato", label: "Número do contrato / cédula / CPR", type: "text" },
+        { id: "ag_data_contrato", label: "Data da contratação", type: "date" },
+        { id: "ag_vencimento", label: "Data(s) de vencimento (parcelado: informe todas separadas por vírgula)", type: "text" },
+        { id: "ag_valor_original", label: "Valor original (R$)", type: "text" },
+        { id: "ag_valor_atual", label: "Valor hoje cobrado / executado (R$)", type: "text" },
+        { id: "ag_finalidade", label: "Finalidade declarada no instrumento", type: "text" },
+        { id: "ag_destinacao", label: "Destinação material real dos recursos", type: "text" },
+        { id: "ag_atividade", label: "Atividade rural exercida / cultura", type: "text" },
+        { id: "ag_linha", label: "Linha de crédito (Pronaf, Pronamp, custeio, investimento etc.)", type: "text" },
+        { id: "ag_fonte", label: "Fonte dos recursos", type: "radio", options: ["Controlados", "Não controlados / livres", "Obrigatórios", "Equalizados (Tesouro Nacional)", "Fundo constitucional (FNO/FCO/FNE)", "Não identificada"] },
+        { id: "ag_garantias", label: "Garantias prestadas (penhor, hipoteca, fiança, alienação fiduciária)", type: "textarea" },
+        { id: "ag_avalistas", label: "Avalistas / coobrigados", type: "text" },
+        { id: "ag_aditivos", label: "Houve aditivos? Descrever", type: "text" },
+        { id: "ag_renegociacoes", label: "Renegociações anteriores", type: "text" },
+        { id: "ag_confissao", label: "Há confissão de dívida?", type: "radio", options: ["Sim", "Não"] },
+        { id: "ag_novacao", label: "Há novação?", type: "radio", options: ["Sim", "Não"] },
+        { id: "ag_cessao", label: "Houve cessão do crédito?", type: "radio", options: ["Sim — devedor notificado", "Sim — sem notificação", "Não"] },
+      ]},
+      { group: "SITUAÇÃO DA INADIMPLÊNCIA", fields: [
+        { id: "ag_data_inad", label: "Data(s) do inadimplemento (parcelas em atraso)", type: "multidate" },
+        { id: "ag_causa", label: "Causas da inadimplência (pode marcar mais de um)", type: "checkbox", options: ["Evento climático (seca, geada, enchente, granizo)", "Frustração de safra por praga ou doença", "Queda abrupta de preços do produto", "Aumento anormal de custos de insumos", "Problema de comercialização", "Problema de saúde do produtor", "Outro"] },
+        { id: "ag_causa_detalhe", label: "Detalhe da causa (safra, produto, período)", type: "text" },
+        { id: "ag_nexo", label: "Nexo com a atividade financiada", type: "radio", options: ["Direto — mesmo produto financiado", "Indireto — afetou a renda global", "Contestável", "Não identificado"] },
+        { id: "ag_seguro", label: "Havia seguro rural?", type: "radio", options: ["Sim — Proagro", "Sim — Proagro Mais", "Sim — seguro privado", "Não"] },
+        { id: "ag_seguro_acion", label: "Seguro foi acionado?", type: "radio", options: ["Sim — pago", "Sim — negado", "Sim — em análise", "Não foi acionado", "N/A"] },
+        { id: "ag_laudo_agro", label: "Há laudo agronômico de frustração de safra?", type: "radio", options: ["Sim — anexar", "Não", "Em providência"] },
+        { id: "ag_laudo_cont", label: "Há laudo contábil ou perícia prévia?", type: "radio", options: ["Sim", "Não"] },
+        { id: "ag_docs_prod", label: "Há documentos de produtividade (NF, notas de venda, laudos Conab/Emater)?", type: "radio", options: ["Sim", "Não", "Parcialmente"] },
+      ]},
+      { group: "SITUAÇÃO ADMINISTRATIVA", fields: [
+        { id: "ag_pedido_adm", label: "Houve pedido de prorrogação / alongamento / renegociação?", type: "radio", options: ["Sim", "Não"] },
+        { id: "ag_data_pedido", label: "Data do pedido", type: "date" },
+        { id: "ag_forma_pedido", label: "Forma do pedido", type: "radio", options: ["Escrita com protocolo", "E-mail", "Aplicativo do banco", "Verbal", "Não houve"] },
+        { id: "ag_resposta_banco", label: "Houve resposta formal do banco?", type: "radio", options: ["Sim — recusa expressa motivada", "Sim — recusa sem motivação", "Sim — proposta insatisfatória", "Silêncio após prazo", "Não"] },
+        { id: "ag_teor_resposta", label: "Teor da resposta / condições propostas", type: "textarea" },
+        { id: "ag_emails", label: "Há troca de e-mails / notificações / mensagens?", type: "radio", options: ["Sim", "Não"] },
+      ]},
+      { group: "SITUAÇÃO PROCESSUAL", fields: [
+        { id: "ag_acao_curso", label: "Há ação judicial em curso?", type: "radio", options: ["Sim", "Não"] },
+        { id: "ag_tipo_acao", label: "Tipo da ação em curso", type: "text" },
+        { id: "ag_num_proc", label: "Número do processo", type: "text" },
+        { id: "ag_fase", label: "Fase atual", type: "text" },
+        { id: "ag_citacao", label: "Data da citação", type: "date" },
+        { id: "ag_prazo_emb", label: "Prazo para embargos (15 dias da citação)", type: "radio", options: ["Em curso — urgente", "Expirado", "N/A", "Não sei"] },
+        { id: "ag_penhora", label: "Há penhora?", type: "radio", options: ["Sim — imóvel rural produtivo", "Sim — safra/animais/maquinário", "Sim — contas bancárias (SISBAJUD)", "Não"] },
+        { id: "ag_sisbajud", label: "Há SISBAJUD ativo?", type: "radio", options: ["Sim", "Não"] },
+        { id: "ag_renajud", label: "Há RENAJUD (veículos)?", type: "radio", options: ["Sim", "Não"] },
+        { id: "ag_leilao", label: "Há leilão designado?", type: "radio", options: ["Sim", "Não"] },
+        { id: "ag_data_leilao", label: "Data do leilão (se houver)", type: "date" },
+        { id: "ag_consolidacao", label: "Há consolidação fiduciária em curso?", type: "radio", options: ["Sim", "Não", "N/A"] },
+        { id: "ag_avaliacao", label: "Há avaliação judicial do bem?", type: "radio", options: ["Sim", "Não"] },
+        { id: "ag_valor_aval", label: "Valor da avaliação judicial (R$)", type: "text" },
+        { id: "ag_bem_produtivo", label: "O bem constrito é produtivo / essencial / moradia da família?", type: "radio", options: ["Sim — imóvel produtivo / moradia", "Sim — maquinário essencial à produção", "Sim — safra / animais", "Não"] },
+      ]},
+      { group: "ENCARGOS E COBRANÇA", fields: [
+        { id: "ag_juros_pact", label: "Juros remuneratórios pactuados (% a.a.)", type: "text" },
+        { id: "ag_juros_cobr", label: "Juros efetivamente cobrados / demonstrado (% a.a.)", type: "text" },
+        { id: "ag_indice_pact", label: "Índice de atualização pactuado", type: "text" },
+        { id: "ag_indice_aplic", label: "Índice efetivamente aplicado", type: "text" },
+        { id: "ag_cdi", label: "Há CDI como indexador?", type: "radio", options: ["Sim", "Não"] },
+        { id: "ag_comp_perm", label: "Há comissão de permanência?", type: "radio", options: ["Sim", "Não"] },
+        { id: "ag_multa", label: "Há multa moratória?", type: "radio", options: ["Sim", "Não"] },
+        { id: "ag_mora_pct", label: "Percentual de multa / mora (informar)", type: "text" },
+        { id: "ag_capitalizacao", label: "Há capitalização de juros?", type: "radio", options: ["Sim — expressamente pactuada", "Sim — sem pacto expresso", "Não", "Não identificado"] },
+        { id: "ag_planilha", label: "Há planilha discriminada do banco?", type: "radio", options: ["Sim — discrimina principal e encargos", "Sim — sem discriminação", "Não fornecida"] },
+        { id: "ag_divergencia", label: "Existe divergência contábil aparente?", type: "radio", options: ["Sim — descrever abaixo", "Não", "Não avaliado"] },
+        { id: "ag_divergencia_desc", label: "Descrever a divergência / excesso identificado", type: "textarea" },
+      ]},
+      { group: "DOCUMENTOS DISPONÍVEIS", fields: [
+        { id: "ag_docs", label: "Documentos disponíveis", type: "checkbox", options: ["Contrato completo / cédula", "Aditivos", "Planilha e memória de cálculo do banco", "Extratos bancários", "Comprovantes de pagamento", "Pedido administrativo protocolado", "Resposta formal do banco", "Notificação de vencimento antecipado", "Laudo agronômico de frustração", "Documentos de seguro / Proagro", "Matrícula e certidões das garantias", "Notas fiscais e comprovantes de venda", "Peças do processo judicial", "DAP ou CAF", "ITR e CAR"] },
+        { id: "ag_docs_obs", label: "Observações sobre documentação / o que falta", type: "textarea" },
+      ]},
+      { group: "OBJETIVO E DÚVIDAS DO ADVOGADO", fields: [
+        { id: "ag_objetivo", label: "Objetivo principal da consulta", type: "radio", options: ["Diagnóstico completo de todas as vias", "Verificar viabilidade de alongamento / prorrogação", "Identificar ilegalidades para revisional", "Preparar defesa em execução em curso", "Verificar viabilidade de tutela de urgência", "Orientar negociação extrajudicial"] },
+        { id: "ag_via_pretendida", label: "Via processual que o advogado pensa em usar", type: "radio", options: ["Ação de alongamento (mandamental)", "Ação revisional autônoma", "Embargos à execução", "Exceção de pré-executividade", "Combinação de vias — aguarda diagnóstico", "Ainda não definida"] },
+        { id: "ag_duvidas", label: "Dúvidas específicas / questões a responder", type: "textarea" },
+        { id: "ag_urgencia_desc", label: "Descrever urgência (leilão, prazo de embargos, bloqueio)", type: "textarea" },
+      ]},
+    ]
+  },
+  {
+    name: "Ação Revisional de Crédito Rural",
+    subtitle: "Revisão de encargos · CCB rural · títulos típicos · Lei de Usura · Súmulas 93 e 286",
+    promptFile: "ACAO_REVISIONAL",
+    fields: [
+      { group: "DADOS DO AUTOR E DO CONTRATO", fields: [
+        { id: "rev_cliente", label: "Nome completo do autor", type: "text" },
+        { id: "rev_cpf", label: "CPF / CNPJ do autor", type: "text" },
+        { id: "rev_advogado", label: "Advogado / OAB", type: "text" },
+        { id: "rev_banco", label: "Banco réu / credor", type: "text" },
+        { id: "rev_vara", label: "Vara / Comarca", type: "text" },
+        { id: "rev_num_contrato", label: "Número do contrato / cédula", type: "text" },
+        { id: "rev_tipo_titulo", label: "Tipo de título", type: "radio", options: ["CRP — Cédula Rural Pignoratícia", "CRH — Cédula Rural Hipotecária", "CRPH — Cédula Rural Pig. e Hipotecária", "NCR — Nota de Crédito Rural", "NPR — Nota Promissória Rural", "CPR Física", "CPR Financeira", "CCB — Cédula de Crédito Bancário", "Confissão de Dívida", "Contrato Bancário Genérico"] },
+        { id: "rev_data_contrato", label: "Data do contrato", type: "date" },
+        { id: "rev_vencimento", label: "Data(s) de vencimento (parcelado: informe todas separadas por vírgula)", type: "text" },
+        { id: "rev_valor_orig", label: "Valor original (R$)", type: "text" },
+        { id: "rev_valor_atual", label: "Valor cobrado atualmente (R$)", type: "text" },
+        { id: "rev_finalidade", label: "Finalidade declarada no instrumento", type: "text" },
+        { id: "rev_destinacao_real", label: "Destinação real dos recursos (para CCB: comprovar uso rural)", type: "textarea" },
+        { id: "rev_linha", label: "Linha de crédito / programa (Pronaf, Pronamp, investimento, custeio etc.)", type: "text" },
+        { id: "rev_fonte", label: "Fonte dos recursos", type: "radio", options: ["Controlados", "Não controlados / livres", "Obrigatórios", "Equalizados", "Não identificada"] },
+        { id: "rev_conf_divida", label: "Houve confissão de dívida ou renegociação anterior?", type: "radio", options: ["Sim — há contratos originários a revisar (Súmula 286/STJ)", "Não"] },
+        { id: "rev_conf_desc", label: "Descrever contratos originários que geraram a confissão (se houver)", type: "textarea" },
+      ]},
+      { group: "ENCARGOS FINANCEIROS (FOCO DA REVISÃO)", fields: [
+        { id: "rev_juros_pact", label: "Taxa de juros remuneratórios pactuada (% a.a.)", type: "text" },
+        { id: "rev_juros_cobr", label: "Taxa efetivamente cobrada segundo planilha do banco (% a.a.)", type: "text" },
+        { id: "rev_teto_mcr", label: "Há teto normativo do CMN/MCR para a linha contratada?", type: "radio", options: ["Sim — informar o teto: ", "Não identificado", "Recursos livres — sem teto CMN"] },
+        { id: "rev_cdi", label: "O CDI é usado como indexador ou componente remuneratório?", type: "radio", options: ["Sim — como indexador puro", "Sim — CDI + spread", "Não"] },
+        { id: "rev_capitalizacao", label: "Há capitalização de juros?", type: "radio", options: ["Sim — expressamente pactuada (Súmula 93/STJ)", "Sim — sem pacto expresso (discutível)", "Não"] },
+        { id: "rev_cap_period", label: "Periodicidade da capitalização", type: "radio", options: ["Mensal", "Anual", "Outra", "N/A"] },
+        { id: "rev_mora", label: "Juros de mora aplicados (% a.a.)", type: "text" },
+        { id: "rev_mora_dl", label: "Juros de mora estão limitados a 1% a.a. conforme art. 5º parágrafo único DL 167/67?", type: "radio", options: ["Sim — limitado a 1% a.a.", "Não — cobrado acima de 1% a.a. (ilegal para títulos DL 167/67)", "N/A — título não regido pelo DL 167/67"] },
+        { id: "rev_multa", label: "Multa moratória (%)", type: "text" },
+        { id: "rev_comp_perm", label: "Comissão de permanência", type: "radio", options: ["Cobrada — não cumulada com outros encargos", "Cobrada — cumulada com juros/multa (ilegal — Súmulas 294/296/472 STJ)", "Não cobrada"] },
+        { id: "rev_indice", label: "Índice de correção monetária", type: "text" },
+        { id: "rev_planilha", label: "Planilha discriminada do banco disponível?", type: "radio", options: ["Sim — discrimina principal, juros, multa, correção separadamente", "Sim — sem discriminação adequada (vício de liquidez)", "Não fornecida (vício de liquidez)"] },
+        { id: "rev_excesso", label: "Há excesso de execução/cobrança identificado?", type: "radio", options: ["Sim — excesso fortemente demonstrado", "Sim — excesso provável (carece de perícia)", "Possível — depende de perícia contábil", "Não identificado"] },
+        { id: "rev_excesso_desc", label: "Descrever o excesso identificado / estimativa de valor", type: "textarea" },
+      ]},
+      { group: "CCB — DESVIO DE FINALIDADE (preencher se o título for CCB)", fields: [
+        { id: "rev_ccb_rural", label: "Os recursos da CCB foram usados em atividade rural?", type: "radio", options: ["Sim — há documentação comprobatória (NF, laudo, declaração)", "Sim — mas sem documentação suficiente", "Não", "N/A — não é CCB"] },
+        { id: "rev_ccb_subst", label: "A CCB substituiu título rural típico anterior mais benéfico?", type: "radio", options: ["Sim", "Não", "Não sei"] },
+        { id: "rev_ccb_taxa", label: "A taxa da CCB supera os limites do regime de crédito rural (recursos controlados)?", type: "radio", options: ["Sim — taxa da CCB muito superior à da linha rural equivalente", "Não — taxa similar", "N/A"] },
+      ]},
+      { group: "SITUAÇÃO PROCESSUAL E PEDIDOS", fields: [
+        { id: "rev_exec_curso", label: "Há execução em curso?", type: "radio", options: ["Sim", "Não"] },
+        { id: "rev_exec_num", label: "Número do processo de execução (se houver)", type: "text" },
+        { id: "rev_penhora", label: "Há penhora?", type: "radio", options: ["Sim — imóvel rural", "Sim — outro bem", "SISBAJUD", "Não"] },
+        { id: "rev_tutela", label: "Requer tutela provisória para suspensão da execução?", type: "radio", options: ["Sim — há urgência (leilão, bloqueio)", "Sim — excesso ostensivo demonstrado", "Não"] },
+        { id: "rev_pericia", label: "Requer perícia contábil?", type: "radio", options: ["Sim — indispensável para quantificar o excesso", "Sim — auxiliar ao pedido principal", "Não por ora"] },
+        { id: "rev_pedido_princ", label: "Pedido principal da revisional", type: "radio", options: ["Revisão dos juros remuneratórios", "Expurgo de capitalização não pactuada", "Revisão dos encargos moratórios (mora, multa)", "Expurgo de comissão de permanência cumulada", "Reconhecimento de CCB como crédito rural (desvio de finalidade)", "Revisão de contratos originários (Súmula 286/STJ)", "Revisão completa de todos os encargos"] },
+        { id: "rev_gratuidade", label: "Requer gratuidade da justiça?", type: "radio", options: ["Sim", "Não"] },
+        { id: "rev_fatos", label: "Resumo dos fatos / irregularidades identificadas", type: "textarea" },
+        { id: "rev_docs", label: "Documentos disponíveis para juntar", type: "checkbox", options: ["Contrato / cédula", "Planilha do banco", "Extrato da dívida", "Comprovantes de pagamento", "Documentos de destinação rural (para CCB)", "Contratos originários (para confissão de dívida)", "Auto de penhora / avaliação", "Outros"] },
+      ]},
+    ]
+  },
+  {
+    name: "Ação Mandamental — Obrigação de Fazer",
+    subtitle: "Forçar alongamento / prorrogação · Súmula 298/STJ · MCR · Lei 9.138/95",
+    promptFile: "ACAO_MANDAMENTAL",
+    fields: [
+      { group: "DADOS DO AUTOR E DO CONTRATO", fields: [
+        { id: "mand_cliente", label: "Nome completo do autor", type: "text" },
+        { id: "mand_cpf", label: "CPF / CNPJ do autor", type: "text" },
+        { id: "mand_advogado", label: "Advogado / OAB", type: "text" },
+        { id: "mand_banco", label: "Banco réu / credor", type: "text" },
+        { id: "mand_vara", label: "Vara / Comarca", type: "text" },
+        { id: "mand_num_contrato", label: "Número do contrato / cédula", type: "text" },
+        { id: "mand_tipo_titulo", label: "Tipo de título", type: "radio", options: ["CRP — Cédula Rural Pignoratícia", "CRH — Cédula Rural Hipotecária", "CRPH — Cédula Rural Pig. e Hipotecária", "NCR — Nota de Crédito Rural", "NPR — Nota Promissória Rural", "CPR Física", "CPR Financeira", "CCB com destinação rural", "Outro"] },
+        { id: "mand_data_contrato", label: "Data do contrato", type: "date" },
+        { id: "mand_vencimento", label: "Data(s) de vencimento (parcelado: informe todas separadas por vírgula)", type: "text" },
+        { id: "mand_valor_orig", label: "Valor original (R$)", type: "text" },
+        { id: "mand_valor_atual", label: "Valor atual cobrado (R$)", type: "text" },
+        { id: "mand_linha", label: "Linha de crédito / programa aplicável", type: "text" },
+        { id: "mand_fonte", label: "Fonte dos recursos", type: "radio", options: ["Controlados", "Não controlados / livres", "Obrigatórios", "Equalizados", "Não identificada"] },
+        { id: "mand_produtor_fam", label: "É agricultor familiar (Lei 11.326/2006)?", type: "radio", options: ["Sim — possui DAP/CAF", "Sim — sem DAP/CAF", "Não — médio produtor", "Não — grande produtor"] },
+        { id: "mand_imovel", label: "O imóvel rural serve de moradia à família?", type: "radio", options: ["Sim", "Não"] },
+        { id: "mand_renda", label: "A renda da família deriva predominantemente da atividade rural?", type: "radio", options: ["Sim — mais de 80%", "Parcialmente — 50 a 80%", "Parcialmente — menos de 50%"] },
+      ]},
+      { group: "CAUSA DA INADIMPLÊNCIA E PROVA DO EVENTO", fields: [
+        { id: "mand_causa", label: "Eventos que geraram a inadimplência (pode marcar mais de um)", type: "checkbox", options: ["Frustração de safra por estiagem / seca", "Frustração de safra por geada / granizo / enchente", "Frustração de safra por praga ou doença (ex: ferrugem, lagarta)", "Queda abrupta no preço do produto comercializado", "Aumento anormal de custos de insumos", "Dificuldade de comercialização dos produtos", "Ocorrência prejudicial ao desenvolvimento da exploração", "Problema de saúde do produtor"] },
+        { id: "mand_causa_det", label: "Descrever o evento em detalhe (produto, safra, período)", type: "textarea" },
+        { id: "mand_imprevisivel", label: "O evento era imprevisível na data da contratação?", type: "radio", options: ["Sim — justificativa abaixo", "Não — evento previsível", "Controvertido"] },
+        { id: "mand_imprevisivel_just", label: "Justificativa da imprevisibilidade", type: "textarea" },
+        { id: "mand_laudo", label: "Há laudo de frustração de safra / declaração de sinistro?", type: "radio", options: ["Sim — laudo agronômico", "Sim — declaração do seguro / Proagro", "Sim — decreto de emergência agropecuária", "Não — providenciar", "Em providência"] },
+        { id: "mand_dados_ext", label: "Há dados objetivos externos (índices pluviométricos, boletins Conab/Emater, preços de commodities)?", type: "radio", options: ["Sim — disponíveis", "Não — mas identificáveis", "Não"] },
+        { id: "mand_proagro", label: "Proagro / Proagro Mais foi acionado?", type: "radio", options: ["Sim — pago", "Sim — negado", "Sim — em análise", "Não foi acionado", "Não tinha seguro"] },
+      ]},
+      { group: "REQUERIMENTO ADMINISTRATIVO (condição de procedibilidade)", fields: [
+        { id: "mand_req_adm", label: "Houve requerimento administrativo de prorrogação / alongamento?", type: "radio", options: ["Sim", "Não — ainda não feito"] },
+        { id: "mand_req_data", label: "Data do requerimento", type: "date" },
+        { id: "mand_req_forma", label: "Forma do requerimento", type: "radio", options: ["Escrita com protocolo", "E-mail documentado", "Aplicativo do banco", "Verbal (sem registro)", "Não houve"] },
+        { id: "mand_req_protocolo", label: "Há protocolo / comprovante do pedido?", type: "radio", options: ["Sim", "Não"] },
+        { id: "mand_resp_banco", label: "O banco respondeu?", type: "radio", options: ["Sim — recusa expressa motivada", "Sim — recusa sem motivação suficiente", "Sim — proposta insatisfatória", "Silêncio após prazo razoável (recusa tácita)", "Não respondeu"] },
+        { id: "mand_resp_texto", label: "Transcrever / descrever a resposta do banco", type: "textarea" },
+        { id: "mand_recusa_legal", label: "A recusa do banco está fundamentada em norma legal / contratual?", type: "radio", options: ["Não — recusa imotivada", "Sim — banco alega motivo legal (qual?)", "Parcialmente"] },
+      ]},
+      { group: "SITUAÇÃO PROCESSUAL", fields: [
+        { id: "mand_exec_curso", label: "Há execução / ação judicial em curso?", type: "radio", options: ["Sim — execução bancária", "Sim — monitória", "Sim — outra ação", "Não"] },
+        { id: "mand_exec_num", label: "Número do processo em curso", type: "text" },
+        { id: "mand_prazo_emb", label: "Prazo para embargos ainda em curso?", type: "radio", options: ["Sim — urgente", "Expirado", "N/A"] },
+        { id: "mand_penhora", label: "Há penhora?", type: "radio", options: ["Sim — imóvel rural produtivo / moradia", "Sim — safra / animais / maquinário", "Sim — SISBAJUD", "Não"] },
+        { id: "mand_leilao", label: "Há leilão designado?", type: "radio", options: ["Sim", "Não"] },
+        { id: "mand_data_leilao", label: "Data do leilão (se houver)", type: "date" },
+      ]},
+      { group: "ENQUADRAMENTO NORMATIVO (para verificar o direito ao alongamento)", fields: [
+        { id: "mand_requisitos_lei9138", label: "Enquadramento na Lei 9.138/95 (alongamento em sentido estrito)", type: "radio", options: ["Claro — período e condições compatíveis", "Controvertido — verificar com advogado", "Não aplicável — buscar prorrogação pelo MCR"] },
+        { id: "mand_requisitos_mcr", label: "Enquadramento no MCR (prorrogação por dificuldade temporária)", type: "radio", options: ["Frustração de safra (MCR — Circ. 1.536)", "Dificuldade de comercialização (MCR — Circ. 1.536)", "Ocorrência prejudicial ao desenvolvimento da exploração", "Redução relevante de renda da atividade financiada", "Não identificado"] },
+        { id: "mand_temporariedade", label: "A dificuldade é temporária (produtor tem capacidade futura de pagar)?", type: "radio", options: ["Sim — fundamentar abaixo", "Incerto", "Não"] },
+        { id: "mand_capac_futura", label: "Fundamentar a capacidade futura de pagamento", type: "textarea" },
+        { id: "mand_valor_incontr", label: "Valor incontroverso que o produtor pode pagar / oferecer como sinal (R$)", type: "text" },
+      ]},
+      { group: "PEDIDOS E ESTRATÉGIA", fields: [
+        { id: "mand_pedido_princ", label: "Pedido principal", type: "radio", options: ["Prorrogação do vencimento pelos mesmos encargos (MCR Circ. 1.536)", "Alongamento nos termos da Lei 9.138/95", "Obrigação de fazer: renegociar em condições específicas", "Combinação: prorrogação + revisão de encargos"] },
+        { id: "mand_tutela", label: "Requer tutela provisória?", type: "radio", options: ["Sim — suspensão da execução / leilão", "Sim — vedação de restrições sobre a safra / imóvel", "Não"] },
+        { id: "mand_gratuidade", label: "Requer gratuidade da justiça?", type: "radio", options: ["Sim", "Não"] },
+        { id: "mand_fatos", label: "Resumo dos fatos / contexto adicional", type: "textarea" },
+        { id: "mand_docs", label: "Documentos disponíveis", type: "checkbox", options: ["Contrato / cédula de crédito rural", "Laudo de frustração de safra", "Decreto de emergência agropecuária", "Protocolo do pedido administrativo", "Resposta / recusa do banco", "Documentos do Proagro / seguro", "Extrato atualizado do débito", "DAP / CAF", "Matrícula do imóvel rural", "ITR e CAR"] },
+      ]},
+    ]
+  }]);
+
+const PROMPTS = {
+  PRE_AUDITORIA: `PROMPT-MESTRE — PRÉ-AUDITORIA ESTRATÉGICA: AÇÃO DE ALONGAMENTO DE DÍVIDA AGRÍCOLA
+
+Você atuará como advogado especializado em direito agrário, crédito rural e processo civil brasileiro. Sua função neste momento não é elaborar uma petição inicial, mas realizar análise estratégica completa do caso antes do ajuizamento, verificando a viabilidade da via processual pretendida, os vícios do título, os riscos reais do cliente, a situação processual em curso quando houver, e as condições para uma negociação paralela eficiente. O resultado desta análise alimentará diretamente o prompt de elaboração da petição inicial. Não invente fatos, não cite normativos ou precedentes sem fundamento real, e não afirme certeza jurídica onde há controvérsia. Utilize exclusivamente os dados fornecidos abaixo.
+
+DADOS DO CASO:
+{{DADOS}}
+
+Com base nos dados fornecidos, realize a análise estratégica completa conforme as seguintes seções:
+
+SEÇÃO 1 — DIAGNÓSTICO DA VIA PROCESSUAL
+SEÇÃO 2 — ANÁLISE FORMAL DO TÍTULO (OBRIGATÓRIO)
+SEÇÃO 3 — ANÁLISE DE ENCARGOS E ADERÊNCIA AO MCR (OBRIGATÓRIO)
+SEÇÃO 4 — MATRIZ DE RISCO (OBRIGATÓRIA — processual, patrimonial, expropriação)
+SEÇÃO 5 — ANÁLISE DO CENÁRIO DA EXECUÇÃO EM CURSO (quando houver)
+SEÇÃO 6 — VIABILIDADE DO DIREITO AO ALONGAMENTO
+SEÇÃO 7 — TEORIA DA IMPREVISÃO
+SEÇÃO 8 — ESTRATÉGIA DE NEGOCIAÇÃO EXTRAJUDICIAL (OBRIGATÓRIA)
+SEÇÃO 9 — CHECKLIST PROBATÓRIO (OBRIGATÓRIO)
+SEÇÃO 10 — MAPA DE TESES (OBRIGATÓRIO)
+SEÇÃO 11 — SÍNTESE ESTRATÉGICA PARA PETIÇÃO INICIAL (OBRIGATÓRIA)
+
+Para cada seção, identifique lacunas nos dados fornecidos, registre o impacto e prossiga. Não invente dispositivos do MCR, resoluções do CMN ou precedentes. Indique marcadores [DADO PENDENTE] onde informações essenciais estiverem ausentes.`,
+
+  PETICAO_INICIAL: `PROMPT-MESTRE — PETIÇÃO INICIAL: AÇÃO DE ALONGAMENTO DE DÍVIDA AGRÍCOLA (MCR, CMN E LEGISLAÇÃO ESPECÍFICA)
+
+Você atuará como advogado especializado em direito agrário, crédito rural e processo civil brasileiro, com domínio do Manual de Crédito Rural (MCR) do Banco Central do Brasil, das resoluções do Conselho Monetário Nacional (CMN), da legislação federal de renegociação de dívidas rurais e da jurisprudência dos tribunais estaduais, federais, do STJ e do STF. Sua função é elaborar a petição inicial com todos os elementos técnicos necessários para uma defesa rural de nível profissional avançado. Não invente fatos, não cite normativos ou precedentes sem fundamento real. Quando houver controvérsia, sinalize e apresente as posições.
+
+DADOS DO CASO:
+{{DADOS}}
+
+Com base nos dados fornecidos e na pré-auditoria (se disponível nos dados), elabore a petição inicial na seguinte ordem:
+
+ETAPA 1 — DIAGNÓSTICO ESTRATÉGICO (com base na pré-auditoria)
+ETAPA 2 — ANÁLISE FORMAL DO TÍTULO (OBRIGATÓRIA)
+ETAPA 2.1 — NULIDADE / INEXIGIBILIDADE FORMAL DO TÍTULO
+ETAPA 3 — ANÁLISE DE ENCARGOS E VINCULAÇÃO AO MCR ESPECÍFICO (OBRIGATÓRIA)
+ETAPA 4 — ENQUADRAMENTO NORMATIVO E SÚMULA 298/STJ
+ETAPA 5 — TEORIA DA IMPREVISÃO E FUNDAMENTAÇÃO ECONÔMICA
+ETAPA 6 — ROTEIRO DE NEGOCIAÇÃO EXTRAJUDICIAL PARALELA
+ETAPA 7 — COMPETÊNCIA E PRESSUPOSTOS PROCESSUAIS
+ETAPA 8 — NARRATIVA DOS FATOS
+ETAPA 9 — FUNDAMENTOS JURÍDICOS (com hierarquia de teses)
+ETAPA 10 — TUTELA PROVISÓRIA (vinculada à matriz de risco)
+ETAPA 11 — PEDIDOS
+ETAPA 12 — VERIFICAÇÃO E MINUTA FINAL
+
+Utilize marcadores [DADO PENDENTE] para campos não fornecidos. A minuta é instrumento de trabalho sujeito à revisão do advogado.`,
+
+  PRE_AUDITORIA_EMBARGOS: `PROMPT-MESTRE — PRÉ-AUDITORIA ESTRATÉGICA: EMBARGOS À EXECUÇÃO DE TÍTULO DE CRÉDITO RURAL
+
+Você atuará como advogado especializado em direito agrário, crédito rural e processo civil brasileiro, com domínio do Decreto-Lei 167/67, do Manual de Crédito Rural (MCR) do Banco Central, das resoluções do Conselho Monetário Nacional (CMN), do CPC/2015 e da jurisprudência do STJ. Sua função é realizar análise estratégica completa do caso antes da oposição dos embargos. O resultado desta análise alimentará diretamente o prompt de elaboração dos embargos à execução. Não invente fatos, normativos ou precedentes.
+
+DADOS DO CASO:
+{{DADOS}}
+
+Com base nos dados fornecidos, realize a análise estratégica completa:
+
+SEÇÃO 1 — CONTROLE DE PRAZOS E ADMISSIBILIDADE (PRIORIDADE ABSOLUTA)
+SEÇÃO 2 — CLASSIFICAÇÃO DO TÍTULO E ANÁLISE DE EXECUTIVIDADE
+SEÇÃO 3 — ANÁLISE DE ENCARGOS E EXCESSO DE EXECUÇÃO (OBRIGATÓRIA)
+SEÇÃO 4 — ANÁLISE DE PRESCRIÇÃO (OBRIGATÓRIA)
+SEÇÃO 5 — ANÁLISE DA PENHORA E IMPENHORABILIDADE
+SEÇÃO 6 — MATRIZ DE RISCO (OBRIGATÓRIA — 5 DIMENSÕES)
+SEÇÃO 7 — DIAGNÓSTICO DA ESTRATÉGIA DEFENSIVA
+SEÇÃO 8 — TEORIA DA IMPREVISÃO (quando aplicável)
+SEÇÃO 8-A — ANÁLISE ECONÔMICA E CAPACIDADE DE PAGAMENTO (OBRIGATÓRIA)
+SEÇÃO 9 — ESTRATÉGIA DE NEGOCIAÇÃO DURANTE OS EMBARGOS
+SEÇÃO 10 — CHECKLIST PROBATÓRIO (OBRIGATÓRIO)
+SEÇÃO 11 — MAPA DE TESES (OBRIGATÓRIO)
+SEÇÃO 12 — SÍNTESE ESTRATÉGICA PARA EMBARGOS (OBRIGATÓRIA) com MAPA DE CONVERSÃO
+
+Não invente dispositivos do MCR ou precedentes. Registre lacunas com [DADO PENDENTE].`,
+
+  EMBARGOS_EXECUCAO: `PROMPT-MESTRE — EMBARGOS À EXECUÇÃO DE TÍTULO DE CRÉDITO RURAL
+
+Você atuará como advogado especializado em direito agrário, crédito rural e processo civil brasileiro, com domínio do Decreto-Lei 167/67, do Manual de Crédito Rural (MCR), das resoluções do CMN, do CPC/2015 (especialmente arts. 914 a 920) e da jurisprudência do STJ. Sua função é elaborar embargos à execução com todos os elementos técnicos necessários. Não invente fatos, normativos ou precedentes. Os embargos devem ser construídos com base no diagnóstico da pré-auditoria (se fornecido nos dados).
+
+DADOS DO CASO:
+{{DADOS}}
+
+Elabore os embargos na seguinte ordem:
+
+ETAPA 1 — VERIFICAÇÃO DE ADMISSIBILIDADE (PRIORIDADE ABSOLUTA)
+ETAPA 2 — DIAGNÓSTICO ESTRATÉGICO
+ETAPA 3 — DEFINIÇÃO EXPRESSA DE TESE PRINCIPAL E SUBSIDIÁRIAS (OBRIGATÓRIA)
+ETAPA 4 — ANÁLISE FORMAL DO TÍTULO (OBRIGATÓRIA)
+ETAPA 5 — ENCARGOS, EXCESSO E MCR (OBRIGATÓRIA — art. 917 §§2º-3º CPC)
+ETAPA 6 — PRESCRIÇÃO (quando aplicável)
+ETAPA 7 — IMPENHORABILIDADE E PENHORA
+ETAPA 8 — TEORIA DA IMPREVISÃO E FUNDAMENTAÇÃO ECONÔMICA
+ETAPA 9 — NARRATIVA DOS FATOS (com amarração econômica obrigatória)
+ETAPA 10 — FUNDAMENTOS JURÍDICOS (com hierarquia e mapa de conversão)
+ETAPA 11 — EFEITO SUSPENSIVO (vinculado à matriz de risco, com intensidade diferenciada)
+ETAPA 12 — PEDIDOS E PROVAS (com quesitos periciais estruturados)
+ETAPA 13 — PLANO PROCESSUAL SUBSIDIÁRIO (OBRIGATÓRIO)
+ETAPA 14 — CONTROLE DE COERÊNCIA INTERNA (OBRIGATÓRIO)
+ETAPA 15 — MINUTA FINAL
+ETAPA 16 — ROTEIRO DE NEGOCIAÇÃO PARALELA
+
+A minuta é instrumento de trabalho sujeito à revisão do advogado.`,
+
+  PRE_AUDITORIA_EXCECAO: `PROMPT-MESTRE — PRÉ-AUDITORIA ESTRATÉGICA: EXCEÇÃO DE PRÉ-EXECUTIVIDADE EM EXECUÇÃO DE TÍTULO DE CRÉDITO RURAL
+
+Você atuará como advogado especializado em direito agrário, crédito rural e processo civil brasileiro, com domínio do Decreto-Lei 167/67, do MCR, das resoluções do CMN, do CPC/2015 e da jurisprudência do STJ — especialmente a Súmula 393. Sua função é realizar análise estratégica focada em verificar se as matérias identificadas no caso se enquadram na via estreita da exceção de pré-executividade. ATENÇÃO: a exceção é via excepcional e restrita. Matérias que exigem dilação probatória devem ser veiculadas em embargos ou ação autônoma.
+
+DADOS DO CASO:
+{{DADOS}}
+
+Realize a análise estratégica:
+
+SEÇÃO 1 — FILTRO DE ADMISSIBILIDADE (PRIORIDADE ABSOLUTA)
+Para cada matéria, aplicar o teste de três etapas:
+1. É matéria de ordem pública?
+2. É cognoscível de ofício?
+3. Dispensa dilação probatória?
+Classificar em: ADMISSÍVEL / LIMÍTROFE INCLUÍVEL / LIMÍTROFE NÃO RECOMENDADA / INADMISSÍVEL
+
+SEÇÃO 2 — ANÁLISE DE PRESCRIÇÃO (quando aplicável)
+SEÇÃO 3 — ANÁLISE DE NULIDADE/INEXIGIBILIDADE DO TÍTULO (quando aplicável)
+SEÇÃO 4 — ANÁLISE DE ILEGITIMIDADE DE PARTE (quando aplicável)
+SEÇÃO 5 — ANÁLISE DE IMPENHORABILIDADE E EXCESSO DE PENHORA (quando aplicável)
+SEÇÃO 6 — DIAGNÓSTICO: EXCEÇÃO OU REDIRECIONAMENTO?
+SEÇÃO 7 — MATRIZ DE RISCO (OBRIGATÓRIA)
+SEÇÃO 8 — MAPA DE TESES (OBRIGATÓRIO — apenas admissíveis e limítrofes incluíveis)
+SEÇÃO 9 — BLOCO DE SAÍDA PADRONIZADO (OBRIGATÓRIO — formato fixo com mapa de conversão)
+
+Não invente dispositivos ou precedentes. Registre lacunas.`,
+
+  EXCECAO_PRE_EXECUTIVIDADE: `PROMPT-MESTRE — EXCEÇÃO DE PRÉ-EXECUTIVIDADE EM EXECUÇÃO DE TÍTULO DE CRÉDITO RURAL
+
+Você atuará como advogado especializado em direito agrário, crédito rural e processo civil brasileiro, com domínio do Decreto-Lei 167/67, do MCR, das resoluções do CMN, do CPC/2015 e da Súmula 393/STJ. Sua função é elaborar a exceção de pré-executividade contendo EXCLUSIVAMENTE matérias de ordem pública que dispensem dilação probatória. Não invente fatos, normativos ou precedentes. REGRA ABSOLUTA: a exceção só admite matérias de ordem pública cognoscíveis de ofício que dispensem dilação probatória (Súmula 393/STJ).
+
+DADOS DO CASO:
+{{DADOS}}
+
+Elabore a exceção na seguinte ordem:
+
+ETAPA 1 — VERIFICAÇÃO DO FILTRO DE ADMISSIBILIDADE
+ETAPA 2 — DEFINIÇÃO DE TESE PRINCIPAL E SUBSIDIÁRIAS (OBRIGATÓRIA)
+ETAPA 3 — CABIMENTO DA EXCEÇÃO (fundamentação obrigatória — Súmula 393/STJ)
+ETAPA 4 — BREVE SÍNTESE FÁTICA (máximo 5-7 parágrafos)
+ETAPA 5 — FUNDAMENTOS JURÍDICOS (hierarquia de teses — aprofundar só a dominante e 1 subsidiária)
+ETAPA 6 — PEDIDO DE SUSPENSÃO DA EXECUÇÃO (quando cabível)
+ETAPA 7 — PEDIDOS
+ETAPA 8 — INDICAÇÃO DE MATÉRIAS RESERVADAS (OBRIGATÓRIO)
+ETAPA 9 — CONTROLE DE COERÊNCIA INTERNA (OBRIGATÓRIO)
+ETAPA 10 — MINUTA FINAL
+ETAPA 11 — PLANO PROCESSUAL COMPLEMENTAR
+
+A exceção deve ser objetiva, concisa e focada exclusivamente em matérias de ordem pública. A minuta é instrumento de trabalho sujeito à revisão do advogado.`
+,
+
+  AGRODEFESA_360: `PROMPT MASTER PREMIUM UNIFICADO — ANÁLISE ESTRATÉGICA DE DÍVIDA RURAL
+(AGRODEFESA 360° | REVISIONAL | MANDAMENTAL | ALONGAMENTO | PRORROGAÇÃO | EXECUÇÃO | EMBARGOS | EXCEÇÃO DE PRÉ-EXECUTIVIDADE | TUTELA | CCB RURAL | CPR | CÉDULAS RURAIS)
+
+Você atuará como advogado sênior especializado em crédito rural, direito bancário rural, títulos do agronegócio, execução bancária, revisão contratual, alongamento de dívida rural, prorrogação de reembolso, tutela de urgência, embargos à execução, exceção de pré-executividade e defesa patrimonial de produtor rural.
+
+Sua função NÃO é redigir imediatamente uma petição. Sua função é realizar uma AUDITORIA JURÍDICA, CONTÁBIL-ESTRATÉGICA, PROBATÓRIA E PROCESSUAL COMPLETA do caso.
+
+A análise deve ser estritamente fundada na Constituição Federal (quando pertinente), no Código Civil, no Código de Processo Civil, na Lei nº 4.829/1965, no Decreto-Lei nº 167/1967, na Lei nº 8.171/1991, na Lei nº 8.929/1994 (CPR), na Lei nº 10.931/2004 (CCB), na Lei nº 9.138/1995 (alongamento), nas demais leis especiais aplicáveis ao período e à operação, no Manual de Crédito Rural (MCR) com observância da temporalidade, nas Resoluções do CMN e atos do Banco Central aplicáveis, e na jurisprudência real, verificável e corretamente classificada do STJ.
+
+REGRAS ABSOLUTAS DE CONDUTA:
+1. Não invente fatos.
+2. Não invente vícios.
+3. Não invente precedentes.
+4. Não presuma regularidade automática do título.
+5. Não presuma irregularidade sem base documental mínima.
+6. Não trate precedente isolado como jurisprudência pacificada.
+7. Não garanta êxito judicial.
+8. Não redija peça sem concluir todas as fases.
+9. Não afirme direito ao alongamento ou à prorrogação sem examinar os requisitos legais, normativos e probatórios.
+10. Não afirme submissão de CCB ao regime rural apenas pelo perfil do devedor; exija elementos concretos de destinação rural.
+11. Não trate toda dificuldade financeira como fato apto à prorrogação; exija nexo com a atividade rural financiada.
+12. Quando houver lacuna documental, indique: o documento faltante, por que importa juridicamente, qual tese fica prejudicada, qual o risco estratégico.
+13. Sempre distinguir: nulidade formal / inexigibilidade / iliquidez / excesso de execução / revisão de encargos / alongamento legal / prorrogação regulamentar / imprevisão / tutela urgente / defesa processual / negociação paralela.
+14. Sempre indicar o grau de força de cada tese: FORTE / MODERADA / FRACA / PREMATURA POR FALTA DE PROVA.
+15. Sempre indicar o grau de urgência: sem urgência imediata / urgência moderada / urgência alta / urgência crítica.
+16. Se faltarem dados essenciais, não conclua em definitivo.
+17. Se a prova estiver incompleta, encerrar com: "Conclusão provisória, dependente da documentação complementar indicada no checklist probatório."
+
+DADOS DO CASO:
+{{DADOS}}
+
+FLUXO OBRIGATÓRIO — A resposta deve seguir rigorosamente esta ordem:
+
+FASE L — LEVANTAMENTO
+Objetivo: organizar cronologia, prova disponível e urgência.
+1. Construir síntese cronológica objetiva.
+2. Separar: fatos documentados / fatos alegados / fatos não confirmados.
+3. Identificar: urgência processual, risco de expropriação, risco de preclusão, risco de perda de safra, risco de colapso da atividade produtiva.
+4. Informar o grau de maturidade da análise: preliminar / parcial / robusta / inconclusiva por deficiência documental.
+SAÍDA: a) síntese do caso; b) fatos incontroversos; c) fatos controvertidos; d) lacunas críticas; e) urgência inicial.
+
+FASE E — ENQUADRAMENTO
+Objetivo: definir o regime jurídico correto da operação.
+1. Verificar se a operação se enquadra materialmente como crédito rural.
+2. Classificar o título: típico rural (CRP/CRH/CRPH/NCR/NPR/DR/CPR física/CPR financeira) ou atípico (CCB/confissão de dívida/contrato bancário).
+3. Se instrumento atípico: analisar a materialidade rural com rigor.
+4. Identificar: diploma principal, diploma subsidiário, disciplina processual, normativos do MCR/CMN relevantes.
+5. Fazer recorte temporal: norma vigente na contratação / na inadimplência / no pedido de prorrogação.
+CLASSIFICAÇÃO OBRIGATÓRIA: A. operação rural típica; B. operação bancária com forte materialidade rural; C. operação bancária com materialidade rural discutível; D. operação sem base suficiente para submissão ao regime protetivo rural.
+
+FASE F — ANÁLISE FORMAL DO TÍTULO
+Objetivo: verificar liquidez, certeza, exigibilidade e executividade.
+Verificar obrigatoriamente: 1. regularidade formal; 2. assinaturas; 3. poderes de representação; 4. cadeia de aditivos; 5. vencimento antecipado e notificação; 6. memória de cálculo; 7. planilha idônea; 8. individualização de principal, juros, multa, correção; 9. compatibilidade entre valor cobrado e documentos; 10. regularidade da cessão; 11. regularidade das garantias; 12. eventual vício apto a gerar: nulidade / inexigibilidade / iliquidez / excesso / necessidade de perícia.
+CLASSIFICAÇÃO: A. formalmente regular; B. formalmente questionável; C. formalmente viciado em grau relevante; D. insuficiência documental.
+REGRA: Se houver vício formal forte, priorizar tese de nulidade/inexigibilidade antes da mera revisão de encargos.
+
+FASE C — ANÁLISE CONTÁBIL-JURÍDICA DOS ENCARGOS
+1. JUROS REMUNERATÓRIOS: taxa contratada vs. taxa cobrada; teto normativo da linha; aderência ao MCR e às Resoluções; classificar tese revisional: FORTE/MODERADA/FRACA/PREMATURA.
+2. CAPITALIZAÇÃO: verificar pacto expresso; periodicidade contratada vs. cobrada; aplicar Súmula 93/STJ quando pertinente; classificar: válida / discutível / aparentemente indevida.
+3. ENCARGOS DE INADIMPLEMENTO: verificar multa, juros de mora, comissão de permanência, cumulação indevida; nos títulos regidos pelo DL 167/67, examinar expressamente o limite de 1% a.a. de juros de mora (art. 5º parágrafo único); apontar efeito sobre o saldo.
+4. CORREÇÃO MONETÁRIA / CDI / INDEXADOR: verificar índice pactuado vs. aplicado; identificar substituição unilateral; examinar uso do CDI (como indexador, como componente remuneratório, como mecanismo híbrido); avaliar sobreposição remuneratória; analisar sob ótica do REsp 1.978.445/RS quando houver CDI em operação rural.
+5. EXCESSO DE EXECUÇÃO: comparar saldo cobrado e saldo aparentemente devido; classificar: excesso apenas possível / excesso provável / excesso fortemente demonstrado; indicar necessidade de perícia contábil.
+6. CONFISSÃO / RENEGOCIAÇÃO / NOVAÇÃO: identificar contratos originários; verificar se encargos pretéritos contaminaram o saldo renegociado (Súmula 286/STJ).
+SAÍDA: a) ilegalidades comprovadas; b) ilegalidades sugeridas, não fechadas; c) pontos dependentes de perícia; d) impacto econômico estimado: baixo / médio / alto / indeterminável.
+
+FASE A — ANÁLISE DO ALONGAMENTO / PRORROGAÇÃO
+PLANO 1 — ALONGAMENTO EM SENTIDO LEGAL ESPECÍFICO: examinar enquadramento na Lei nº 9.138/1995 e legislação correlata; enfrentar expressamente a Súmula 298 do STJ; esclarecer que a súmula não dispensa prova dos requisitos legais; concluir: enquadramento claro / controvertido / não enquadramento.
+PLANO 2 — PRORROGAÇÃO / REPROGRAMAÇÃO PELO MCR: examinar a regra geral do MCR sobre prorrogação por dificuldade temporária; verificar: frustração de safra / dificuldade de comercialização / ocorrência prejudicial / redução relevante de renda / temporariedade / capacidade futura de pagamento; examinar pedido administrativo e eventual recusa.
+SUBBLOCO IMPREVISÃO / ONEROSIDADE EXCESSIVA (arts. 478-480 CC): analisar superveniência, extraordinariedade, nexo causal, onerosidade efetiva; avaliar utilidade tática e risco de baixa aderência judicial.
+CONCLUSÃO: viabilidade de alongamento legal: FORTE/MODERADA/FRACA/PREMATURA; viabilidade de prorrogação pelo MCR: FORTE/MODERADA/FRACA/PREMATURA; utilidade da tese de imprevisão: ALTA/MÉDIA/BAIXA.
+
+FASE M — MÓDULOS ESPECIAIS (ativar os pertinentes)
+MÓDULO M1 — CCB COM DESTINAÇÃO RURAL: ativar quando o título for CCB, contrato bancário ou confissão de dívida com indício de financiamento rural. Analisar: se a destinação dos recursos foi comprovadamente rural; se houve substituição de título rural típico por título bancário mais oneroso; se existe base concreta para incidência do regime protetivo rural; se há desvio de forma ou de finalidade; se a linha, taxa e encargos destoam do regime esperado para operação rural. Conclusão: forte materialidade rural / materialidade rural provável / materialidade rural insuficientemente demonstrada / tese fraca de ruralização da CCB.
+MÓDULO M2 — EXECUÇÃO BANCÁRIA RURAL: ativar quando houver execução, monitória, cumprimento de título, busca e apreensão, consolidação fiduciária ou expropriação. Analisar: liquidez, certeza e exigibilidade; memória de cálculo; planilha discriminada; excesso ostensivo; nulidade formal evidente; necessidade de garantia do juízo; cabimento de embargos; cabimento de exceção de pré-executividade; urgência para suspensão de leilão ou constrição; risco sobre imóvel produtivo, maquinário essencial, safra, contas, animais e avalistas. Conclusão: melhor via defensiva imediata / tese arguível de plano / tese dependente de perícia / necessidade de tutela urgente.
+MÓDULO M3 — CPR FÍSICA E CPR FINANCEIRA: ativar quando houver CPR. Analisar: se é física ou financeira; regularidade da descrição da obrigação; correspondência entre produto, quantidade, qualidade, local e data; aditivos e alteração de liquidação; conversão indevida da obrigação; discussão sobre indexação, liquidação financeira, equivalência econômica; operação associada a financiamento rural subjacente. Conclusão: CPR formalmente sólida / com fragilidades formais / com discussão econômica relevante / dependente de prova técnica.
+
+FASE J — JURISPRUDÊNCIA APLICÁVEL
+1. JURISPRUDÊNCIA PACIFICADA / ALTA DENSIDADE: súmulas aplicáveis (especialmente Súmulas 93, 286, 298, 364/STJ); precedentes qualificados aderentes.
+2. JURISPRUDÊNCIA PERSUASIVA RELEVANTE: precedentes úteis sobre liquidez, planilha, revisão, alongamento, prorrogação, CCB materialmente rural, CPR, REsp 1.978.445/RS (CDI em crédito rural), REsp 1.333.977/MT (capitalização).
+3. ALERTAS DE CAUTELA: tese controvertida / precedente isolado / tese dependente de peculiaridade documental / tese sensível ao tribunal local.
+Para cada item: tese jurídica extraída / grau de força / aderência ao caso / limite de aplicação.
+
+FASE R — MATRIZ DE RISCO
+Classificar cada eixo em BAIXO / MÉDIO / ALTO:
+1. RISCO PROCESSUAL: regularidade do título, qualidade da prova, risco de improcedência, inadequação da via, risco de preclusão.
+2. RISCO PATRIMONIAL: garantias reais, bens essenciais, imóvel produtivo, safra, máquinas, contas, coobrigados.
+3. RISCO DE EXPROPRIAÇÃO IMEDIATA: leilão, consolidação fiduciária, penhora ativa, bloqueios, perda iminente de bem produtivo.
+4. RISCO CONTÁBIL: opacidade da cobrança, insuficiência da planilha, dependência de perícia, dificuldade de quantificar excesso.
+SAÍDA: risco global / medida prioritária / janela de urgência.
+
+FASE P — CHECKLIST PROBATÓRIO
+A. OBRIGATÓRIOS: contrato completo, aditivos, planilha e memória do banco, extratos, comprovantes de pagamento, pedido administrativo, resposta do banco, notificações de vencimento antecipado, peças do processo.
+B. ESTRATÉGICOS: laudo agronômico, histórico de produtividade, notas fiscais da produção, documentos de comercialização, documentos do seguro/Proagro, matrículas e certidões das garantias, documentos que comprovem destinação rural dos recursos, fluxo econômico da atividade.
+C. A PRODUZIR: perícia contábil, perícia agronômica, prova testemunhal técnica, documentos complementares de destinação e causalidade.
+
+FASE N — NEGOCIAÇÃO PARALELA
+A. DIAGNÓSTICO NEGOCIAL: força jurídica do produtor, fragilidades do credor, risco de sucumbência, custo do litígio, utilidade do acordo.
+B. PROPOSTA TÉCNICA: alongamento / reprogramação / carência / expurgo de encargos / redução de multa e mora / recomposição do fluxo / valor incontroverso / reforço de garantia (só se estrategicamente útil).
+C. ROTEIRO DE REUNIÃO: como abrir / pontos jurídicos a usar / fragilidades do banco a explorar / como demonstrar impacto produtivo / linha de corte negocial.
+D. PLANO B: tutela / perícia / embargos / revisional / ação mandamental / cronograma de escalada.
+
+FASE T — TUTELA E URGÊNCIA
+1. PROBABILIDADE DO DIREITO: tese principal / documento de suporte / principal fragilidade.
+2. PERIGO DE DANO: leilão / perda da safra / bloqueio de fluxo / paralisação da atividade / perda de bem essencial.
+3. REVERSIBILIDADE E PROPORCIONALIDADE: adequação da suspensão / preservação da atividade produtiva / equilíbrio entre as partes / eventual oferta de valor incontroverso.
+
+FASE X — ESTRATÉGIA PROCESSUAL
+Examinar separadamente: 1. AÇÃO REVISIONAL (cabimento, utilidade, limites, necessidade de perícia, risco); 2. AÇÃO MANDAMENTAL / OBRIGAÇÃO DE FAZER (cabimento para alongamento/prorrogação, necessidade de prova do requerimento e da recusa, tutela possível); 3. EMBARGOS À EXECUÇÃO (matérias adequadas, efeito suspensivo, urgência, prova mínima); 4. EXCEÇÃO DE PRÉ-EXECUTIVIDADE (nulidade evidente, inexigibilidade manifesta, iliquidez ostensiva, ilegitimidade, matérias de prova pré-constituída); 5. ESTRATÉGIA COMBINADA.
+Ao final: via preferencial / via subsidiária / fundamento da escolha / principal risco da estratégia.
+
+FASE V — PARECER FINAL DE VIABILIDADE
+A conclusão deve conter: 1. RESUMO EXECUTIVO; 2. DIAGNÓSTICO JURÍDICO CENTRAL; 3. TESES PRINCIPAIS; 4. TESES SECUNDÁRIAS; 5. IRREGULARIDADES FORMAIS IDENTIFICADAS; 6. ABUSIVIDADES / EXCESSOS IDENTIFICADOS; 7. VIABILIDADE DE ALONGAMENTO; 8. VIABILIDADE DE PRORROGAÇÃO PELO MCR; 9. VIABILIDADE DE AÇÃO REVISIONAL; 10. VIABILIDADE DE DEFESA NA EXECUÇÃO; 11. VIABILIDADE DE EXCEÇÃO DE PRÉ-EXECUTIVIDADE; 12. NECESSIDADE DE TUTELA DE URGÊNCIA; 13. IMPACTO ECONÔMICO ESTIMADO; 14. MEDIDA IMEDIATA RECOMENDADA; 15. CLASSIFICAÇÃO FINAL DO CASO.
+
+FASE Q — AUDITORIA FINAL
+Revisar expressamente: prazo processual preservado? / tese principal sustentável? / prova mínima existente? / pedido proporcional? / risco patrimonial corretamente mapeado? / tutela compatível com a matriz de risco? / há dependência de perícia? / há conclusão apenas provável? / há tese sem prova bastante? / houve uso de jurisprudência apenas persuasiva?
+
+Escreva em linguagem técnica, estratégica, precisa e sóbria. Não seja genérico. Não use retórica emocional. Não transforme hipótese em certeza. Não cite norma ou precedente sem explicar sua utilidade concreta. Sempre que houver controvérsia, diga que há controvérsia. Sempre que faltar documento, diga o efeito da lacuna. Se a análise estiver incompleta, encerrar com: "Conclusão provisória, dependente da documentação complementar indicada no checklist probatório."`,
+
+  ACAO_REVISIONAL: `PROMPT-MESTRE — AÇÃO REVISIONAL DE CRÉDITO RURAL
+
+Você atuará como advogado especializado em direito agrário, crédito rural, direito bancário e processo civil brasileiro. Sua função é elaborar uma petição inicial de ação revisional tecnicamente sólida, com base nos dados e documentos fornecidos. A revisional deve buscar a correção dos encargos financeiros ilegais ou abusivos aplicados ao contrato de crédito rural.
+
+Base normativa obrigatória: Lei nº 4.829/1965; Decreto-Lei nº 167/1967; Manual de Crédito Rural (MCR); Resoluções do CMN aplicáveis; Decreto nº 22.626/1933 (Lei de Usura — limitação de 12% a.a. quando o CMN não fixa teto específico); Código Civil (arts. 478-480 para imprevisão); CPC/2015; jurisprudência do STJ (Súmulas 93, 286, 294, 296, 298, 472).
+
+REGRAS ABSOLUTAS: Não invente fatos, dispositivos ou precedentes. Não afirme certeza jurídica onde há controvérsia. Identifique lacunas com [DADO PENDENTE]. Sempre indique o grau de força de cada tese: FORTE / MODERADA / FRACA / PREMATURA.
+
+DADOS DO CASO:
+{{DADOS}}
+
+Elabore a petição revisional na seguinte ordem:
+
+ETAPA 1 — ANÁLISE PRÉVIA DO TÍTULO E ENQUADRAMENTO NORMATIVO
+Identificar: natureza jurídica do título (típico rural vs. CCB/confissão de dívida); regime normativo aplicável; se é CCB, verificar materialidade rural e desvio de finalidade; se é confissão de dívida, identificar contratos originários revisáveis (Súmula 286/STJ); linha de crédito e fonte dos recursos; normativos do MCR/CMN vigentes na data do contrato.
+CLASSIFICAÇÃO OBRIGATÓRIA: operação rural típica / operação bancária com forte materialidade rural / operação bancária com materialidade rural discutível.
+
+ETAPA 2 — ANÁLISE CONTÁBIL-JURÍDICA DOS ENCARGOS (OBRIGATÓRIA)
+Para cada encargo, identificar: o que foi pactuado, o que foi cobrado, a norma violada, a tese revisional e seu grau de força.
+2.1. JUROS REMUNERATÓRIOS: taxa contratada vs. média BACEN; teto do MCR para a linha; verificar se CMN fixou teto — se não fixou, aplicar Lei de Usura (Decreto 22.626/33 — 12% a.a.); Tabela Price vs. SAC.
+2.2. CAPITALIZAÇÃO: verificar pacto expresso (Súmula 93/STJ); periodicidade contratada vs. cobrada; REsp 1.333.977/MT (Repetitivo): ausência de pacto expresso torna a capitalização mensal ilegal.
+2.3. JUROS DE MORA: nos títulos regidos pelo DL 167/67, verificar expressamente se estão limitados a 1% a.a. (art. 5º parágrafo único); verificar cumulação indevida com comissão de permanência.
+2.4. COMISSÃO DE PERMANÊNCIA: verificar se está sendo cobrada cumulada com juros de mora e multa (vedação — Súmulas 294, 296 e 472/STJ).
+2.5. CDI COMO INDEXADOR: verificar se o CDI resulta em taxa final superior a 12% a.a.; análise sob ótica do REsp 1.978.445/RS (CDI em crédito rural).
+2.6. EXCESSO DE EXECUÇÃO / SALDO DEVEDOR: comparar saldo cobrado e saldo calculado com encargos legais; estimar impacto quantitativo; indicar necessidade de perícia contábil.
+2.7. CONFISSÃO DE DÍVIDA (se houver): aplicar Súmula 286/STJ para revisão dos contratos originários que geraram a confissão.
+
+ETAPA 3 — MÓDULO CCB COM DESTINAÇÃO RURAL (se aplicável)
+Se o título for CCB: analisar se a destinação dos recursos foi comprovadamente rural; verificar se houve substituição de título rural típico mais benéfico por CCB mais onerosa; verificar se a linha, taxa e encargos destoam do regime de crédito rural; concluir sobre a materialidade rural e a aplicabilidade do regime protetivo.
+
+ETAPA 4 — JURISPRUDÊNCIA APLICÁVEL
+1. ALTA DENSIDADE: Súmulas STJ 93, 286, 294, 296, 298, 472; REsp 1.333.977/MT (capitalização — Repetitivo); REsp 1.978.445/RS (CDI em crédito rural).
+2. PERSUASIVA: precedentes sobre excesso de execução, planilha discriminada, revisão de CCB com destinação rural.
+3. ALERTAS: indicar onde há controvérsia ou precedente isolado.
+
+ETAPA 5 — COMPETÊNCIA E PRESSUPOSTOS PROCESSUAIS
+Identificar: competência (foro do domicílio do produtor rural); legitimidade ativa e passiva; interesse de agir; eventual litisconsórcio passivo com avalistas.
+
+ETAPA 6 — NARRATIVA DOS FATOS
+Em ordem cronológica: apresentação do autor e da atividade rural; origem da obrigação; encargos pactuados; encargos cobrados; irregularidades identificadas; dano causado.
+
+ETAPA 7 — FUNDAMENTOS JURÍDICOS (com hierarquia de teses)
+Tese principal primeiro — maior desenvolvimento argumentativo. Teses subsidiárias em sequência. Cada tese deve: nascer de fato concreto narrado; citar dispositivo legal e precedente do STJ; estimar impacto quantitativo quando possível. Nunca inventar referências.
+
+ETAPA 8 — TUTELA PROVISÓRIA (quando cabível)
+Probabilidade do direito: indicar a tese mais forte com base nos dados.
+Perigo de dano: execução em curso, leilão designado, bloqueio de contas, comprometimento da safra.
+Reversibilidade e proporcionalidade.
+Pedido específico de tutela: suspensão da execução / vedação de novas constrições / manutenção do status quo.
+
+ETAPA 9 — PEDIDOS
+Principal: revisão judicial dos encargos com recálculo do saldo devedor com aplicação dos encargos legais; devolução / compensação dos valores cobrados a maior.
+Subsidiários e instrumentais: perícia contábil com quesitos mínimos; tutela provisória (se cabível); produção de provas.
+
+ETAPA 10 — CONTROLE DE COERÊNCIA INTERNA
+Verificar: os pedidos estão fundados nas teses? Há tese sem pedido correspondente? A tutela está ancorada em fato concreto de urgência? Há [DADO PENDENTE] que comprometa a coerência da minuta?
+
+ETAPA 11 — MINUTA FINAL
+Elaborar a minuta completa da petição inicial. Utilizar [DADO PENDENTE] onde informação essencial estiver ausente. A minuta é instrumento de trabalho sujeito à revisão do advogado responsável.`,
+
+  ACAO_MANDAMENTAL: `PROMPT-MESTRE — AÇÃO MANDAMENTAL DE CRÉDITO RURAL (OBRIGAÇÃO DE FAZER — ALONGAMENTO / PRORROGAÇÃO)
+
+Você atuará como advogado especializado em direito agrário, crédito rural e processo civil brasileiro. Sua função é elaborar uma petição inicial de ação mandamental (obrigação de fazer) para forçar a instituição financeira a realizar o alongamento ou a prorrogação da dívida rural, com base na Súmula 298/STJ e nas normas do MCR/CMN.
+
+Base normativa obrigatória: Lei nº 4.829/1965; Decreto-Lei nº 167/1967; Lei nº 9.138/1995 (especialmente art. 5º — alongamento em sentido estrito); Manual de Crédito Rural (MCR), especialmente as regras de prorrogação por dificuldade temporária de reembolso (Circular BACEN 1.536); Resoluções do CMN aplicáveis ao período e à linha de crédito; Código Civil (arts. 478-480 para imprevisão); CPC/2015; Súmula 298/STJ; jurisprudência do STJ sobre condições de procedibilidade.
+
+REGRAS ABSOLUTAS: Não afirme direito ao alongamento ou à prorrogação sem examinar os requisitos legais, normativos e probatórios. Não invente fatos, dispositivos ou precedentes. Não garanta êxito. Identifique lacunas com [DADO PENDENTE]. A Súmula 298/STJ não dispensa a prova dos requisitos legais e normativos — deixe isso claro na petição.
+
+DADOS DO CASO:
+{{DADOS}}
+
+Elabore a petição mandamental na seguinte ordem:
+
+ETAPA 1 — ANÁLISE DO ENQUADRAMENTO NORMATIVO (OBRIGATÓRIA — antes de qualquer redação)
+1.1. PLANO 1 — ALONGAMENTO EM SENTIDO LEGAL ESPECÍFICO (Lei 9.138/1995, art. 5º): verificar se o contrato e o período se enquadram no programa; verificar se o cliente preenche os requisitos subjetivos e objetivos; concluir: enquadramento claro / controvertido / não aplicável.
+1.2. PLANO 2 — PRORROGAÇÃO PELO MCR (Circ. BACEN 1.536): verificar: frustração de safra por fatores adversos / dificuldade de comercialização dos produtos / ocorrência prejudicial ao desenvolvimento das explorações; verificar temporariedade da dificuldade e capacidade futura de pagamento; examinar se a dificuldade tem nexo com a atividade financiada.
+1.3. CONDIÇÃO DE PROCEDIBILIDADE — REQUERIMENTO ADMINISTRATIVO PRÉVIO: analisar se houve requerimento e recusa formal; se não houve, indicar o risco de extinção sem resolução do mérito por falta de interesse de agir; recomendar notificação extrajudicial prévia se ainda não feita.
+1.4. TESE DE IMPREVISÃO (arts. 478-480 CC): analisar superveniência, extraordinariedade do evento, nexo causal, onerosidade excessiva; avaliar como fundamento autônomo ou subsidiário.
+CONCLUSÃO OBRIGATÓRIA: grau de viabilidade do direito ao alongamento/prorrogação: FORTE / MODERADA / FRACA / PREMATURA POR FALTA DE PROVA.
+
+ETAPA 2 — ANÁLISE DO TÍTULO E DOS ENCARGOS (OBRIGATÓRIA)
+Verificar: natureza jurídica do título; regularidade formal; encargos cobrados e sua conformidade ao MCR; se há excesso de execução; se há vício formal explorável. (Esta análise alimentará eventual cumulação com pedido revisional ou com pedido de perícia.)
+
+ETAPA 3 — COMPETÊNCIA E PRESSUPOSTOS PROCESSUAIS
+Competência: foro do domicílio do produtor rural; legitimidade ativa e passiva; interesse de agir (demonstrar o requerimento e a recusa ou silêncio); possibilidade jurídica do pedido.
+
+ETAPA 4 — NARRATIVA DOS FATOS
+Em ordem cronológica: identificação do autor e da atividade rural; origem e características da obrigação; evento que gerou a inadimplência (comprovar imprevisibilidade e nexo causal); nexo entre o evento e a atividade financiada; requerimento administrativo de prorrogação / alongamento; resposta do banco (recusa ou silêncio); situação atual da dívida e da atividade produtiva; riscos de expropriação iminentes.
+
+ETAPA 5 — FUNDAMENTOS JURÍDICOS (com hierarquia de teses)
+TESE PRINCIPAL (desenvolver com profundidade): direito subjetivo ao alongamento / prorrogação — Súmula 298/STJ — requisitos preenchidos (demonstrar um a um com base nos fatos narrados e nos documentos disponíveis).
+TESES SUBSIDIÁRIAS: imprevisão / onerosidade excessiva (arts. 478-480 CC) / excesso de execução / nulidade do título (se houver vício formal).
+Para cada tese: citar norma específica, precedente do STJ aplicável, demonstrar aderência aos fatos concretos narrados.
+
+ETAPA 6 — TUTELA PROVISÓRIA (OBRIGATÓRIA na maioria dos casos)
+Probabilidade do direito: Súmula 298/STJ + preenchimento dos requisitos do MCR ou da Lei 9.138/95 + requerimento e recusa documentados.
+Perigo de dano: execução em curso / leilão designado / penhora sobre imóvel produtivo ou safra / bloqueio de contas / risco de colapso da atividade produtiva.
+Reversibilidade e proporcionalidade: a suspensão da execução / constrição é reversível; preserva a atividade produtiva; não elimina o direito do credor (apenas suspende).
+Pedido de tutela: suspensão da execução / vedação de atos expropriatórios / manutenção da posse sobre o imóvel rural e os instrumentos de produção.
+Oferta de valor incontroverso (se estrategicamente útil): oferecer o pagamento do valor incontroverso como demonstração de boa-fé e reforço do pedido de tutela.
+
+ETAPA 7 — PEDIDOS
+Principal: condenação da instituição financeira à obrigação de fazer (proceder ao alongamento / prorrogação nos termos da norma identificada); fixação de prazo para cumprimento e cominação de multa por descumprimento (astreintes — art. 536 CPC).
+Subsidiários: revisão judicial dos encargos se necessário; perícia contábil.
+Instrumentais: tutela provisória; produção de provas.
+
+ETAPA 8 — ROTEIRO DE NEGOCIAÇÃO PARALELA
+Avaliar: força jurídica do produtor na negociação / fragilidades do banco / conveniência de acordo antes ou durante o processo / condições mínimas aceitáveis / como usar a ação como instrumento de pressão legítima.
+
+ETAPA 9 — CONTROLE DE COERÊNCIA INTERNA
+Verificar: o pedido de obrigação de fazer está ancorado na norma específica identificada? A tutela está justificada por fato concreto de urgência? O requerimento administrativo prévio está documentado ou há risco de extinção? Há [DADO PENDENTE] que comprometa a coerência?
+
+ETAPA 10 — MINUTA FINAL
+Elaborar a minuta completa da petição inicial. Utilizar [DADO PENDENTE] onde informação essencial estiver ausente. A minuta é instrumento de trabalho sujeito à revisão do advogado responsável.`
+
+};
+
+// ── SESSION SYSTEM (same as Lex Executio with all bug fixes) ──────────────────
+let currentMode = 'form';  // 'form' | 'paste' | 'pdf'
+let formPdfFiles = [];     // PDFs attached in form mode
+let pdfTabFiles  = [];     // PDFs in pdf-tab mode
+let sessions = [];
+let activeSession = null;
+let currentWorkflow = 0;
+let apiKey = '';
+let sessionIdCounter = 0;
+let queueRunning = false;
+
+function createSession(workflowIndex) {
+  const id = ++sessionIdCounter;
+  const wf = WORKFLOWS[workflowIndex];
+  const s = {
+    id, workflowIndex,
+    label: `P${sessions.length + 1} — ${wf.name.substring(0, 20)}`,
+    status: 'idle',    // idle | running | done | error
+    mode: 'form',       // form | paste | pdf
+    formData: {},
+    pasteText: '',
+    pasteCtx: '',
+    observacoes: '',
+    formPdfs: [],       // PDFs attached in form mode
+    pdfTabFiles: [],    // PDFs in pdf-tab mode
+    pdfTabCtx: '',
+    history: [],
+    allText: '',
+    domContent: '',
+    lastError: null,
+    lastErrorStatus: null
+  };
+  sessions.push(s);
+  return s;
+}
+
+function addProcess() {
+  if (sessions.length >= MAX_SESSIONS) { alert(`Máximo de ${MAX_SESSIONS} processos.`); return; }
+  if (activeSession) saveSessionState(activeSession);
+  const s = createSession(currentWorkflow);
+  renderTabs();
+  activateSession(s);
+}
+
+function removeSession(id, e) {
+  e && e.stopPropagation();
+  const idx = sessions.findIndex(s => s.id === id);
+  if (idx === -1) return;
+  sessions.splice(idx, 1);
+  if (sessions.length === 0) {
+    const s = createSession(0);
+    renderTabs();
+    activateSession(s);
+    return;
+  }
+  if (activeSession && activeSession.id === id) {
+    activateSession(sessions[Math.min(idx, sessions.length - 1)]);
+  } else {
+    renderTabs();
+  }
+}
+
+function renderTabs() {
+  const bar = document.getElementById('tabsBar');
+  bar.innerHTML = '';
+  sessions.forEach(s => {
+    const div = document.createElement('div');
+    const isActive = activeSession && activeSession.id === s.id;
+    div.className = `process-tab ${isActive ? 'active' : ''} ${s.status !== 'idle' ? s.status : ''}`;
+    const icon = s.status === 'running' ? '⟳ ' : s.status === 'done' ? '✓ ' : s.status === 'error' ? '✕ ' : '';
+    div.innerHTML = `<span onclick="activateSession(sessions.find(x=>x.id===${s.id}))">${icon}${s.label}</span><span class="tab-close" onclick="removeSession(${s.id},event)">✕</span>`;
+    bar.appendChild(div);
+  });
+  const add = document.createElement('div');
+  add.className = 'tab-add';
+  add.textContent = '+ Novo Processo';
+  add.onclick = addProcess;
+  bar.appendChild(add);
+  const runAll = document.createElement('button');
+  runAll.className = 'run-all-btn';
+  runAll.id = 'runAllBtn';
+  runAll.textContent = '▶ Executar Todos';
+  runAll.onclick = runQueue;
+  const idleCount = sessions.filter(s => s.status === 'idle').length;
+  runAll.disabled = idleCount === 0 || queueRunning;
+  bar.appendChild(runAll);
+}
+
+// saveSessionState: NEVER overwrites workflowIndex (key fix from Lex Executio)
+function saveSessionState(s) {
+  if (!s) return;
+  // Save mode
+  s.mode = currentMode || s.mode || 'form';
+  // Save paste text
+  const pasteEl = document.getElementById('pasteText');
+  if (pasteEl) s.pasteText = pasteEl.value;
+  const pasteCtxEl = document.getElementById('pasteCtx');
+  if (pasteCtxEl) s.pasteCtx = pasteCtxEl.value;
+  // Save observations
+  const obsEl = document.getElementById('observacoes');
+  if (obsEl) s.observacoes = obsEl.value;
+  // Save form PDFs
+  s.formPdfs = [...(formPdfFiles || [])];
+  // Save PDF tab files
+  s.pdfTabFiles = [...(pdfTabFiles || [])];
+  const pdfCtxEl = document.getElementById('pdfTabCtx');
+  if (pdfCtxEl) s.pdfTabCtx = pdfCtxEl.value;
+  // NOTE: workflowIndex is NEVER overwritten here
+  const wf = WORKFLOWS[s.workflowIndex];
+  s.formData = {};
+  wf.fields.forEach(group => {
+    group.fields.forEach(f => {
+      if (f.type === 'text' || f.type === 'date') {
+        const el = document.getElementById(f.id);
+        if (el) s.formData[f.id] = el.value;
+      } else if (f.type === 'textarea') {
+        const el = document.getElementById(f.id);
+        if (el) s.formData[f.id] = el.value;
+      } else if (f.type === 'radio') {
+        const ch = document.querySelector(`input[name="${f.id}"]:checked`);
+        if (ch) s.formData[f.id] = ch.value;
+      } else if (f.type === 'checkbox') {
+        const checked = document.querySelectorAll(`input[name="${f.id}"]:checked`);
+        s.formData[f.id] = Array.from(checked).map(c => c.value);
+      } else if (f.type === 'multidate') {
+        const inputs = document.querySelectorAll(`#${f.id}_container input[type="date"]`);
+        s.formData[f.id] = Array.from(inputs).map(i => i.value).filter(v => v);
+      }
+    });
+  });
+}
+
+function loadSessionState(s) {
+  // Restore mode
+  currentMode = s.mode || 'form';
+  switchMode(currentMode);
+  // Restore paste text
+  const pasteEl = document.getElementById('pasteText');
+  if (pasteEl) pasteEl.value = s.pasteText || '';
+  const pasteCtxEl = document.getElementById('pasteCtx');
+  if (pasteCtxEl) pasteCtxEl.value = s.pasteCtx || '';
+  // Restore observations
+  const obsEl = document.getElementById('observacoes');
+  if (obsEl) obsEl.value = s.observacoes || '';
+  // Restore form PDFs
+  formPdfFiles = [...(s.formPdfs || [])];
+  renderFormPdfList();
+  // Restore PDF tab
+  pdfTabFiles = [...(s.pdfTabFiles || [])];
+  renderPdfTabList();
+  const pdfCtxEl = document.getElementById('pdfTabCtx');
+  if (pdfCtxEl) pdfCtxEl.value = s.pdfTabCtx || '';
+  const wf = WORKFLOWS[s.workflowIndex];
+  wf.fields.forEach(group => {
+    group.fields.forEach(f => {
+      const val = s.formData[f.id];
+      if (val === undefined) return;
+      if (f.type === 'text' || f.type === 'date') {
+        const el = document.getElementById(f.id);
+        if (el) el.value = val;
+      } else if (f.type === 'textarea') {
+        const el = document.getElementById(f.id);
+        if (el) el.value = val;
+      } else if (f.type === 'radio') {
+        const rb = document.querySelector(`input[name="${f.id}"][value="${CSS.escape ? CSS.escape(val) : val}"]`);
+        if (!rb) {
+          const all = document.querySelectorAll(`input[name="${f.id}"]`);
+          all.forEach(r => { if (r.value === val) r.checked = true; });
+        } else { rb.checked = true; }
+      } else if (f.type === 'checkbox' && Array.isArray(val)) {
+        val.forEach(v => {
+          const cb = document.querySelector(`input[name="${f.id}"][value="${v}"]`);
+          if (cb) cb.checked = true;
+        });
+      } else if (f.type === 'multidate' && Array.isArray(val) && val.length > 0) {
+        const container = document.getElementById(f.id + '_container');
+        if (container) {
+          container.innerHTML = ''; // clear default empty row
+          val.forEach(dateVal => {
+            const row = document.createElement('div');
+            row.style.cssText = 'display:flex;align-items:center;gap:8px;';
+            const inp = document.createElement('input');
+            inp.type = 'date'; inp.className = 'field-input'; inp.name = f.id;
+            inp.style.cssText = 'flex:1;color-scheme:dark;';
+            inp.value = dateVal;
+            const removeBtn = document.createElement('button');
+            removeBtn.type = 'button'; removeBtn.textContent = '✕';
+            removeBtn.style.cssText = 'background:none;border:1px solid var(--border2);color:var(--text3);border-radius:5px;padding:4px 8px;cursor:pointer;font-size:12px;flex-shrink:0;';
+            removeBtn.onclick = () => { if (container.querySelectorAll('input[type="date"]').length > 1) row.remove(); };
+            removeBtn.onmouseover = () => removeBtn.style.color = 'var(--red2)';
+            removeBtn.onmouseout  = () => removeBtn.style.color = 'var(--text3)';
+            row.appendChild(inp); row.appendChild(removeBtn);
+            container.appendChild(row);
+          });
+        }
+      }
+    });
+  });
+}
+
+function activateSession(s) {
+  if (activeSession && activeSession.id !== s.id) {
+    saveSessionState(activeSession);
+    if ((activeSession.status === 'done' || activeSession.status === 'running') &&
+        document.getElementById('outputContent').style.display !== 'none') {
+      activeSession.domContent = document.getElementById('outputContent').innerHTML;
+    }
+  }
+  activeSession = s;
+  currentWorkflow = s.workflowIndex;
+  // Update sidebar highlight using onclick attribute (fixes DOM-position bug)
+  document.querySelectorAll('.workflow-item').forEach(el => {
+    const match = el.getAttribute('onclick')?.match(/selectWorkflow\((\d+)\)/);
+    const elIndex = match ? parseInt(match[1]) : -1;
+    el.classList.toggle('active', elIndex === s.workflowIndex);
+  });
+  renderTabs();
+  renderForm();
+  switchMode(s.mode || 'form');
+  loadSessionState(s);
+  const outEl = document.getElementById('outputContent');
+  const emptyEl = document.getElementById('emptyState');
+  if (s.status === 'idle') {
+    emptyEl.style.display = 'flex';
+    outEl.style.display = 'none';
+    outEl.innerHTML = '';
+  } else {
+    emptyEl.style.display = 'none';
+    outEl.style.display = 'block';
+    outEl.innerHTML = s.domContent || '';
+    outEl.scrollTop = 99999;
+  }
+  setStatusUI(s);
+}
+
+function selectWorkflow(index) {
+  currentWorkflow = index;
+  if (activeSession) {
+    saveSessionState(activeSession);
+    activeSession.workflowIndex = index;
+    activeSession.formData = {};
+    activeSession.label = `P${sessions.indexOf(activeSession) + 1} — ${WORKFLOWS[index].name.substring(0, 20)}`;
+  }
+  document.querySelectorAll('.workflow-item').forEach(el => {
+    const match = el.getAttribute('onclick')?.match(/selectWorkflow\((\d+)\)/);
+    const elIndex = match ? parseInt(match[1]) : -1;
+    el.classList.toggle('active', elIndex === index);
+  });
+  renderForm();
+  renderTabs();
+}
+
+function setStatusUI(s) {
+  const dot = document.getElementById('statusDot');
+  const label = document.getElementById('outputLabel');
+  if (s.status === 'running') { dot.className = 'status-dot loading'; label.textContent = 'Gerando análise jurídica...'; }
+  else if (s.status === 'done') { dot.className = 'status-dot done'; label.textContent = 'Análise concluída'; }
+  else if (s.status === 'error') { dot.className = 'status-dot'; label.textContent = 'Erro na execução'; }
+  else { dot.className = 'status-dot'; label.textContent = 'Aguardando execução'; }
+}
+
+function collectDataFromSession(s) {
+  const mode = s.mode || 'form';
+  const obs = (s.observacoes || '').trim();
+
+  if (mode === 'paste') {
+    const txt = (s.pasteText || '').trim();
+    const ctx = (s.pasteCtx || '').trim();
+    let result = '';
+    if (txt) result += `FASE 1 — TEXTO DOS AUTOS:\n${txt}`;
+    if (ctx) result += `\n\nFASE 2 — CONTEXTO ADICIONAL:\n${ctx}`;
+    if (obs) result += `\n\nFASE 3 — OBSERVAÇÕES DO ADVOGADO:\n${obs}`;
+    return result;
+  }
+
+  if (mode === 'pdf') {
+    const pdfText = (s.pdfTabFiles || [])
+      .filter(f => f.text && f.text.trim().length > 0)
+      .map(f => `=== ${f.name} ===\n${f.text}`).join('\n\n');
+    const ctx = (s.pdfTabCtx || '').trim();
+    let result = '';
+    if (pdfText) result += `FASE 2 — CONTEÚDO EXTRAÍDO DOS AUTOS (PDF):\n${pdfText}`;
+    if (ctx) result += `\n\nCONTEXTO ADICIONAL:\n${ctx}`;
+    if (obs) result += `\n\nFASE 3 — OBSERVAÇÕES DO ADVOGADO:\n${obs}`;
+    return result;
+  }
+
+  // form mode — build from formData + attached PDFs + observations
+  const wf = WORKFLOWS[s.workflowIndex];
+  const parts = ['FASE 1 — DADOS DO FORMULÁRIO:'];
+  wf.fields.forEach(group => {
+    parts.push(`\n--- ${group.group} ---`);
+    group.fields.forEach(f => {
+      const val = s.formData[f.id];
+      if (!val || (Array.isArray(val) && val.length === 0)) return;
+      if (Array.isArray(val)) parts.push(`${f.label}: ${val.join(', ')}`);
+      else parts.push(`${f.label}: ${val}`);
+    });
+  });
+  let result = parts.join('\n');
+
+  // Phase 2: attached PDFs
+  const formPdfText = (s.formPdfs || [])
+    .filter(f => f.text && f.text.trim().length > 0)
+    .map(f => `=== ${f.name} ===\n${f.text}`).join('\n\n');
+  if (formPdfText) result += `\n\nFASE 2 — DOCUMENTOS ANEXADOS (extraídos de PDF):\n${formPdfText}`;
+
+  // Phase 3: observations
+  if (obs) result += `\n\nFASE 3 — OBSERVAÇÕES DO ADVOGADO:\n${obs}`;
+
+  return result;
+}
+
+function buildPromptFromSession(session) {
+  const wf = WORKFLOWS[session.workflowIndex];
+  const template = PROMPTS[wf.promptFile];
+  const data = collectDataFromSession(session);
+  const phaseInstruction = `
+
+INSTRUÇÃO DE ANÁLISE EM FASES:
+- FASE 1 contém os dados do formulário preenchido ou o texto colado.
+- FASE 2 contém os documentos em PDF anexados (se houver). Analise cada documento junto com os dados da Fase 1.
+- FASE 3 contém observações específicas do advogado que devem ser respondidas ou incorporadas na análise.
+Integre todas as fases na análise — não trate nenhuma fase isoladamente.
+Ao concluir TODA a análise/peça, escreva exatamente na última linha: [ANÁLISE CONCLUÍDA]`;
+  return template.replace('{{DADOS}}', data || '[Dados não fornecidos]') + phaseInstruction;
+}
+
+async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+
+// ── PDF CHUNKING FOR LARGE DOCUMENTS ─────────────────────────────────────────
+const PDF_CHUNK_SIZE = 550000; // ~137k tokens per message — safe ceiling
+
+function getPdfFullText(session) {
+  const mode = session.mode || 'form';
+  if (mode === 'pdf') {
+    return (session.pdfTabFiles || [])
+      .filter(f => f.text && f.text.trim().length > 0)
+      .map(f => `=== ${f.name} ===\n${f.text}`).join('\n\n');
+  }
+  // form mode
+  return (session.formPdfs || [])
+    .filter(f => f.text && f.text.trim().length > 0)
+    .map(f => `=== ${f.name} ===\n${f.text}`).join('\n\n');
+}
+
+function buildChunkedMessages(session) {
+  // Returns array of user messages to send before the main prompt
+  // If PDF text fits in one message, returns [] (use normal flow)
+  const wf = WORKFLOWS[session.workflowIndex];
+  const promptKey = wf.promptKey || wf.promptFile;
+  const template = (typeof PROMPTS !== 'undefined' ? PROMPTS[promptKey] : null) || '';
+  
+  // Build non-pdf data part
+  const mode = session.mode || 'form';
+  let formData = '';
+  if (mode === 'form') {
+    const lines = [];
+    wf.fields.forEach(group => {
+      lines.push(`\n${group.group}:`);
+      group.fields.forEach(f => {
+        const val = session.formData?.[f.id];
+        if (!val || (Array.isArray(val) && val.length === 0)) return;
+        const display = Array.isArray(val) ? val.join(', ') : val;
+        if (display) lines.push(`  ${f.label}: ${display}`);
+      });
+    });
+    formData = lines.join('\n');
+  } else if (mode === 'paste') {
+    const txt = (session.pasteText || '').trim();
+    const ctx = (session.pasteCtx || '').trim();
+    formData = (txt ? `TEXTO DOS AUTOS:\n${txt}` : '') + (ctx ? `\n\nCONTEXTO ADICIONAL:\n${ctx}` : '');
+  }
+
+  const pdfFullText = getPdfFullText(session);
+  const obs = (session.observacoes || session.pasteCtx || '').trim();
+
+  // Estimate total size
+  const promptSize = template.length;
+  const totalSize = promptSize + formData.length + pdfFullText.length;
+
+  if (totalSize <= PDF_CHUNK_SIZE || !pdfFullText) {
+    return null; // No chunking needed — use normal flow
+  }
+
+  // Need chunking — split PDF text into chunks
+  const chunks = [];
+  let remaining = pdfFullText;
+  while (remaining.length > 0) {
+    chunks.push(remaining.substring(0, PDF_CHUNK_SIZE));
+    remaining = remaining.substring(PDF_CHUNK_SIZE);
+  }
+
+  // Build message sequence
+  const messages = [];
+
+  // First message: prompt + formData + first chunk instruction
+  const firstChunkMsg = template.replace('{{DADOS}}', 
+    (formData ? formData + '\n\n' : '') +
+    `DOCUMENTOS ANEXADOS — PARTE 1 DE ${chunks.length}:\n${chunks[0]}` +
+    (chunks.length > 1 ? `\n\n[ATENÇÃO: Há mais ${chunks.length - 1} parte(s) dos documentos. Aguarde receber todas as partes antes de iniciar a análise. Quando receber a instrução "INICIAR ANÁLISE", execute o prompt completo acima.]` : '')
+  ) + '\n\nIMPORTANTE: Ao concluir TODA a análise/peça, escreva exatamente na última linha: [ANÁLISE CONCLUÍDA]';
+
+  messages.push({ role: 'user', content: firstChunkMsg });
+
+  if (chunks.length > 1) {
+    // Middle chunks
+    for (let i = 1; i < chunks.length - 1; i++) {
+      messages.push({ role: 'assistant', content: `Recebi a parte ${i} de ${chunks.length}. Aguardando as próximas partes antes de iniciar a análise.` });
+      messages.push({ role: 'user', content: `DOCUMENTOS ANEXADOS — PARTE ${i + 1} DE ${chunks.length}:\n${chunks[i]}\n\n[Aguarde a próxima parte.]` });
+    }
+    // Last chunk + trigger
+    messages.push({ role: 'assistant', content: `Recebi a parte ${chunks.length - 1} de ${chunks.length}. Aguardando a parte final.` });
+    messages.push({ role: 'user', content: `DOCUMENTOS ANEXADOS — PARTE ${chunks.length} DE ${chunks.length} (ÚLTIMA):\n${chunks[chunks.length - 1]}` +
+      (obs ? `\n\nOBSERVAÇÕES DO ADVOGADO:\n${obs}` : '') +
+      `\n\nINICIAR ANÁLISE: Você recebeu todos os documentos. Execute agora o prompt completo conforme instruído na primeira mensagem.` });
+  }
+
+  return messages;
+}
+
+// ── PDF INTELIGENTE — PIPELINE DE PRÉ-PROCESSAMENTO ──────────────────────────
+// Ao invés de enviar o texto bruto (que estoura o limite de 200k tokens),
+// o sistema processa cada PDF com claude-sonnet para extração analítica profunda.
+// Funciona com qualquer tamanho de documento.
+
+const MAX_CHARS_PER_PDF_CHUNK = 120000; // ~30k tokens por pedaço — seguro
+const MAX_CHARS_DIRECT        = 150000; // acima disso extrai antes de analisar
+
+function getExtractionPrompt(workflowIndex) {
+  return `Você é um advogado sênior especializado em crédito rural, direito bancário agrário, execução bancária e processo civil brasileiro. Está lendo parte de um documento jurídico extenso que será analisado em profundidade na etapa seguinte.
+
+Sua tarefa NÃO é fazer análise jurídica agora. Sua tarefa é produzir um EXTRATO ANALÍTICO FIEL do documento — um texto em prosa jurídica estruturada que preserva todo o conteúdo relevante com precisão suficiente para que outro advogado consiga fazer análise completa do caso sem precisar ler o original.
+
+REGRAS ABSOLUTAS:
+1. Transcreva LITERALMENTE cláusulas contratuais, taxas de juros, valores, datas, dispositivos de decisões e textos normativos — não parafraseie dados numéricos.
+2. Preserve o raciocínio jurídico presente no documento (tese do banco, fundamento da decisão, argumento do produtor) — não apenas o resultado.
+3. Mantenha a sequência cronológica dos fatos, pedidos e decisões.
+4. Registre explicitamente o que está AUSENTE ou ILEGÍVEL nesta parte.
+5. Descarte apenas: capas, certidões de intimação, despachos de mero expediente, texto repetitivo de rodapés e carimbos.
+6. Escreva em prosa contínua organizada por seções temáticas — NÃO use listas com marcadores como formato principal.
+
+Para operação de crédito rural, produza um extrato analítico em prosa cobrindo obrigatoriamente:
+
+TÍTULO E PARTES: Tipo exato do instrumento (CRP/CRH/CRPH/NCR/NPR/DR/CPR física/CPR financeira/CCB/confissão de dívida), número, data, valor original, vencimento(s), credor/banco, devedor(es), avalistas, linha de crédito, fonte dos recursos (controlados/livres/equalizados/fundo constitucional). Transcreva literalmente a qualificação das partes e o objeto do contrato.
+
+ENCARGOS PACTUADOS: Transcreva literalmente a cláusula de juros remuneratórios (taxa, base anual/mensal, incidência), a cláusula de capitalização se houver pacto expresso, os encargos de mora (juros moratórios, multa percentual), o índice de correção monetária, eventual CDI como indexador, comissão de permanência. Registre exatamente o que está escrito — incluindo ambiguidades e omissões.
+
+PLANILHA E SALDO: Descreva o que consta na planilha ou demonstrativo do banco: valor do principal, juros discriminados, multa, correção, saldo total cobrado. Se a planilha não discriminar os componentes separadamente, registre isso explicitamente — é vício de liquidez relevante.
+
+GARANTIAS: Descreva as garantias prestadas — penhor (bem, valor estimado, data de constituição), hipoteca (matrícula, imóvel, valor), fiança/aval (quem garantiu), alienação fiduciária.
+
+HISTÓRICO CONTRATUAL: Renegociações, aditivos, confissões de dívida, novações, cessões de crédito. Para cada uma: data, condição alterada, valor renegociado.
+
+INADIMPLÊNCIA E EVENTO RURAL: Descreva o que o documento informa sobre a causa da inadimplência — frustração de safra, queda de preços, evento climático, praga, problema de comercialização. Registre datas, produto afetado, safra prejudicada, percentual de quebra se informado.
+
+PROAGRO/SEGURO: Foi acionado? Qual o resultado? Há laudo de frustração? Decreto de emergência?
+
+PEDIDO DE PRORROGAÇÃO/ALONGAMENTO: Houve pedido administrativo? Data, forma, protocolo, resposta do banco (teor e motivação da recusa se houver).
+
+SITUAÇÃO PROCESSUAL: Fase atual, data da citação, prazo de embargos (calcule se possível), penhoras (bem, valor, data), SISBAJUD ativo (valor bloqueado, contas), RENAJUD, leilões designados (data, bem, avaliação), consolidação fiduciária em curso.
+
+DECISÕES: Para cada decisão relevante, transcreva o dispositivo literalmente e resuma os fundamentos. Indique os efeitos práticos imediatos.
+
+LAUDOS E DOCUMENTOS TÉCNICOS: Descreva laudos agronômicos, notas fiscais de venda, documentos de produtividade, declarações do Proagro — com seus principais dados quantitativos.
+
+VÍCIOS IDENTIFICÁVEIS: Registre qualquer irregularidade formal visível — ausência de assinatura, representação sem procuração juntada, divergência entre valores, ausência de data, encargo pactuado acima do teto normativo da linha.`;
+}
+
+async function summarizePdfChunk(chunkText, chunkNum, totalChunks, docName, workflowIndex) {
+  const extractionPrompt = getExtractionPrompt(workflowIndex);
+  const continuationNote = totalChunks > 1
+    ? (chunkNum < totalChunks
+        ? `\n\nATENÇÃO: Este é o trecho ${chunkNum} de ${totalChunks} do documento "${docName}". Produza o extrato deste trecho. Um próximo trecho será enviado na sequência — não conclua a análise do caso.`
+        : `\n\nATENÇÃO: Este é o trecho FINAL (${chunkNum}/${totalChunks}) do documento "${docName}". Produza o extrato deste trecho concluindo o conteúdo do documento.`)
+    : '';
+
+  const msg = `${extractionPrompt}${continuationNote}
+
+---
+DOCUMENTO: "${docName}"${totalChunks > 1 ? ` — PARTE ${chunkNum} DE ${totalChunks}` : ''}
+---
+
+${chunkText}`;
+
+  const resp = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': sanitizeApiKey(apiKey),
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true'
+    },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-5',  // Sonnet: preserva raciocínio jurídico e profundidade analítica
+      max_tokens: 8000,
+      messages: [{ role: 'user', content: msg }]
+    })
+  });
+
+  if (!resp.ok) {
+    const err = await resp.json();
+    throw new Error(`Erro ao processar PDF (${resp.status}): ${err.error?.message || 'Erro desconhecido'}`);
+  }
+  const data = await resp.json();
+  return data.content?.[0]?.text || '';
+}
+
+async function preprocessPdfs(session, onProgress) {
+  const mode = session.mode || 'form';
+  let files = [];
+  if (mode === 'pdf') files = (session.pdfTabFiles || []).filter(f => f.text?.trim().length > 0);
+  else files = (session.formPdfs || []).filter(f => f.text?.trim().length > 0);
+
+  if (!files.length) return '';
+
+  const totalChars = files.reduce((s, f) => s + f.text.length, 0);
+
+  // Small enough — send directly
+  if (totalChars <= MAX_CHARS_DIRECT) {
+    return files.map(f => `=== ${f.name} ===\n${f.text}`).join('\n\n');
+  }
+
+  // Need pre-processing — summarize each file with Haiku
+  const summaries = [];
+  for (let fi = 0; fi < files.length; fi++) {
+    const file = files[fi];
+    onProgress && onProgress(`📄 Extraindo conteúdo de "${file.name}" (${fi+1}/${files.length})...`);
+
+    const text = file.text;
+    if (text.length <= MAX_CHARS_PER_PDF_CHUNK) {
+      const summary = await summarizePdfChunk(text, 1, 1, file.name, session.workflowIndex);
+      summaries.push(`=== RESUMO EXTRAÍDO: ${file.name} ===\n${summary}`);
+    } else {
+      const chunks = [];
+      for (let i = 0; i < text.length; i += MAX_CHARS_PER_PDF_CHUNK) {
+        chunks.push(text.substring(i, i + MAX_CHARS_PER_PDF_CHUNK));
+      }
+      const chunkSummaries = [];
+      for (let ci = 0; ci < chunks.length; ci++) {
+        onProgress && onProgress(`📄 Extraindo conteúdo de "${file.name}" — parte ${ci+1}/${chunks.length}...`);
+        const s = await summarizePdfChunk(chunks[ci], ci+1, chunks.length, file.name, session.workflowIndex);
+        chunkSummaries.push(s);
+      }
+      summaries.push(`=== RESUMO EXTRAÍDO: ${file.name} (${chunks.length} partes) ===\n${chunkSummaries.join('\n\n--- continuação ---\n\n')}`);
+    }
+  }
+  return summaries.join('\n\n');
+}
+
+async function runSession(session) {
+  if (!apiKey) { loadApiKey(); return; }
+  session.status = 'running';
+  session.history = [];
+  session.allText = '';
+  session.domContent = '';
+  session.lastError = null;
+  session.lastErrorStatus = null;
+
+  const amIVisible = () => activeSession && activeSession.id === session.id;
+
+  if (amIVisible()) {
+    document.getElementById('emptyState').style.display = 'none';
+    document.getElementById('outputContent').style.display = 'block';
+    document.getElementById('outputContent').innerHTML = '';
+    setStatusUI(session);
+  }
+  renderTabs();
+
+  // ── PRÉ-PROCESSAMENTO DE PDFs (resolve qualquer tamanho de documento) ──────
+  let pdfSummary = '';
+  const mode = session.mode || 'form';
+  const hasPdfs = mode === 'pdf'
+    ? (session.pdfTabFiles || []).some(f => f.text?.trim().length > 0)
+    : (session.formPdfs || []).some(f => f.text?.trim().length > 0);
+
+  if (hasPdfs) {
+    const totalChars = mode === 'pdf'
+      ? (session.pdfTabFiles || []).reduce((s,f) => s + (f.text||'').length, 0)
+      : (session.formPdfs || []).reduce((s,f) => s + (f.text||'').length, 0);
+
+    if (totalChars > MAX_CHARS_DIRECT && amIVisible()) {
+      document.getElementById('outputContent').innerHTML +=
+        `<div class="api-error" style="color:var(--gold);border-color:rgba(201,168,76,.3);">` +
+        `📄 Documentos grandes detectados (${Math.round(totalChars/1000)}k caracteres). ` +
+        `Iniciando extração analítica com claude-sonnet — conteúdo jurídico extraído com profundidade antes da análise principal...</div>`;
+    }
+
+    try {
+      pdfSummary = await preprocessPdfs(session, (msg) => {
+        if (amIVisible()) {
+          const el = document.getElementById('outputContent');
+          const lastProg = el.querySelector('.pdf-progress');
+          if (lastProg) lastProg.textContent = msg;
+          else {
+            const div = document.createElement('div');
+            div.className = 'pdf-progress api-error';
+            div.style.cssText = 'color:var(--gold);border-color:rgba(201,168,76,.3);font-size:11px;';
+            div.textContent = msg;
+            el.appendChild(div);
+          }
+        }
+      });
+      if (amIVisible()) {
+        document.querySelectorAll('.pdf-progress').forEach(e => e.remove());
+        if (totalChars > MAX_CHARS_DIRECT) {
+          document.getElementById('outputContent').innerHTML +=
+            `<div class="api-error" style="color:var(--green2);border-color:rgba(74,124,89,.3);font-size:11px;">` +
+            `✓ Extração analítica concluída. Iniciando análise jurídica...</div>`;
+        }
+      }
+    } catch(err) {
+      session.status = 'error';
+      session.lastError = err.message;
+      if (amIVisible()) {
+        document.getElementById('outputContent').innerHTML +=
+          `<div class="api-error">Erro no pré-processamento dos PDFs: ${err.message}</div>`;
+        setStatusUI(session);
+      }
+      renderTabs();
+      return;
+    }
+  }
+
+  // ── MONTAR PROMPT FINAL ────────────────────────────────────────────────────
+  const wf = WORKFLOWS[session.workflowIndex];
+  const template = PROMPTS[wf.promptFile] || '';
+
+  // Build non-PDF data
+  let formData = '';
+  if (mode === 'paste') {
+    const txt = (session.pasteText || '').trim();
+    const ctx = (session.pasteCtx  || '').trim();
+    formData = (txt ? `TEXTO DOS AUTOS:\n${txt}` : '') + (ctx ? `\n\nCONTEXTO ADICIONAL:\n${ctx}` : '');
+  } else if (mode === 'pdf') {
+    const ctx = (session.pdfTabCtx || '').trim();
+    formData = ctx ? `CONTEXTO ADICIONAL:\n${ctx}` : '';
+  } else {
+    // form mode
+    const lines = [];
+    wf.fields.forEach(group => {
+      lines.push(`\n${group.group}:`);
+      group.fields.forEach(f => {
+        const val = session.formData?.[f.id];
+        if (!val || (Array.isArray(val) && val.length === 0)) return;
+        const display = Array.isArray(val) ? val.join(', ') : val;
+        if (display) lines.push(`  ${f.label}: ${display}`);
+      });
+    });
+    formData = lines.join('\n');
+  }
+
+  const obs = (session.observacoes || '').trim();
+  let fullData = formData;
+  if (pdfSummary) fullData += `\n\n--- DOCUMENTOS ANEXADOS ---\n${pdfSummary}`;
+  if (obs) fullData += `\n\n--- OBSERVAÇÕES DO ADVOGADO ---\n${obs}`;
+
+  const userPrompt = template.replace('{{DADOS}}', fullData || '[Dados não fornecidos]')
+    + '\n\nIMPORTANTE: Ao concluir TODA a análise/peça, escreva exatamente na última linha: [ANÁLISE CONCLUÍDA]';
+
+  session.history = [{ role: 'user', content: userPrompt }];
+
+  // ── LOOP DE EXECUÇÃO ────────────────────────────────────────────────────────
+  let turns = 0;
+  let finished = false;
+
+  while (!finished && turns < MAX_TURNS) {
+    turns++;
+    let turnText = null;
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      session.lastError = null;
+      session.lastErrorStatus = null;
+      turnText = await streamTurn(session, turns > 1);
+      if (turnText !== null) break;
+      const isRateLimit = session.lastErrorStatus === 429 || (session.lastError && (
+        session.lastError.includes('rate limit') || session.lastError.includes('rate_limit') ||
+        session.lastError.includes('overloaded') || session.lastError.includes('529')
+      ));
+      if (attempt < MAX_RETRIES) {
+        const waitMs = isRateLimit ? RATE_LIMIT_DELAY : RETRY_DELAY * attempt;
+        if (amIVisible()) {
+          document.getElementById('outputContent').innerHTML +=
+            `<div class="api-error" style="font-size:11px;opacity:.7;">⏳ ${isRateLimit
+              ? `Limite de tokens atingido. Aguardando ${Math.round(waitMs/1000)}s e retomando...`
+              : `Tentando novamente (${attempt}/${MAX_RETRIES})...`}</div>`;
+        }
+        await sleep(waitMs);
+      }
+    }
+    if (turnText === null) {
+      session.status = 'error';
+      renderTabs();
+      if (amIVisible()) setStatusUI(session);
+      return;
+    }
+    session.allText += (session.allText ? '\n\n' : '') + turnText;
+    session.history.push({ role: 'assistant', content: turnText });
+
+    const isDone = turnText.includes('[ANÁLISE CONCLUÍDA]') || turnText.includes('[MINUTA FINAL]') || turnText.includes('[MINUTA CONCLUÍDA]');
+    if (isDone || turns >= MAX_TURNS) {
+      finished = true;
+    } else {
+      session.history.push({ role: 'user', content: 'Continue a análise do ponto onde parou, sem repetir o que já foi escrito.' });
+    }
+  }
+
+  session.status = 'done';
+  renderTabs();
+  if (amIVisible()) setStatusUI(session);
+}
+
+async function streamTurn(session, isContinuation) {
+  const amIVisible = () => activeSession && activeSession.id === session.id;
+  let turnText = '';
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': sanitizeApiKey(apiKey),
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({ model: 'claude-sonnet-4-5', max_tokens: 8000, stream: true, messages: session.history })
+    });
+
+    if (!response.ok) {
+      const err = await response.json();
+      if (response.status === 401) {
+        apiKey = '';
+        try { localStorage.removeItem('lex_rural_api_key'); } catch(e) {}
+        openApiModal();
+      }
+      session.lastError = err.error?.message || 'Erro na API';
+      session.lastErrorStatus = response.status;
+      if (amIVisible()) document.getElementById('outputContent').innerHTML += `<div class="api-error">Erro: ${session.lastError}</div>`;
+      return null;
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    const turnId = `turn-${session.id}-${Date.now()}`;
+
+    if (amIVisible()) {
+      if (isContinuation) {
+        document.getElementById('outputContent').innerHTML +=
+          '<hr style="border:none;border-top:1px dashed var(--border2);margin:18px 0 14px;">';
+      }
+      const div = document.createElement('div');
+      div.id = turnId; div.className = 'turn-block';
+      document.getElementById('outputContent').appendChild(div);
+    }
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n'); buffer = lines.pop();
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        const data = line.slice(6);
+        if (data === '[DONE]') continue;
+        try {
+          const parsed = JSON.parse(data);
+          if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
+            turnText += parsed.delta.text;
+            if (amIVisible()) {
+              let el = document.getElementById(turnId);
+              if (!el) {
+                el = document.createElement('div');
+                el.id = turnId; el.className = 'turn-block';
+                document.getElementById('outputContent').appendChild(el);
+              }
+              el.innerHTML = formatOutputText(turnText) + '<span class="streaming-cursor"></span>';
+              document.getElementById('outputContent').scrollTop = 99999;
+            }
+          }
+        } catch(e) {}
+      }
+    }
+
+    if (amIVisible()) {
+      const el = document.getElementById(turnId);
+      if (el) el.innerHTML = formatOutputText(turnText);
+    }
+
+    const existingDom = session.domContent || '';
+    const sep = (isContinuation && existingDom) ? '<hr style="border:none;border-top:1px dashed rgba(255,255,255,.13);margin:18px 0 14px;">' : '';
+    const newBlock = `<div class="turn-block" id="${turnId}">${formatOutputText(turnText)}</div>`;
+    if (amIVisible()) {
+      session.domContent = document.getElementById('outputContent').innerHTML;
+    } else {
+      session.domContent = existingDom + (existingDom ? sep : '') + newBlock;
+    }
+    return turnText;
+
+  } catch(err) {
+    session.lastError = err.message;
+    if (amIVisible()) document.getElementById('outputContent').innerHTML += `<div class="api-error">Erro: ${err.message}</div>`;
+    return null;
+  }
+}
+
+async function runQueue() {
+  if (queueRunning) return;
+  const idleSessions = sessions.filter(s => s.status === 'idle');
+  if (idleSessions.length === 0) return;
+  queueRunning = true;
+  renderTabs();
+  for (const s of idleSessions) {
+    if (activeSession && activeSession.id !== s.id) saveSessionState(activeSession);
+    await runSession(s);
+    if (idleSessions.indexOf(s) < idleSessions.length - 1) await sleep(15000);
+  }
+  queueRunning = false;
+  renderTabs();
+}
+
+function executarPrompt() {
+  if (!activeSession) return;
+  if (!apiKey) { openApiModal(); return; }
+  if (activeSession.status === 'running') return;
+  saveSessionState(activeSession);
+  activeSession.status = 'idle';
+  runSession(activeSession);
+}
+
+function copyOutput() {
+  if (!activeSession || !activeSession.allText) return;
+  navigator.clipboard.writeText(activeSession.allText).then(() => {
+    const btn = event.target; btn.textContent = 'Copiado!';
+    setTimeout(() => { btn.textContent = 'Copiar'; }, 2000);
+  });
+}
+
+function clearCurrentOutput() {
+  if (!activeSession) return;
+  activeSession.status = 'idle';
+  activeSession.allText = '';
+  activeSession.domContent = '';
+  activeSession.history = [];
+  document.getElementById('outputContent').style.display = 'none';
+  document.getElementById('outputContent').innerHTML = '';
+  document.getElementById('emptyState').style.display = 'flex';
+  setStatusUI(activeSession);
+  renderTabs();
+}
+
+function saveCurrentPdf() {
+  if (!activeSession || !activeSession.allText) return;
+  const wf = WORKFLOWS[activeSession.workflowIndex];
+  const title = wf.name;
+  const date = new Date().toLocaleDateString('pt-BR');
+  const label = activeSession.label;
+
+  const rawContent = (activeSession.domContent || document.getElementById('outputContent').innerHTML)
+    .replace(/<span[^>]*streaming-cursor[^>]*><\/span>/g, '')
+    .replace(/\[ANÁLISE CONCLUÍDA\]/g, '')
+    .replace(/<hr[^>]*>/g, '<hr style="border:none;border-top:1px dashed #ccc;margin:20px 0;">');
+
+  const html = `<!DOCTYPE html>
+<html lang="pt-BR"><head><meta charset="UTF-8"><title>${title}</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600&family=Inter:wght@400;500;600&display=swap');
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Inter',Georgia,serif;font-size:11pt;color:#1a1a1a;background:#fff}
+  .page{max-width:780px;margin:0 auto;padding:40px 48px}
+  .header{border-bottom:2px solid #3a5c2a;padding-bottom:16px;margin-bottom:28px}
+  .header-top{display:flex;justify-content:space-between;align-items:flex-start}
+  .logo{font-family:'Playfair Display',serif;font-size:18pt;font-weight:600;color:#3a5c2a}
+  .logo-sub{font-size:8pt;color:#666;text-transform:uppercase;letter-spacing:.1em;margin-top:2px}
+  .doc-title{font-family:'Playfair Display',serif;font-size:13pt;font-weight:600;color:#3a5c2a;margin-top:14px}
+  .doc-label{font-size:9pt;color:#666;margin-top:4px}
+  .doc-date{font-size:9pt;color:#888;text-align:right}
+  .disclaimer{background:#f5f7fa;border-left:3px solid #3a5c2a;padding:8px 12px;font-size:8.5pt;color:#555;margin-bottom:24px;border-radius:0 4px 4px 0}
+  .turn-block{margin-bottom:0}
+  .turn-block h1,.content h1{font-family:'Playfair Display',serif;font-size:14pt;font-weight:600;color:#3a5c2a;margin:24px 0 10px;padding-bottom:6px;border-bottom:1px solid #dde3ea}
+  .turn-block h2,.content h2{font-size:8pt;font-weight:700;color:#3a5c2a;margin:20px 0 6px;text-transform:uppercase;letter-spacing:.1em}
+  .turn-block h3,.content h3{font-size:11pt;font-weight:600;color:#1a1a1a;margin:14px 0 6px}
+  .turn-block p,.content p{margin-bottom:9px;text-align:justify}
+  .turn-block strong,.content strong{font-weight:600;color:#3a5c2a}
+  .turn-block ul,.turn-block ol,.content ul,.content ol{padding-left:20px;margin-bottom:9px}
+  .turn-block li,.content li{margin-bottom:4px}
+  .api-error{display:none}
+  .footer{margin-top:40px;padding-top:12px;border-top:1px solid #dde3ea;display:flex;justify-content:space-between;font-size:8pt;color:#aaa}
+  @media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}.page{padding:24px 32px}}
+` + '</style></head><body>' + `
+<div class="page">
+  <div class="header">
+    <div class="header-top">
+      <div><div class="logo">Lex Rural</div><div class="logo-sub">Assistente Jurídico · Crédito Rural</div></div>
+      <div class="doc-date">Gerado em ${date}</div>
+    </div>
+    <div class="doc-title">${title}</div>
+    <div class="doc-label">${label}</div>
+  </div>
+  <div class="disclaimer"><strong>Instrumento de trabalho:</strong> Análise gerada por inteligência artificial (Claude · Anthropic). Não substitui o juízo técnico do advogado responsável. Verifique todos os precedentes antes de utilizar em peça processual.</div>
+  <div class="content">${rawContent}</div>
+  <div class="footer"><span>Lex Rural · Assistente Jurídico</span><span>${title} · ${date}</span></div>
+</div>
+${'<scri'+'pt>'}if(document.fonts&&document.fonts.ready){document.fonts.ready.then(function(){window.print();})}else{setTimeout(function(){window.print();},800)}${'</scri'+'pt>'}</body></html>`;
+
+  const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const win = window.open(url, '_blank');
+  if (!win) {
+    const a = document.createElement('a');
+    a.href = url; a.download = label.replace(/[^\w\- ]/g,'').trim() + '.html'; a.click();
+  }
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+}
+
+// ── API KEY ───────────────────────────────────────────────────────────────────
+function sanitizeApiKey(raw) {
+  return (raw || '').replace(/[^\x20-\x7E]/g, '').trim();
+}
+
+function loadApiKey() {
+  try { apiKey = sanitizeApiKey(localStorage.getItem('lex_rural_api_key') || ''); } catch(e) { apiKey = ''; }
+  updateKeyBtn();
+  if (!apiKey) openApiModal();
+}
+
+function updateKeyBtn() {
+  const btn = document.getElementById('keyBtn');
+  const label = document.getElementById('keyBtnLabel');
+  if (apiKey) { btn.className = 'key-btn configured'; label.textContent = 'API Key configurada'; }
+  else { btn.className = 'key-btn'; label.textContent = 'Configurar API Key'; }
+}
+
+function openApiModal() { document.getElementById('apiModal').classList.remove('hidden'); }
+function closeApiModal() { document.getElementById('apiModal').classList.add('hidden'); }
+
+function toggleKeyVisibility() {
+  const input = document.getElementById('apiKeyInput');
+  const btn = event.target;
+  if (input.type === 'password') { input.type = 'text'; btn.textContent = 'ocultar'; }
+  else { input.type = 'password'; btn.textContent = 'mostrar'; }
+}
+
+function saveApiKey() {
+  const input = document.getElementById('apiKeyInput');
+  const raw = input.value;
+  const val = sanitizeApiKey(raw);
+  if (raw !== val) input.value = val;
+  if (!val || (!val.startsWith('sk-ant-') && !val.startsWith('sk-'))) {
+    input.style.borderColor = 'var(--red2)';
+    setTimeout(() => { input.style.borderColor = ''; }, 1500);
+    return;
+  }
+  apiKey = val;
+  try { localStorage.setItem('lex_rural_api_key', val); } catch(e) {}
+  updateKeyBtn();
+  closeApiModal();
+}
+
+// ── FORM RENDERING ────────────────────────────────────────────────────────────
+function formatOutputText(text) {
+  text = text.replace(/\[ANÁLISE CONCLUÍDA\]\s*$/, '')
+             .replace(/\[MINUTA FINAL\]\s*$/, '')
+             .replace(/\[MINUTA CONCLUÍDA\]\s*$/, '').trim();
+  return '<p>' + text
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/\*\*\*(.+?)\*\*\*/g,'<strong>$1</strong>')
+    .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+    .replace(/^# (.+)$/gm,'<h1>$1</h1>')
+    .replace(/^## (.+)$/gm,'<h2>$1</h2>')
+    .replace(/^### (.+)$/gm,'<h3>$1</h3>')
+    .replace(/^(FASE [A-Z] —.+)$/gm,'<h2>$1</h2>')
+    .replace(/^(ETAPA \d+ —.+)$/gm,'<h2>$1</h2>')
+    .replace(/^(SEÇÃO \d+ —.+)$/gm,'<h2>$1</h2>')
+    .replace(/^(MÓDULO M\d+ —.+)$/gm,'<h3>$1</h3>')
+    .replace(/^(\d+\. [A-ZÀÁÂÃÉÍÓÔÕÚ ]+)$/gm,'<h2>$1</h2>')
+    .replace(/\[DADO PENDENTE\]/g,'<span style="background:rgba(139,58,58,0.2);color:#c05050;padding:1px 6px;border-radius:4px;font-size:11px;font-weight:600">DADO PENDENTE</span>')
+    .replace(/\n\n/g,'</p><p>')
+    .replace(/\n/g,'<br>') + '</p>';
+}
+
+function selectStep(btn, idx) {
+  // Toggle step buttons
+  document.querySelectorAll('.step-btn').forEach((b, i) => b.classList.toggle('active', i === idx));
+  // Only show/hide numbered sections (section-0, section-1, etc.) — NOT pdf/obs
+  document.querySelectorAll('[id^="section-"]').forEach(s => {
+    const match = s.id.match(/^section-(\d+)$/);
+    if (match) s.classList.toggle('hidden', parseInt(match[1]) !== idx);
+  });
+}
+function renderForm() {
+  if (!activeSession) return;
+  const wf = WORKFLOWS[activeSession.workflowIndex];
+  document.getElementById('formTitle').textContent = wf.name;
+  document.getElementById('formSubtitle').textContent = wf.subtitle;
+
+  const stepsBar = document.getElementById('stepsBar');
+  stepsBar.innerHTML = '';
+  wf.fields.forEach((group, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'step-btn' + (i === 0 ? ' active' : '');
+    btn.textContent = group.group;
+    btn.onclick = () => selectStep(btn, i);
+    stepsBar.appendChild(btn);
+  });
+
+  const body = document.getElementById('formBody');
+  body.innerHTML = '';
+  wf.fields.forEach((group, gIdx) => {
+    const section = document.createElement('div');
+    section.className = 'form-section' + (gIdx > 0 ? ' hidden' : '');
+    section.id = `section-${gIdx}`;
+    const title = document.createElement('div');
+    title.className = 'section-title';
+    title.textContent = group.group;
+    section.appendChild(title);
+
+    group.fields.forEach(f => {
+      const wrap = document.createElement('div');
+      wrap.className = 'field-wrap';
+      const lbl = document.createElement('label');
+      lbl.className = 'field-label';
+      lbl.textContent = f.label;
+      wrap.appendChild(lbl);
+
+      if (f.type === 'text' || f.type === 'date') {
+        const inp = document.createElement('input');
+        inp.type = f.type; inp.id = f.id; inp.className = 'field-input';
+        if (f.type === 'date') inp.style.colorScheme = 'dark';
+        wrap.appendChild(inp);
+      } else if (f.type === 'textarea') {
+        const ta = document.createElement('textarea');
+        ta.id = f.id; ta.className = 'field-textarea'; ta.rows = 4;
+        wrap.appendChild(ta);
+      } else if (f.type === 'radio') {
+        const rg = document.createElement('div'); rg.className = 'radio-group';
+        f.options.forEach(opt => {
+          const label = document.createElement('label');
+          label.className = 'radio-btn';
+          const inp = document.createElement('input');
+          inp.type = 'radio'; inp.name = f.id; inp.value = opt;
+          inp.onchange = () => {
+            document.querySelectorAll(`input[name="${f.id}"]`).forEach(r => {
+              r.parentElement.classList.toggle('selected', r.checked);
+            });
+          };
+          label.appendChild(inp);
+          label.append(opt);
+          rg.appendChild(label);
+        });
+        wrap.appendChild(rg);
+      } else if (f.type === 'checkbox') {
+        const cg = document.createElement('div'); cg.className = 'radio-group';
+        f.options.forEach(opt => {
+          const label = document.createElement('label');
+          label.className = 'check-btn';
+          const inp = document.createElement('input');
+          inp.type = 'checkbox'; inp.name = f.id; inp.value = opt;
+          inp.onchange = () => label.classList.toggle('selected', inp.checked);
+          label.appendChild(inp);
+          label.append(opt);
+          cg.appendChild(label);
+        });
+        wrap.appendChild(cg);
+      } else if (f.type === 'multidate') {
+        // Multiple date entries with + button
+        const container = document.createElement('div');
+        container.id = f.id + '_container';
+        container.style.cssText = 'display:flex;flex-direction:column;gap:6px;';
+
+        const addDateRow = (val) => {
+          const row = document.createElement('div');
+          row.style.cssText = 'display:flex;align-items:center;gap:8px;';
+          const inp = document.createElement('input');
+          inp.type = 'date';
+          inp.className = 'field-input';
+          inp.name = f.id;
+          inp.style.cssText = 'flex:1;color-scheme:dark;';
+          if (val) inp.value = val;
+          const removeBtn = document.createElement('button');
+          removeBtn.type = 'button';
+          removeBtn.textContent = '✕';
+          removeBtn.style.cssText = 'background:none;border:1px solid var(--border2);color:var(--text3);border-radius:5px;padding:4px 8px;cursor:pointer;font-size:12px;flex-shrink:0;';
+          removeBtn.onclick = () => {
+            if (container.querySelectorAll('input[type="date"]').length > 1) {
+              row.remove();
+            }
+          };
+          removeBtn.onmouseover = () => removeBtn.style.color = 'var(--red2)';
+          removeBtn.onmouseout  = () => removeBtn.style.color = 'var(--text3)';
+          row.appendChild(inp);
+          row.appendChild(removeBtn);
+          container.appendChild(row);
+        };
+
+        addDateRow(''); // start with one empty row
+
+        const addBtn = document.createElement('button');
+        addBtn.type = 'button';
+        addBtn.innerHTML = '<span style="font-size:15px;line-height:1;">+</span> Adicionar data';
+        addBtn.style.cssText = 'background:none;border:1px dashed var(--gold-border);color:var(--gold);border-radius:6px;padding:5px 12px;cursor:pointer;font-size:11.5px;font-weight:500;width:fit-content;margin-top:2px;';
+        addBtn.onmouseover = () => addBtn.style.background = 'var(--gold-bg)';
+        addBtn.onmouseout  = () => addBtn.style.background = 'none';
+        addBtn.onclick = () => addDateRow('');
+
+        wrap.appendChild(container);
+        wrap.appendChild(addBtn);
+      }
+      section.appendChild(wrap);
+    });
+    body.appendChild(section);
+  });
+
+  // ── PDF attachment section — always visible at bottom of form ──
+  const pdfSection = document.createElement('div');
+  pdfSection.id = 'section-pdf-attach';
+  pdfSection.style.cssText = 'margin-top:20px;padding-top:16px;border-top:1px dashed rgba(255,255,255,0.12);';
+  pdfSection.innerHTML =
+    '<div style="font-size:11px;font-weight:600;color:var(--gold);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;">\ud83d\udcce Documentos Anexados (PDF \u2014 Fase 2)</div>' +
+    '<div style="font-size:11.5px;color:var(--text3);margin-bottom:10px;">' +
+      'Anexe contratos, autos, demonstrativo do banco, laudos ou qualquer documento relevante. ' +
+      'O texto ser\u00e1 extra\u00eddo automaticamente e analisado junto com os dados acima.' +
+    '</div>' +
+    '<div class="pdf-drop-zone" id="formPdfDropZone"' +
+      ' onclick="document.getElementById(\'formPdfInput\').click()"' +
+      ' ondragover="onFormPdfDragOver(event)" ondragleave="onFormPdfDragLeave()" ondrop="onFormPdfDrop(event)">' +
+      '<input type="file" id="formPdfInput" accept=".pdf" multiple onchange="onFormPdfSelect(event)" style="display:none">' +
+      '<div class="pdf-drop-icon">\ud83d\udcc4</div>' +
+      '<div class="pdf-drop-label">Arraste PDFs aqui ou clique para selecionar</div>' +
+      '<div class="pdf-drop-sub">M\u00faltiplos arquivos suportados \u00b7 M\u00e1x. 50MB por arquivo</div>' +
+    '</div>' +
+    '<div class="pdf-files-list" id="formPdfList"></div>';
+  body.appendChild(pdfSection);
+
+  // ── Observations — always visible at bottom of form ──
+  const obsSection = document.createElement('div');
+  obsSection.id = 'section-obs-form';
+  obsSection.style.cssText = 'margin-top:16px;padding-top:14px;border-top:1px dashed rgba(255,255,255,0.12);';
+  obsSection.innerHTML =
+    '<div style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:7px;">' +
+      '\ud83d\udcac Observa\u00e7\u00f5es do Advogado \u2014 Fase 3' +
+    '</div>' +
+    '<textarea id="observacoes" class="field-textarea" rows="5"' +
+      ' placeholder="D\u00favidas espec\u00edficas, urg\u00eancias (leil\u00e3o, prazo), estrat\u00e9gias, quest\u00f5es a responder, qualquer contexto adicional que o assistente deve considerar..."></textarea>';
+  body.appendChild(obsSection);
+  body.appendChild(obsSection);
+
+}
+// ── FORM-MODE PDF DRAG & DROP ─────────────────────────────────────────────────
+function onFormPdfDragOver(e) { e.preventDefault(); document.getElementById('formPdfDropZone')?.classList.add('drag-over'); }
+function onFormPdfDragLeave()  { document.getElementById('formPdfDropZone')?.classList.remove('drag-over'); }
+function onFormPdfDrop(e) {
+  e.preventDefault();
+  document.getElementById('formPdfDropZone')?.classList.remove('drag-over');
+  processFormPdfs(Array.from(e.dataTransfer.files).filter(f => f.type === 'application/pdf'));
+}
+
+// ── MODE SWITCHING ────────────────────────────────────────────────────────────
+function switchMode(mode) {
+  currentMode = mode;
+  if (activeSession) activeSession.mode = mode;
+  ['form','paste','pdf'].forEach(m => {
+    document.getElementById('mode-tab-' + m)?.classList.toggle('active', m === mode);
+  });
+  document.getElementById('formArea').style.display   = mode === 'form'  ? 'block' : 'none';
+  document.getElementById('pasteArea').style.display  = mode === 'paste' ? 'flex'  : 'none';
+  document.getElementById('pdfArea').style.display    = mode === 'pdf'   ? 'flex'  : 'none';
+}
+
+// ── PDF TEXT EXTRACTION (pdf.js) ─────────────────────────────────────────────
+async function extractPdfText(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const typedarray = new Uint8Array(e.target.result);
+        const pdf = await pdfjsLib.getDocument({ data: typedarray }).promise;
+        let fullText = '';
+        for (let i = 1; i <= pdf.numPages; i++) {
+          const page    = await pdf.getPage(i);
+          const content = await page.getTextContent();
+          fullText += '\n[Página ' + i + ']\n' + content.items.map(it => it.str).join(' ') + '\n';
+        }
+        resolve(fullText);
+      } catch(err) { reject(err); }
+    };
+    reader.onerror = reject;
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+// ── PDF FORM ATTACHMENT (in form mode) ───────────────────────────────────────
+async function onFormPdfSelect(e) {
+  const files = Array.from(e.target.files).filter(f => f.type === 'application/pdf');
+  e.target.value = '';
+  await processFormPdfs(files);
+}
+
+async function processFormPdfs(files) {
+  for (const file of files) {
+    const entry = { name: file.name, text: '', status: 'loading' };
+    formPdfFiles.push(entry); renderFormPdfList();
+    try {
+      entry.text   = await extractPdfText(file);
+      entry.status = entry.text.trim().length > 50 ? 'ok' : 'empty';
+    } catch(e) { entry.status = 'error'; }
+    renderFormPdfList();
+    renderPdfSizeBar('formPdfSizeBar', formPdfFiles);
+  }
+}
+
+function renderFormPdfList() {
+  const list = document.getElementById('formPdfList');
+  if (!list) return;
+  list.innerHTML = formPdfFiles.map((f, i) => {
+    const txt = f.status === 'loading' ? 'Extraindo texto...'
+      : f.status === 'ok'    ? ('\u2713 ' + f.text.length.toLocaleString() + ' caracteres extraídos')
+      : f.status === 'empty' ? '\u26a0 Pouco texto \u2014 PDF pode ser imagem/escaneado'
+      : '\u2715 Erro na extração \u2014 tente colar o texto';
+    const cls = f.status === 'ok' ? 'ok' : f.status !== 'loading' ? 'err' : '';
+    return '<div class="pdf-file-item">' +
+      '<div class="pdf-file-icon">\ud83d\udcc4</div>' +
+      '<div class="pdf-file-info">' +
+        '<div class="pdf-file-name">' + f.name + '</div>' +
+        '<div class="pdf-file-status ' + cls + '">' + txt + '</div>' +
+      '</div>' +
+      '<button class="pdf-file-remove" onclick="removeFormPdf(' + i + ')">\u2715</button>' +
+      '</div>';
+  }).join('');
+}
+function removeFormPdf(i) { formPdfFiles.splice(i, 1); renderFormPdfList(); renderPdfSizeBar('formPdfSizeBar', formPdfFiles); }
+
+// ── PDF TAB HANDLING ─────────────────────────────────────────────────────────
+function onPdfTabDragOver(e) { e.preventDefault(); document.getElementById('pdfDropZone')?.classList.add('drag-over'); }
+function onPdfTabDragLeave()  { document.getElementById('pdfDropZone')?.classList.remove('drag-over'); }
+function onPdfTabDrop(e) {
+  e.preventDefault();
+  document.getElementById('pdfDropZone')?.classList.remove('drag-over');
+  processPdfTab(Array.from(e.dataTransfer.files).filter(f => f.type === 'application/pdf'));
+}
+function onPdfTabSelect(e) { processPdfTab(Array.from(e.target.files)); e.target.value = ''; }
+
+async function processPdfTab(files) {
+  if (!files.length) return;
+  const prog = document.getElementById('pdfProgress');
+  if (prog) prog.style.display = 'block';
+  for (const file of files) {
+    const entry = { name: file.name, text: '', status: 'loading' };
+    pdfTabFiles.push(entry); renderPdfTabList();
+    try {
+      entry.text   = await extractPdfText(file);
+      entry.status = entry.text.trim().length > 50 ? 'ok' : 'empty';
+    } catch(e) { entry.status = 'error'; }
+    renderPdfTabList();
+  }
+  if (prog) prog.style.display = 'none';
+}
+
+
+// ── PDF SIZE MANAGEMENT ───────────────────────────────────────────────────────
+const PDF_CHAR_WARN  = 300000;  // ~75k tokens — warn user
+const PDF_CHAR_LIMIT = 400000;  // ~100k tokens — hard truncate with notice
+
+function estimateTokens(chars) { return Math.round(chars / 4); }
+
+function getTotalPdfChars(files) {
+  return (files || []).filter(f => f.text && f.text.trim().length > 0)
+                      .reduce((sum, f) => sum + f.text.length, 0);
+}
+
+function renderPdfSizeBar(containerId, files) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  const total = getTotalPdfChars(files);
+  const tokens = estimateTokens(total);
+  const pct = Math.min(100, (total / PDF_CHAR_LIMIT) * 100);
+  const state = total > PDF_CHAR_LIMIT ? 'over' : total > PDF_CHAR_WARN ? 'warn' : 'ok';
+  const msg = state === 'over'
+    ? `⚠ Volume muito alto — o texto será truncado automaticamente para caber no limite da API. Remova PDFs ou use "Colar texto" com trecho selecionado.`
+    : state === 'warn'
+    ? `⚠ Volume elevado — próximo do limite. A análise pode ficar incompleta se houver histórico de turnos anteriores.`
+    : `✓ Volume adequado para análise completa.`;
+  const color = state === 'over' ? 'var(--red2)' : state === 'warn' ? '#c9a84c' : 'var(--green2)';
+  container.innerHTML = files.length === 0 ? '' : `
+    <div class="pdf-token-bar ${state}">
+      <div class="pdf-token-label">
+        <span style="color:var(--text2)">Volume dos PDFs</span>
+        <span style="color:${color};font-weight:600">~${tokens.toLocaleString()} tokens &nbsp;(${(total/1000).toFixed(0)}k chars)</span>
+      </div>
+      <div style="background:var(--border2);border-radius:2px;height:4px;">
+        <div class="pdf-token-fill ${state}" style="width:${pct}%"></div>
+      </div>
+      <div class="pdf-token-msg" style="color:${color}">${msg}</div>
+    </div>`;
+}
+
+function truncatePdfText(text, maxChars, filename) {
+  if (text.length <= maxChars) return text;
+  const kept = text.substring(0, maxChars);
+  const omitted = text.length - maxChars;
+  return kept + `\n\n[... TRUNCADO: mais ${omitted.toLocaleString()} caracteres omitidos de "${filename}" por exceder o limite de contexto da API. Anexe menos PDFs ou cole apenas os trechos relevantes ...]`;
+}
+
+function applyPdfSizeLimit(files) {
+  // Distribute the budget proportionally across files
+  const total = getTotalPdfChars(files);
+  if (total <= PDF_CHAR_LIMIT) return files.map(f => ({ ...f }));
+  const scale = PDF_CHAR_LIMIT / total;
+  return files.map(f => {
+    if (!f.text || f.text.trim().length === 0) return { ...f };
+    const budget = Math.floor(f.text.length * scale);
+    return { ...f, text: truncatePdfText(f.text, budget, f.name) };
+  });
+}
+
+function renderPdfTabList() {
+  const list = document.getElementById('pdfTabList');
+  if (!list) return;
+  list.innerHTML = pdfTabFiles.map((f, i) => {
+    const txt = f.status === 'loading' ? 'Extraindo texto...'
+      : f.status === 'ok'    ? ('\u2713 ' + f.text.length.toLocaleString() + ' caracteres extraídos')
+      : f.status === 'empty' ? '\u26a0 Pouco texto \u2014 PDF pode ser imagem/escaneado'
+      : '\u2715 Erro na extração \u2014 tente colar o texto';
+    const cls = f.status === 'ok' ? 'ok' : f.status !== 'loading' ? 'err' : '';
+    return '<div class="pdf-file-item">' +
+      '<div class="pdf-file-icon">\ud83d\udcc4</div>' +
+      '<div class="pdf-file-info">' +
+        '<div class="pdf-file-name">' + f.name + '</div>' +
+        '<div class="pdf-file-status ' + cls + '">' + txt + '</div>' +
+      '</div>' +
+      '<button class="pdf-file-remove" onclick="removePdfTab(' + i + ')">\u2715</button>' +
+      '</div>';
+  }).join('');
+}
+function removePdfTab(i) { pdfTabFiles.splice(i, 1); renderPdfTabList(); }
+
+if (typeof pdfjsLib !== 'undefined') {
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+}
+
+function limparFormulario() {
+  document.querySelectorAll('#modeForm input[type="text"], #modeForm input[type="date"], #modeForm textarea').forEach(el => el.value = '');
+  document.querySelectorAll('.radio-btn,.check-btn').forEach(el => el.classList.remove('selected'));
+  document.querySelectorAll('input[type="radio"],input[type="checkbox"]').forEach(el => el.checked = false);
+  // Reset multidate fields to single empty row
+  document.querySelectorAll('[id$="_container"]').forEach(container => {
+    const rows = container.querySelectorAll('input[type="date"]');
+    if (rows.length > 0) {
+      rows[0].value = '';
+      Array.from(rows).slice(1).forEach(inp => inp.closest('div[style]')?.remove());
+    }
+  });
+  if (activeSession) activeSession.formData = {};
+}
+
+// ── INIT ──────────────────────────────────────────────────────────────────────
+const firstSession = createSession(0);
+renderTabs();
+activateSession(firstSession);
+switchMode('form');
+loadApiKey();
+</script>
+</body>
+</html>
