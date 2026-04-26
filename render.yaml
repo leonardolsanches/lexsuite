@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: lex-suite
+    name: lexsuite
     env: static
     buildCommand: pnpm install && pnpm --filter @workspace/lex-suite run build
     staticPublishPath: artifacts/lex-suite/dist/public
