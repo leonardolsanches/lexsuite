@@ -1,4 +1,4 @@
-import express, { type Express } from "express";
+import express, { type Express, type Request, type Response, type NextFunction } from "express";
 import cors from "cors";
 import pinoHttp from "pino-http";
 import { clerkMiddleware } from "@clerk/express";
@@ -37,5 +37,17 @@ app.use(express.urlencoded({ extended: true }));
 app.use(clerkMiddleware());
 
 app.use("/api", router);
+
+app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
+  const message = err instanceof Error ? err.message : "Erro interno do servidor";
+  const isBridgeError = message.includes("DB_BRIDGE_URL") || message.includes("DB Bridge");
+  const status = isBridgeError ? 503 : 500;
+  logger.error({ err }, "Unhandled error");
+  res.status(status).json({
+    error: isBridgeError
+      ? "Banco de dados indisponível. DB_BRIDGE_URL não está configurado ou o serviço está offline."
+      : message,
+  });
+});
 
 export default app;

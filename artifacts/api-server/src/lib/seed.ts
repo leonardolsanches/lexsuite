@@ -1,4 +1,4 @@
-import { db, workflowsTable, promptsTable } from "@workspace/db";
+import { bridgeQueryOne, bridgeExecute } from "./bridge";
 import { logger } from "./logger";
 
 const LEX_RURAL_WORKFLOWS = [
@@ -1567,9 +1567,13 @@ Não invente fatos ou precedentes. A minuta é instrumento de trabalho sujeito �
 ];
 
 export async function seedDatabase() {
+  if (!process.env.DB_BRIDGE_URL) {
+    logger.warn("DB_BRIDGE_URL não configurado — seed ignorado. Configure o Secret e reinicie.");
+    return;
+  }
   try {
-    const existingWorkflows = await db.select().from(workflowsTable).limit(1);
-    if (existingWorkflows.length > 0) {
+    const existing = await bridgeQueryOne("SELECT id FROM workflows LIMIT 1");
+    if (existing) {
       logger.info("Database already seeded, skipping...");
       return;
     }
@@ -1578,25 +1582,22 @@ export async function seedDatabase() {
 
     const allWorkflows = [...LEX_RURAL_WORKFLOWS, ...LEX_EXECUTIO_WORKFLOWS];
     for (const wf of allWorkflows) {
-      await db.insert(workflowsTable).values({
-        key: wf.key,
-        name: wf.name,
-        subtitle: wf.subtitle,
-        module: wf.module,
-        category: wf.category,
-        promptKey: wf.promptKey,
-        fields: wf.fields,
-        sortOrder: wf.sortOrder,
-      });
+      await bridgeExecute(
+        `INSERT INTO workflows (key, name, subtitle, module, category, prompt_key, fields, sort_order)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+         ON CONFLICT (key) DO NOTHING`,
+        [wf.key, wf.name, wf.subtitle, wf.module, wf.category ?? null, wf.promptKey, wf.fields, wf.sortOrder]
+      );
     }
 
     const allPrompts = [...LEX_RURAL_PROMPTS, ...LEX_EXECUTIO_PROMPTS];
     for (const p of allPrompts) {
-      await db.insert(promptsTable).values({
-        key: p.key,
-        module: p.module,
-        content: p.content,
-      });
+      await bridgeExecute(
+        `INSERT INTO prompts (key, module, content)
+         VALUES ($1, $2, $3)
+         ON CONFLICT (key) DO NOTHING`,
+        [p.key, p.module, p.content]
+      );
     }
 
     logger.info(`Seeded ${allWorkflows.length} workflows and ${allPrompts.length} prompts successfully.`);

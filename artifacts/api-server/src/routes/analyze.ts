@@ -1,10 +1,9 @@
 import { Router, type IRouter } from "express";
-import { db, sessionsTable, promptsTable, workflowsTable, documentsTable, userModulesTable } from "@workspace/db";
-import { eq, and } from "drizzle-orm";
 import { requireAuth } from "../lib/auth";
 import { isAnyLlmConfigured, getLlmStatusMessage, streamAnalysis } from "../lib/llm";
 import { isOllamaConfigured, getOllamaBaseUrl, listOllamaModels, pingOllama, getOllamaModelParecer, getOllamaModelExtraction } from "../lib/ollama";
-import { isDbBridgeConfigured, pingDbBridge, getDbBridgeUrl } from "../lib/embedding";
+import { isDbBridgeConfigured, dbBridgeSearchChunks } from "../lib/embedding";
+import { pingDbBridge, getDbBridgeUrl, bridgeQuery, bridgeQueryOne, bridgeExecute } from "../lib/bridge";
 import { searchRelevantChunks, buildRagContext } from "../lib/rag";
 import { logger } from "../lib/logger";
 
@@ -61,17 +60,20 @@ router.post("/analyze", requireAuth, async (req, res): Promise<void> => {
     return;
   }
 
-  const activeModules = await db.select().from(userModulesTable)
-    .where(eq(userModulesTable.userId, userId));
+  const activeModules = await bridgeQuery(
+    "SELECT module FROM user_modules WHERE user_id = $1",
+    [userId]
+  );
   const hasModule = activeModules.some(m => m.module === module);
   if (!hasModule) {
     res.status(403).json({ error: `Module '${module}' não está ativado para sua conta` });
     return;
   }
 
-  const [prompt] = await db.select().from(promptsTable)
-    .where(eq(promptsTable.key, workflowKey))
-    .limit(1);
+  const prompt = await bridgeQueryOne(
+    "SELECT key, content, module FROM prompts WHERE key = $1",
+    [workflowKey]
+  );
 
   if (!prompt) {
     res.status(404).json({ error: "Prompt não encontrado para o workflow" });
@@ -106,10 +108,14 @@ router.post("/analyze", requireAuth, async (req, res): Promise<void> => {
       }
     }
   } else {
-    const userDocs = await db.select().from(documentsTable)
-      .where(and(eq(documentsTable.userId, userId), eq(documentsTable.module, module), eq(documentsTable.status, "ready")));
+    const userDocs = await bridgeQuery(
+      "SELECT filename, content FROM documents WHERE user_id = $1 AND module = $2 AND status = 'ready'",
+      [userId, module]
+    );
     if (userDocs.length > 0) {
-      const docsContext = userDocs.map(d => `[${d.filename}]: ${d.content.slice(0, 2000)}`).join("\n\n");
+      const docsContext = userDocs
+        .map(d => `[${d.filename}]: ${String(d.content).slice(0, 2000)}`)
+        .join("\n\n");
       ragContext = `BASE DE CONHECIMENTO (documentos indexados):\n${docsContext}\n\n`;
     }
   }
@@ -118,7 +124,7 @@ router.post("/analyze", requireAuth, async (req, res): Promise<void> => {
     dataSection = ragContext + dataSection;
   }
 
-  const fullPrompt = prompt.content.replace("{{DADOS}}", dataSection || "(nenhum dado fornecido)");
+  const fullPrompt = String(prompt.content).replace("{{DADOS}}", dataSection || "(nenhum dado fornecido)");
 
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
@@ -126,19 +132,20 @@ router.post("/analyze", requireAuth, async (req, res): Promise<void> => {
   res.setHeader("X-Accel-Buffering", "no");
   res.flushHeaders();
 
-  let sessionRecord: { id: number } | undefined;
+  let sessionRecord: { id: number } | null = null;
   if (sessionId) {
-    const [s] = await db.select().from(sessionsTable)
-      .where(and(eq(sessionsTable.id, sessionId), eq(sessionsTable.userId, userId)))
-      .limit(1);
-    sessionRecord = s;
+    const s = await bridgeQueryOne(
+      "SELECT id FROM sessions WHERE id = $1 AND user_id = $2",
+      [sessionId, userId]
+    );
+    if (s) sessionRecord = { id: s.id as number };
   }
 
   if (sessionRecord) {
-    await db.update(sessionsTable).set({
-      status: "running",
-      formData: formData ? JSON.stringify(formData) : null,
-    }).where(eq(sessionsTable.id, sessionRecord.id));
+    await bridgeExecute(
+      "UPDATE sessions SET status = 'running', form_data = $2, updated_at = NOW() WHERE id = $1",
+      [sessionRecord.id, formData ? JSON.stringify(formData) : null]
+    );
   }
 
   let fullOutput = "";
@@ -155,15 +162,18 @@ router.post("/analyze", requireAuth, async (req, res): Promise<void> => {
     res.end();
 
     if (sessionRecord) {
-      await db.update(sessionsTable).set({
-        status: "done",
-        outputHtml: fullOutput,
-      }).where(eq(sessionsTable.id, sessionRecord.id));
+      await bridgeExecute(
+        "UPDATE sessions SET status = 'done', output_html = $2, updated_at = NOW() WHERE id = $1",
+        [sessionRecord.id, fullOutput]
+      );
     }
   } catch (err: any) {
     logger.error({ err }, "Erro durante streaming de análise");
     if (sessionRecord) {
-      await db.update(sessionsTable).set({ status: "error" }).where(eq(sessionsTable.id, sessionRecord.id));
+      await bridgeExecute(
+        "UPDATE sessions SET status = 'error', updated_at = NOW() WHERE id = $1",
+        [sessionRecord.id]
+      );
     }
     if (!res.writableEnded) {
       res.write(`data: ${JSON.stringify({ type: "error", message: err.message ?? "Falha na análise" })}\n\n`);

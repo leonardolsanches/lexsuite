@@ -24,5 +24,7 @@ app.listen(port, async (err) => {
 
   logger.info({ port }, "Server listening");
 
-  await seedDatabase();
+  seedDatabase().catch((err) => {
+    logger.error({ err }, "Seed falhou — servidor continua no ar");
+  });
 });

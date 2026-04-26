@@ -1,16 +1,11 @@
 import { getOllamaBaseUrl, OLLAMA_DEFAULT_MODEL_EMBEDDING } from "./ollama";
+import { getDbBridgeUrl, isDbBridgeConfigured, pingDbBridge, bridgeExecute } from "./bridge";
 import { logger } from "./logger";
+
+export { getDbBridgeUrl, isDbBridgeConfigured, pingDbBridge };
 
 export function getEmbeddingModel(): string {
   return process.env.OLLAMA_MODEL_EMBEDDING ?? OLLAMA_DEFAULT_MODEL_EMBEDDING;
-}
-
-export function getDbBridgeUrl(): string | null {
-  return process.env.DB_BRIDGE_URL ?? null;
-}
-
-export function isDbBridgeConfigured(): boolean {
-  return !!process.env.DB_BRIDGE_URL;
 }
 
 export async function generateEmbedding(text: string): Promise<number[]> {
@@ -97,27 +92,8 @@ export async function dbBridgeSearchChunks(
 }
 
 export async function dbBridgeDeleteDocumentChunks(documentId: number): Promise<void> {
-  const url = getDbBridgeUrl();
-  if (!url) return;
-
-  await fetch(`${url}/query`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      sql: "DELETE FROM document_chunks WHERE document_id = $1",
-      params: [documentId],
-    }),
-    signal: AbortSignal.timeout(10_000),
-  }).catch((err) => logger.warn({ err }, "DB Bridge: falha ao deletar chunks"));
-}
-
-export async function pingDbBridge(): Promise<boolean> {
-  const url = getDbBridgeUrl();
-  if (!url) return false;
-  try {
-    const resp = await fetch(`${url}/health`, { signal: AbortSignal.timeout(5_000) });
-    return resp.ok;
-  } catch {
-    return false;
-  }
+  await bridgeExecute(
+    "DELETE FROM document_chunks WHERE document_id = $1",
+    [documentId]
+  ).catch((err) => logger.warn({ err }, "DB Bridge: falha ao deletar chunks"));
 }

@@ -1,10 +1,9 @@
 import { Router, type IRouter } from "express";
 import { createRequire } from "node:module";
 import multer from "multer";
-import { eq, and } from "drizzle-orm";
-import { db, documentsTable } from "@workspace/db";
 import { requireAuth } from "../lib/auth";
-import { isDbBridgeConfigured, dbBridgeDeleteDocumentChunks, pingDbBridge, getDbBridgeUrl } from "../lib/embedding";
+import { isDbBridgeConfigured, dbBridgeDeleteDocumentChunks } from "../lib/embedding";
+import { pingDbBridge, getDbBridgeUrl, bridgeQuery, bridgeQueryOne, bridgeExecute, toIso, type Row } from "../lib/bridge";
 import { indexDocument } from "../lib/rag";
 import { logger } from "../lib/logger";
 
@@ -18,46 +17,51 @@ const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 20 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
-    const allowed = ["application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "text/plain"];
-    if (allowed.includes(file.mimetype) || file.originalname.endsWith(".pdf") || file.originalname.endsWith(".docx") || file.originalname.endsWith(".txt")) {
-      cb(null, true);
-    } else {
-      cb(new Error("Tipo de arquivo não suportado. Use PDF, DOCX ou TXT."));
-    }
+    const ok =
+      file.mimetype === "application/pdf" ||
+      file.mimetype === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+      file.mimetype === "text/plain" ||
+      file.originalname.endsWith(".pdf") ||
+      file.originalname.endsWith(".docx") ||
+      file.originalname.endsWith(".txt");
+    ok ? cb(null, true) : cb(new Error("Tipo de arquivo não suportado. Use PDF, DOCX ou TXT."));
   },
 });
 
 async function extractText(buffer: Buffer, mimetype: string, originalname: string): Promise<string> {
-  const isPdf = mimetype === "application/pdf" || originalname.endsWith(".pdf");
-  const isDocx = mimetype === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" || originalname.endsWith(".docx");
-  const isTxt = mimetype === "text/plain" || originalname.endsWith(".txt");
-
-  if (isPdf) {
+  if (mimetype === "application/pdf" || originalname.endsWith(".pdf")) {
     const result = await pdfParse(buffer);
     return result.text;
   }
-  if (isDocx) {
+  if (
+    mimetype === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+    originalname.endsWith(".docx")
+  ) {
     const result = await mammoth.extractRawText({ buffer });
     return result.value;
   }
-  if (isTxt) {
-    return buffer.toString("utf-8");
-  }
-  throw new Error("Formato não reconhecido");
+  return buffer.toString("utf-8");
+}
+
+function mapDoc(d: Row) {
+  return {
+    id: d.id,
+    userId: d.user_id,
+    filename: d.filename,
+    module: d.module,
+    status: d.status,
+    chunkCount: d.chunk_count ?? 0,
+    createdAt: toIso(d.created_at),
+  };
 }
 
 router.get("/documents", requireAuth, async (req, res): Promise<void> => {
   const userId = (req as any).userId as string;
-  const docs = await db.select().from(documentsTable).where(eq(documentsTable.userId, userId));
-  res.json(docs.map(d => ({
-    id: d.id,
-    userId: d.userId,
-    filename: d.filename,
-    module: d.module,
-    status: d.status,
-    chunkCount: d.chunkCount,
-    createdAt: d.createdAt.toISOString(),
-  })));
+  const docs = await bridgeQuery(
+    "SELECT id, user_id, filename, module, status, chunk_count, created_at FROM documents WHERE user_id = $1 ORDER BY created_at DESC",
+    [userId]
+  );
+  res.json(docs.map(mapDoc));
 });
 
 router.post("/documents/upload", requireAuth, upload.single("file"), async (req, res): Promise<void> => {
@@ -88,22 +92,20 @@ router.post("/documents/upload", requireAuth, upload.single("file"), async (req,
     return;
   }
 
-  const [doc] = await db.insert(documentsTable).values({
-    userId,
-    filename: req.file.originalname,
-    content: extractedText.slice(0, 50_000),
-    module: modulo,
-    status: "indexing",
-    chunkCount: 0,
-  }).returning();
+  const doc = await bridgeQueryOne(
+    `INSERT INTO documents (user_id, filename, content, module, status, chunk_count)
+     VALUES ($1, $2, $3, $4, 'indexing', 0)
+     RETURNING id, user_id, filename, module, status, chunk_count, created_at`,
+    [userId, req.file.originalname, extractedText.slice(0, 50_000), modulo]
+  );
+
+  if (!doc) {
+    res.status(500).json({ error: "Falha ao salvar documento" });
+    return;
+  }
 
   res.status(202).json({
-    id: doc.id,
-    filename: doc.filename,
-    module: doc.module,
-    status: doc.status,
-    chunkCount: doc.chunkCount,
-    createdAt: doc.createdAt.toISOString(),
+    ...mapDoc(doc),
     message: "Arquivo recebido. Indexação em andamento...",
   });
 
@@ -111,21 +113,18 @@ router.post("/documents/upload", requireAuth, upload.single("file"), async (req,
     try {
       const casoId = caso_id?.trim() || null;
       let indexed = 0;
-
       if (isDbBridgeConfigured()) {
-        indexed = await indexDocument(doc.id, casoId, extractedText, modulo);
+        indexed = await indexDocument(doc.id as number, casoId, extractedText, modulo);
       }
-
       const chunkCount = indexed > 0 ? indexed : Math.ceil(extractedText.length / 2000);
-      await db.update(documentsTable).set({
-        status: "ready",
-        chunkCount,
-      }).where(eq(documentsTable.id, doc.id));
-
+      await bridgeExecute(
+        "UPDATE documents SET status = 'ready', chunk_count = $2 WHERE id = $1",
+        [doc.id, chunkCount]
+      );
       logger.info({ docId: doc.id, indexed }, "Documento indexado com sucesso");
     } catch (err) {
-      logger.error({ err, docId: doc.id }, "Falha na indexação RAG do documento");
-      await db.update(documentsTable).set({ status: "error" }).where(eq(documentsTable.id, doc.id)).catch(() => {});
+      logger.error({ err, docId: doc.id }, "Falha na indexação RAG");
+      await bridgeExecute("UPDATE documents SET status = 'error' WHERE id = $1", [doc.id]).catch(() => {});
     }
   });
 });
@@ -139,22 +138,21 @@ router.post("/documents", requireAuth, async (req, res): Promise<void> => {
     return;
   }
 
-  const [doc] = await db.insert(documentsTable).values({
-    userId,
-    filename,
-    content: String(content).slice(0, 50_000),
-    module: modulo,
-    status: "indexing",
-    chunkCount: 0,
-  }).returning();
+  const text = String(content).slice(0, 50_000);
+  const doc = await bridgeQueryOne(
+    `INSERT INTO documents (user_id, filename, content, module, status, chunk_count)
+     VALUES ($1, $2, $3, $4, 'indexing', 0)
+     RETURNING id, user_id, filename, module, status, chunk_count, created_at`,
+    [userId, filename, text, modulo]
+  );
+
+  if (!doc) {
+    res.status(500).json({ error: "Falha ao salvar documento" });
+    return;
+  }
 
   res.status(201).json({
-    id: doc.id,
-    filename: doc.filename,
-    module: doc.module,
-    status: doc.status,
-    chunkCount: doc.chunkCount,
-    createdAt: doc.createdAt.toISOString(),
+    ...mapDoc(doc),
     message: "Texto recebido. Indexação em andamento...",
   });
 
@@ -162,16 +160,17 @@ router.post("/documents", requireAuth, async (req, res): Promise<void> => {
     try {
       const casoId = caso_id?.trim() || null;
       let indexed = 0;
-
       if (isDbBridgeConfigured()) {
-        indexed = await indexDocument(doc.id, casoId, String(content), modulo);
+        indexed = await indexDocument(doc.id as number, casoId, text, modulo);
       }
-
-      const chunkCount = indexed > 0 ? indexed : Math.ceil(String(content).length / 2000);
-      await db.update(documentsTable).set({ status: "ready", chunkCount }).where(eq(documentsTable.id, doc.id));
+      const chunkCount = indexed > 0 ? indexed : Math.ceil(text.length / 2000);
+      await bridgeExecute(
+        "UPDATE documents SET status = 'ready', chunk_count = $2 WHERE id = $1",
+        [doc.id, chunkCount]
+      );
     } catch (err) {
-      logger.error({ err, docId: doc.id }, "Falha na indexação RAG do documento (texto)");
-      await db.update(documentsTable).set({ status: "error" }).where(eq(documentsTable.id, doc.id)).catch(() => {});
+      logger.error({ err, docId: doc.id }, "Falha na indexação RAG (texto)");
+      await bridgeExecute("UPDATE documents SET status = 'error' WHERE id = $1", [doc.id]).catch(() => {});
     }
   });
 });
@@ -186,11 +185,12 @@ router.delete("/documents/:id", requireAuth, async (req, res): Promise<void> => 
     return;
   }
 
-  const [deleted] = await db.delete(documentsTable)
-    .where(and(eq(documentsTable.id, id), eq(documentsTable.userId, userId)))
-    .returning();
+  const { rowCount } = await bridgeExecute(
+    "DELETE FROM documents WHERE id = $1 AND user_id = $2",
+    [id, userId]
+  );
 
-  if (!deleted) {
+  if (rowCount === 0) {
     res.status(404).json({ error: "Documento não encontrado" });
     return;
   }

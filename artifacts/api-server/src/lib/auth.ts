@@ -1,7 +1,6 @@
 import { getAuth } from "@clerk/express";
 import type { Request, Response, NextFunction } from "express";
-import { db, usersTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { bridgeQuery, bridgeQueryOne } from "./bridge";
 
 export const requireAuth = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   const auth = getAuth(req);
@@ -15,13 +14,19 @@ export const requireAuth = async (req: Request, res: Response, next: NextFunctio
 };
 
 export async function getOrCreateUser(clerkUserId: string, email: string, name?: string | null) {
-  const existing = await db.select().from(usersTable).where(eq(usersTable.id, clerkUserId)).limit(1);
-  if (existing.length > 0) return existing[0];
-  const [user] = await db.insert(usersTable).values({
-    id: clerkUserId,
-    email,
-    name: name ?? null,
-    role: "user",
-  }).returning();
-  return user;
+  const existing = await bridgeQueryOne(
+    "SELECT id, email, name, role, created_at FROM users WHERE id = $1",
+    [clerkUserId]
+  );
+  if (existing) return existing;
+
+  const user = await bridgeQueryOne(
+    `INSERT INTO users (id, email, name, role)
+     VALUES ($1, $2, $3, 'user')
+     ON CONFLICT (id) DO UPDATE SET email = EXCLUDED.email
+     RETURNING id, email, name, role, created_at`,
+    [clerkUserId, email, name ?? null]
+  );
+
+  return user!;
 }
