@@ -219,86 +219,106 @@ export default function ModuleView({ module }: ModuleViewProps) {
     const wf = moduleWorkflows.find(w => w.key === activeTab.workflowKey);
     if (!wf) return null;
 
-    let fields = [];
+    let parsed: any = [];
     try {
-      fields = JSON.parse(wf.fields);
+      parsed = JSON.parse(wf.fields);
     } catch(e) {
       return <div>Campos do workflow inválidos</div>;
     }
 
-    return (
-      <div className="space-y-6">
-        {fields.map((f: any) => (
-          <div key={f.id} className="space-y-2">
-            <label className="text-sm font-medium text-foreground">{f.label}</label>
-            {f.type === 'text' || f.type === 'date' ? (
-              <Input 
-                type={f.type} 
-                value={activeTab.formData[f.id] || ''}
-                onChange={(e) => updateActiveTab({ formData: { ...activeTab.formData, [f.id]: e.target.value } })}
-                className="bg-input border-border"
-              />
-            ) : f.type === 'textarea' ? (
-              <Textarea 
-                value={activeTab.formData[f.id] || ''}
-                onChange={(e) => updateActiveTab({ formData: { ...activeTab.formData, [f.id]: e.target.value } })}
-                className="bg-input border-border min-h-[100px]"
-              />
-            ) : f.type === 'radio' ? (
-              <div className="flex flex-wrap gap-2">
-                {f.options?.map((opt: string) => (
-                  <button
-                    key={opt}
-                    onClick={() => updateActiveTab({ formData: { ...activeTab.formData, [f.id]: opt } })}
-                    className={`px-4 py-2 rounded-full text-sm border transition-colors ${
-                      activeTab.formData[f.id] === opt 
-                        ? 'bg-primary text-primary-foreground border-primary' 
-                        : 'bg-card text-muted-foreground border-border hover:border-primary/50'
-                    }`}
-                  >
-                    {opt}
-                  </button>
-                ))}
-              </div>
-            ) : f.type === 'checkbox' ? (
-              <div className="flex flex-wrap gap-2">
-                {f.options?.map((opt: string) => {
-                  const currentVals = activeTab.formData[f.id] || [];
-                  const isSelected = currentVals.includes(opt);
-                  return (
-                    <button
-                      key={opt}
-                      onClick={() => {
-                        const newVals = isSelected 
-                          ? currentVals.filter((v: string) => v !== opt)
-                          : [...currentVals, opt];
-                        updateActiveTab({ formData: { ...activeTab.formData, [f.id]: newVals } });
-                      }}
-                      className={`px-4 py-2 rounded-full text-sm border transition-colors ${
-                        isSelected 
-                          ? 'bg-primary text-primary-foreground border-primary' 
-                          : 'bg-card text-muted-foreground border-border hover:border-primary/50'
-                      }`}
-                    >
-                      {opt}
-                    </button>
-                  );
-                })}
-              </div>
-            ) : f.type === 'multidate' ? (
-              <div className="space-y-2">
-                 {/* Simplified multidate */}
-                 <Input 
-                  type="text" 
-                  placeholder="e.g. 2023-01-01, 2023-02-01"
-                  value={activeTab.formData[f.id] || ''}
-                  onChange={(e) => updateActiveTab({ formData: { ...activeTab.formData, [f.id]: e.target.value } })}
-                  className="bg-input border-border"
-                />
-              </div>
-            ) : null}
+    const renderField = (f: any) => (
+      <div key={f.id} className="space-y-2">
+        <label className="text-sm font-medium text-foreground">{f.label}</label>
+        {f.type === 'text' || f.type === 'date' ? (
+          <Input
+            type={f.type}
+            value={activeTab.formData[f.id] || ''}
+            onChange={(e) => updateActiveTab({ formData: { ...activeTab.formData, [f.id]: e.target.value } })}
+            className="bg-input border-border"
+          />
+        ) : f.type === 'textarea' ? (
+          <Textarea
+            value={activeTab.formData[f.id] || ''}
+            onChange={(e) => updateActiveTab({ formData: { ...activeTab.formData, [f.id]: e.target.value } })}
+            className="bg-input border-border min-h-[100px]"
+          />
+        ) : f.type === 'radio' ? (
+          <div className="flex flex-wrap gap-2">
+            {f.options?.map((opt: string) => (
+              <button
+                key={opt}
+                onClick={() => updateActiveTab({ formData: { ...activeTab.formData, [f.id]: opt } })}
+                className={`px-3 py-1.5 rounded-full text-xs border transition-colors ${
+                  activeTab.formData[f.id] === opt
+                    ? 'bg-primary text-primary-foreground border-primary'
+                    : 'bg-card text-muted-foreground border-border hover:border-primary/50'
+                }`}
+              >
+                {opt}
+              </button>
+            ))}
           </div>
-        ))}
+        ) : f.type === 'checkbox' ? (
+          <div className="flex flex-wrap gap-2">
+            {f.options?.map((opt: string) => {
+              const currentVals = activeTab.formData[f.id] || [];
+              const isSelected = currentVals.includes(opt);
+              return (
+                <button
+                  key={opt}
+                  onClick={() => {
+                    const newVals = isSelected
+                      ? currentVals.filter((v: string) => v !== opt)
+                      : [...currentVals, opt];
+                    updateActiveTab({ formData: { ...activeTab.formData, [f.id]: newVals } });
+                  }}
+                  className={`px-3 py-1.5 rounded-full text-xs border transition-colors ${
+                    isSelected
+                      ? 'bg-primary text-primary-foreground border-primary'
+                      : 'bg-card text-muted-foreground border-border hover:border-primary/50'
+                  }`}
+                >
+                  {opt}
+                </button>
+              );
+            })}
+          </div>
+        ) : f.type === 'multidate' ? (
+          <div className="space-y-2">
+            <Input
+              type="text"
+              placeholder="Ex: 10/03/2024, 10/06/2024"
+              value={activeTab.formData[f.id] || ''}
+              onChange={(e) => updateActiveTab({ formData: { ...activeTab.formData, [f.id]: e.target.value } })}
+              className="bg-input border-border"
+            />
+          </div>
+        ) : null}
+      </div>
+    );
+
+    const isGrouped = parsed.length > 0 && parsed[0].group !== undefined;
+
+    if (isGrouped) {
+      return (
+        <div className="space-y-8">
+          {parsed.map((grp: any) => (
+            <div key={grp.group} className="space-y-4">
+              <div className="border-b border-primary/30 pb-1">
+                <p className="text-xs font-semibold uppercase tracking-wider text-primary">{grp.group}</p>
+              </div>
+              <div className="space-y-4">
+                {grp.fields?.map((f: any) => renderField(f))}
+              </div>
+            </div>
+          ))}
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-4">
+        {parsed.map((f: any) => renderField(f))}
       </div>
     );
   };
