@@ -1,0 +1,31 @@
+kind = "slides"
+previewPath = "/lex-memorial/"
+title = "Lex Suite — Memorial Descritivo"
+version = "1.0.0"
+id = "artifacts/lex-memorial"
+router = "path"
+
+[[integratedSkills]]
+name = "slides"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/lex-memorial/" ]
+localPort = 19134
+
+[services.development]
+run = "pnpm --filter @workspace/lex-memorial run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/lex-memorial", "run", "build" ]
+publicDir = "artifacts/lex-memorial/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "19134"
+BASE_PATH = "/lex-memorial/"
