@@ -27,6 +27,10 @@ LEX_MODO_LLM = "local"
 OLLAMA_MODEL_PARECER = "deepseek-r1:7b"
 OLLAMA_MODEL_EXTRACAO = "qwen2:7b"
 
+[userenv.development]
+OLLAMA_BASE_URL = "https://pressing-liabilities-baseline-vertical.trycloudflare.com"
+DB_BRIDGE_URL = "https://brass-crossing-mesh-cap.trycloudflare.com"
+
 [[ports]]
 localPort = 8080
 externalPort = 8080
