@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { ClerkProvider, SignIn, SignUp, Show, useClerk, useUser } from '@clerk/react';
+import { ClerkProvider, SignIn, SignUp, AuthenticateWithRedirectCallback, Show, useClerk, useUser } from '@clerk/react';
 import { shadcn } from '@clerk/themes';
 import { Switch, Route, useLocation, Router as WouterRouter, Redirect } from 'wouter';
 import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
@@ -176,6 +176,12 @@ function ClerkProviderWithRoutes() {
         <TooltipProvider>
           <Switch>
             <Route path="/" component={HomeRedirect} />
+            <Route path="/sign-in/sso-callback">
+              <AuthenticateWithRedirectCallback />
+            </Route>
+            <Route path="/sign-up/sso-callback">
+              <AuthenticateWithRedirectCallback />
+            </Route>
             <Route path="/sign-in/*?" component={SignInPage} />
             <Route path="/sign-up/*?" component={SignUpPage} />
             
