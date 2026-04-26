@@ -1,6 +1,6 @@
 import { Link } from 'wouter';
 import { Button } from '@/components/ui/button';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { ArrowRight, Scale, Wheat } from 'lucide-react';
 
 export default function Landing() {
@@ -19,12 +19,12 @@ export default function Landing() {
             Lex Suite
           </h1>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto font-sans leading-relaxed">
-            The sophisticated legal AI cockpit for Brazilian lawyers. Analyze court cases, extract insights, and draft precise legal instruments.
+            O cockpit de inteligência jurídica para advogados brasileiros. Analise processos, extraia fundamentos e elabore peças com precisão.
           </p>
           <div className="flex justify-center gap-4 pt-4">
             <Link href="/sign-in">
               <Button size="lg" className="text-lg px-8 font-sans" data-testid="btn-signin">
-                Sign In <ArrowRight className="ml-2 w-5 h-5" />
+                Entrar <ArrowRight className="ml-2 w-5 h-5" />
               </Button>
             </Link>
           </div>
@@ -39,7 +39,7 @@ export default function Landing() {
               </div>
               <CardTitle className="font-serif text-2xl">Lex Rural</CardTitle>
               <CardDescription className="text-base font-sans">
-                Specialized module for rural credit disputes. Analyze agricultural contracts, CCB, and CPR documents with precision.
+                Módulo especializado em crédito rural e agronegócio. Analise contratos, CCB, CPR e operações do MCR com fundamentação precisa.
               </CardDescription>
             </CardHeader>
           </Card>
@@ -52,7 +52,7 @@ export default function Landing() {
               </div>
               <CardTitle className="font-serif text-2xl">Lex Executio</CardTitle>
               <CardDescription className="text-base font-sans">
-                Court enforcement analyzer. Process long execution proceedings, track procedural phases, and draft manifestations.
+                Módulo de execuções bancárias e cumprimento de sentença. Analise fases processuais, calcule débitos e elabore embargos.
               </CardDescription>
             </CardHeader>
           </Card>

@@ -74,14 +74,14 @@ export default function ModuleView({ module }: ModuleViewProps) {
   // Create a new tab
   const handleNewProcess = () => {
     if (tabs.length >= 8) {
-      toast({ title: 'Limit reached', description: 'Maximum 8 simultaneous tabs allowed.', variant: 'destructive' });
+      toast({ title: 'Limite atingido', description: 'Máximo de 8 abas simultâneas.', variant: 'destructive' });
       return;
     }
     const newId = Math.random().toString(36).substr(2, 9);
     const newTab: ProcessTab = {
       id: newId,
       workflowKey: null,
-      label: `Process ${tabs.length + 1}`,
+      label: `Processo ${tabs.length + 1}`,
       status: 'idle',
       mode: 'form',
       formData: {},
@@ -129,7 +129,7 @@ export default function ModuleView({ module }: ModuleViewProps) {
     const wf = moduleWorkflows.find(w => w.key === workflowKey);
     updateActiveTab({ 
       workflowKey, 
-      label: wf?.name || 'Untitled',
+      label: wf?.name || 'Sem título',
       formData: {}, // reset
       outputHtml: ''
     });
@@ -137,7 +137,7 @@ export default function ModuleView({ module }: ModuleViewProps) {
 
   const handleRunAnalysis = async () => {
     if (!activeTab || !activeTab.workflowKey) {
-      toast({ title: 'Select a workflow first', variant: 'destructive' });
+      toast({ title: 'Selecione um workflow primeiro', variant: 'destructive' });
       return;
     }
 
@@ -149,13 +149,13 @@ export default function ModuleView({ module }: ModuleViewProps) {
     let pdfExtractedText = '';
     if (activeTab.mode === 'pdf' && activeTab.pdfs.length > 0) {
       try {
-        toast({ title: 'Extracting PDF text...', description: 'This may take a moment depending on the size.' });
+        toast({ title: 'Extraindo texto dos PDFs...', description: 'Pode levar alguns instantes dependendo do tamanho.' });
         for (const file of activeTab.pdfs) {
           const text = await extractText(file);
-          pdfExtractedText += `\n\n--- Document: ${file.name} ---\n\n${text}`;
+          pdfExtractedText += `\n\n--- Documento: ${file.name} ---\n\n${text}`;
         }
       } catch (err) {
-        toast({ title: 'PDF Extraction failed', variant: 'destructive' });
+        toast({ title: 'Falha na extração do PDF', variant: 'destructive' });
         updateActiveTab({ status: 'error' });
         return;
       }
@@ -192,7 +192,13 @@ export default function ModuleView({ module }: ModuleViewProps) {
         updateActiveTab({ status: 'done', outputHtml: fullContent });
       });
 
-    } catch (err) {
+    } catch (err: any) {
+      const msg = err?.message || '';
+      if (msg.includes('não configurad') || msg.includes('not configured')) {
+        toast({ title: 'IA não configurada', description: 'Configure o motor de IA nas preferências do sistema.', variant: 'destructive' });
+      } else {
+        toast({ title: 'Erro na análise', description: msg || 'Tente novamente.', variant: 'destructive' });
+      }
       updateActiveTab({ status: 'error' });
     }
   };
@@ -208,7 +214,7 @@ export default function ModuleView({ module }: ModuleViewProps) {
   const categories = Array.from(new Set(moduleWorkflows.map(w => w.category || 'General')));
 
   const renderFormFields = () => {
-    if (!activeTab || !activeTab.workflowKey) return <div className="text-muted-foreground p-4 text-center">Select a workflow from the sidebar.</div>;
+    if (!activeTab || !activeTab.workflowKey) return <div className="text-muted-foreground p-4 text-center">Selecione um workflow na barra lateral.</div>;
     
     const wf = moduleWorkflows.find(w => w.key === activeTab.workflowKey);
     if (!wf) return null;
@@ -217,7 +223,7 @@ export default function ModuleView({ module }: ModuleViewProps) {
     try {
       fields = JSON.parse(wf.fields);
     } catch(e) {
-      return <div>Invalid workflow fields</div>;
+      return <div>Campos do workflow inválidos</div>;
     }
 
     return (
@@ -328,10 +334,10 @@ export default function ModuleView({ module }: ModuleViewProps) {
           <Link href={`/app/${module}/documents`}>
             <Button variant="ghost" size="sm" className="text-muted-foreground gap-2">
               <Database className="w-4 h-4" />
-              Documents
+              Base de Docs
             </Button>
           </Link>
-          <Button variant="ghost" size="icon" onClick={() => signOut()} title="Sign Out">
+          <Button variant="ghost" size="icon" onClick={() => signOut()} title="Sair">
             <LogOut className="h-4 w-4 text-muted-foreground" />
           </Button>
         </div>
@@ -341,7 +347,7 @@ export default function ModuleView({ module }: ModuleViewProps) {
         {/* Sidebar */}
         <div className="w-[260px] shrink-0 border-r border-border bg-card flex flex-col">
           <div className="p-4 border-b border-border">
-            <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Workflows</h2>
+            <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Fluxos de Trabalho</h2>
           </div>
           <ScrollArea className="flex-1">
             <div className="p-2 space-y-6">
@@ -417,7 +423,7 @@ export default function ModuleView({ module }: ModuleViewProps) {
               onClick={handleNewProcess}
               className="ml-2 text-muted-foreground h-8 px-2"
             >
-              <Plus className="w-4 h-4 mr-1" /> New
+              <Plus className="w-4 h-4 mr-1" /> Novo
             </Button>
             <div className="flex-1"></div>
             <Button 
@@ -426,9 +432,10 @@ export default function ModuleView({ module }: ModuleViewProps) {
               onClick={handleRunAnalysis}
               disabled={!activeTab?.workflowKey || activeTab?.status === 'running'}
               className="h-8 gap-2 ml-4"
+              data-testid="btn-executar"
             >
               <Play className="w-3 h-3" />
-              Execute
+              Executar
             </Button>
           </div>
 
@@ -444,8 +451,8 @@ export default function ModuleView({ module }: ModuleViewProps) {
                 >
                   <div className="p-3 border-b border-border shrink-0">
                     <TabsList className="w-full grid grid-cols-3 bg-background">
-                      <TabsTrigger value="form" className="text-xs">Guided Form</TabsTrigger>
-                      <TabsTrigger value="paste" className="text-xs">Paste Text</TabsTrigger>
+                      <TabsTrigger value="form" className="text-xs">Formulário</TabsTrigger>
+                      <TabsTrigger value="paste" className="text-xs">Colar Texto</TabsTrigger>
                       <TabsTrigger value="pdf" className="text-xs">Upload PDF</TabsTrigger>
                     </TabsList>
                   </div>
@@ -459,11 +466,11 @@ export default function ModuleView({ module }: ModuleViewProps) {
                         
                         <TabsContent value="paste" className="m-0 border-0 p-0 h-full flex flex-col space-y-4">
                           <div className="space-y-2 flex-1 flex flex-col">
-                            <label className="text-sm font-medium text-foreground">Paste Document Content</label>
+                            <label className="text-sm font-medium text-foreground">Colar Texto do Documento</label>
                             <Textarea 
                               value={activeTab.pasteText}
                               onChange={(e) => updateActiveTab({ pasteText: e.target.value })}
-                              placeholder="Paste the contract, petition, or ruling text here..."
+                              placeholder="Cole aqui o contrato, petição, decisão ou qualquer texto para análise..."
                               className="flex-1 bg-input border-border min-h-[400px] resize-none font-mono text-sm leading-relaxed"
                             />
                           </div>
@@ -472,8 +479,8 @@ export default function ModuleView({ module }: ModuleViewProps) {
                         <TabsContent value="pdf" className="m-0 border-0 p-0 space-y-4">
                           <div className="border-2 border-dashed border-border rounded-lg p-8 text-center bg-background hover:bg-muted/30 transition-colors">
                             <FileText className="w-10 h-10 text-muted-foreground mx-auto mb-4" />
-                            <h3 className="text-sm font-medium mb-1">Drag & Drop PDFs</h3>
-                            <p className="text-xs text-muted-foreground mb-4">or click to browse files</p>
+                            <h3 className="text-sm font-medium mb-1">Arraste PDFs aqui</h3>
+                            <p className="text-xs text-muted-foreground mb-4">ou clique para selecionar arquivos</p>
                             <Input 
                               type="file" 
                               accept="application/pdf" 
@@ -484,14 +491,14 @@ export default function ModuleView({ module }: ModuleViewProps) {
                             />
                             <Button variant="outline" size="sm" asChild>
                               <label htmlFor={`pdf-upload-${activeTab.id}`} className="cursor-pointer">
-                                Select Files
+                                Selecionar Arquivos
                               </label>
                             </Button>
                           </div>
                           
                           {activeTab.pdfs.length > 0 && (
                             <div className="space-y-2">
-                              <h4 className="text-sm font-medium">Uploaded Documents</h4>
+                              <h4 className="text-sm font-medium">Documentos Selecionados</h4>
                               <div className="space-y-2">
                                 {activeTab.pdfs.map((pdf, i) => (
                                   <div key={i} className="flex items-center justify-between p-3 bg-background border border-border rounded-md">
@@ -521,17 +528,17 @@ export default function ModuleView({ module }: ModuleViewProps) {
               <div className="flex-1 flex flex-col bg-background min-w-0 relative">
                 <div className="h-12 border-b border-border bg-card flex items-center justify-between px-4 shrink-0">
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-foreground">Analysis Output</span>
+                    <span className="text-sm font-medium text-foreground">Resultado da Análise</span>
                     {activeTab.status === 'running' && (
                       <span className="text-xs text-muted-foreground flex items-center gap-2">
                         <span className="animate-pulse w-2 h-2 rounded-full bg-primary inline-block"></span>
-                        Generating...
+                        Gerando...
                       </span>
                     )}
                   </div>
                   <div className="flex items-center gap-2">
                     <Button variant="ghost" size="sm" className="h-8 gap-2 text-muted-foreground hover:text-foreground">
-                      <Copy className="w-3.5 h-3.5" /> Copy
+                      <Copy className="w-3.5 h-3.5" /> Copiar
                     </Button>
                     <Button variant="ghost" size="sm" className="h-8 gap-2 text-muted-foreground hover:text-foreground">
                       <Download className="w-3.5 h-3.5" /> PDF
@@ -551,7 +558,7 @@ export default function ModuleView({ module }: ModuleViewProps) {
                         <div className="w-16 h-16 rounded-full border border-border flex items-center justify-center bg-card">
                           <span className="font-serif italic text-2xl">ℓ</span>
                         </div>
-                        <p className="text-sm font-sans">Output will appear here after execution</p>
+                        <p className="text-sm font-sans">O resultado aparecerá aqui após a execução</p>
                       </div>
                     )}
                   </div>
@@ -560,7 +567,7 @@ export default function ModuleView({ module }: ModuleViewProps) {
             </div>
           ) : (
             <div className="flex-1 flex items-center justify-center bg-background text-muted-foreground">
-              Create a new process to begin.
+              Crie um novo processo para iniciar.
             </div>
           )}
         </div>

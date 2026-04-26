@@ -17,7 +17,12 @@ router.post("/analyze", requireAuth, async (req, res): Promise<void> => {
   }
 
   if (!isAnthropicConfigured()) {
-    res.status(503).json({ error: "Anthropic API not configured. Set ANTHROPIC_API_KEY environment variable." });
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+    res.flushHeaders();
+    res.write(`data: ${JSON.stringify({ type: "error", message: "Motor de IA não configurado. Configure ANTHROPIC_API_KEY ou conecte um modelo local para ativar o processamento." })}\n\n`);
+    res.end();
     return;
   }
 

@@ -153,8 +153,18 @@ function ClerkProviderWithRoutes() {
       localization={{
         signIn: {
           start: {
-            title: "Welcome to Lex Suite",
-            subtitle: "Sign in to access your legal AI assistant",
+            title: "Lex Suite",
+            subtitle: "Entre para acessar seu assistente jurídico",
+            actionText: "Não tem conta?",
+            actionLink: "Cadastre-se",
+          },
+        },
+        signUp: {
+          start: {
+            title: "Criar conta no Lex Suite",
+            subtitle: "Cadastre-se para acessar o assistente jurídico",
+            actionText: "Já tem conta?",
+            actionLink: "Entre aqui",
           },
         },
       }}
