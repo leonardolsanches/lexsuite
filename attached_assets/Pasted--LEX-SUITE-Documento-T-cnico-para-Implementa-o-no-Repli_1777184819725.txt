@@ -1,0 +1,534 @@
+# LEX SUITE — Documento Técnico para Implementação no Replit
+> Versão 1.0 | Autor: Leonardo Sanches | Data: 26/04/2026
+
+---
+
+## 1. VISÃO GERAL DO SISTEMA
+
+O **Lex Suite** é uma plataforma jurídica modular com processamento local de documentos via LLM (Mini PC Ubuntu) e backend hospedado no Render. O objetivo é reduzir o consumo de tokens na API Anthropic fazendo a extração e triagem de conteúdo localmente, enviando apenas o resumo estruturado para o parecer final.
+
+### Módulos
+| Módulo | Descrição | Status |
+|--------|-----------|--------|
+| **Lex Rural** | Contratos agrários, arrendamento, ITR, CAR | Fase 1 |
+| **Lex Executivo** | Execuções fiscais, títulos, penhoras | Fase 1 |
+| *(futuros)* | Lex Trabalhista, Lex Imobiliário, etc. | Roadmap |
+
+---
+
+## 2. ARQUITETURA
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                     USUÁRIO (Browser)                    │
+└────────────────────────┬────────────────────────────────┘
+                         │ HTTPS
+┌────────────────────────▼────────────────────────────────┐
+│              RENDER — Backend Flask/Python               │
+│  - Autenticação JWT                                      │
+│  - Controle de módulos por licença                       │
+│  - Orquestração do fluxo de análise                      │
+│  - API REST para o frontend                              │
+└──────┬──────────────────────────────┬───────────────────┘
+       │ HTTP (Cloudflare Tunnel)      │ HTTP (Cloudflare Tunnel)
+┌──────▼──────────┐          ┌────────▼──────────────────┐
+│  OLLAMA API     │          │  DB BRIDGE (FastAPI)       │
+│  Mini PC local  │          │  Mini PC local             │
+│  :11434         │          │  :8765                     │
+│                 │          │                            │
+│  • qwen2:7b     │          │  PostgreSQL :5432          │
+│  • deepseek-r1  │          │  DB: lexsuite              │
+│  • GLM-4-32B    │          │  User: lexuser             │
+│  • llama3       │          │                            │
+└─────────────────┘          └────────────────────────────┘
+       ▲
+       │ Fallback premium
+┌──────┴──────────┐
+│  ANTHROPIC API  │
+│  Claude Sonnet  │
+└─────────────────┘
+```
+
+---
+
+## 3. INFRAESTRUTURA DO MINI PC (já configurada)
+
+### Servidor
+- **Hardware:** Mini PC Intel N100, 32GB RAM, Ubuntu 24.04 LTS
+- **IP local:** 192.168.0.38
+- **HD externo:** /dev/sdb1 (Leo 2T, NTFS, montado em /mnt/leo2t)
+
+### Serviços ativos
+| Serviço | Porta | Status |
+|---------|-------|--------|
+| Ollama | 11434 | ✅ Ativo |
+| PostgreSQL 16 | 5432 | ✅ Ativo |
+| DB Bridge (FastAPI) | 8765 | ✅ Ativo |
+
+### Modelos LLM disponíveis
+| Modelo | ID | Tamanho | Uso recomendado |
+|--------|----|---------|-----------------|
+| deepseek-r1:7b | 755ced02ce7b | 4.7 GB | Parecer jurídico (raciocínio) |
+| qwen2:7b | dd314f039b9d | 4.4 GB | Extração de conteúdo |
+| llama3:latest | 365c0bd3c000 | 4.7 GB | Geral/fallback |
+| GLM-4-32B-Q4 | d61b44b6a5d3 | 19 GB | Pareceres complexos |
+
+### Banco de Dados
+- **Engine:** PostgreSQL 16.13
+- **Database:** lexsuite
+- **User:** lexuser
+- **Password:** LexSuite2024x
+
+### Túneis Cloudflare (temporários — renovar ao reiniciar)
+| Serviço | URL pública atual |
+|---------|------------------|
+| Ollama API | https://reliability-publishers-circuit-todd.trycloudflare.com |
+| DB Bridge | https://beliefs-jill-dentists-possibly.trycloudflare.com |
+
+> ⚠️ As URLs temporárias mudam a cada reinicialização. Ver Seção 8 para torná-las permanentes.
+
+---
+
+## 4. FLUXO DE PROCESSAMENTO
+
+```
+UPLOAD DE ARQUIVO (PDF/DOC/IMG)
+         │
+         ▼
+[1] EXTRAÇÃO LOCAL (Mini PC)
+    • Conversão para texto via PyMuPDF / python-docx
+    • Chunking em blocos de ~500 tokens
+    • qwen2:7b extrai apenas pontos relevantes ao módulo
+    • Resultado: resumo estruturado ~10-15% do original
+         │
+         ▼
+[2] ARMAZENAMENTO (PostgreSQL local via Bridge)
+    • Salva chunks + metadados + resumo
+    • Indexação por caso/processo
+         │
+         ▼
+[3] PARECER (Render → LLM)
+    • Envia APENAS o resumo estruturado
+    • deepseek-r1:7b gera parecer local
+    • OU Anthropic Claude (fallback premium)
+         │
+         ▼
+[4] RESULTADO FINAL
+    • Laudo/Parecer em PDF
+    • Salvo no banco + disponível para download
+```
+
+---
+
+## 5. ESTRUTURA DO PROJETO NO REPLIT
+
+```
+lex-suite/
+├── app.py                    # Entry point Flask
+├── requirements.txt
+├── .env                      # Variáveis de ambiente (não commitar)
+│
+├── config/
+│   ├── settings.py           # Configurações centralizadas
+│   └── prompts/              # Prompts por módulo (variáveis de ambiente)
+│       ├── lex_rural.txt
+│       └── lex_executivo.txt
+│
+├── modules/
+│   ├── __init__.py
+│   ├── lex_rural/
+│   │   ├── routes.py
+│   │   ├── workflow.py       # Extração + parecer rural
+│   │   └── prompts.py
+│   └── lex_executivo/
+│       ├── routes.py
+│       ├── workflow.py
+│       └── prompts.py
+│
+├── core/
+│   ├── auth.py               # JWT + controle de módulos
+│   ├── llm_client.py         # Cliente Ollama + Anthropic
+│   ├── db_client.py          # Cliente DB Bridge
+│   ├── file_processor.py     # Extração de texto de arquivos
+│   └── rag.py                # RAG local (chunks + busca)
+│
+├── templates/
+│   ├── base.html
+│   ├── login.html
+│   ├── dashboard.html
+│   ├── modules/
+│   │   ├── rural.html
+│   │   └── executivo.html
+│   └── admin/
+│       └── licencas.html
+│
+└── static/
+    ├── css/
+    └── js/
+```
+
+---
+
+## 6. VARIÁVEIS DE AMBIENTE (.env / Render Secrets)
+
+```env
+# ═══════════════════════════════════════════════
+# MINI PC — LLM LOCAL
+# ═══════════════════════════════════════════════
+OLLAMA_BASE_URL=https://reliability-publishers-circuit-todd.trycloudflare.com
+OLLAMA_MODEL_EXTRACAO=qwen2:7b
+OLLAMA_MODEL_PARECER=deepseek-r1:7b
+OLLAMA_MODEL_COMPLEXO=JollyLlama/GLM-4-32B-0414-Q4_K_M:latest
+
+# ═══════════════════════════════════════════════
+# BANCO DE DADOS — DB BRIDGE (Mini PC)
+# ═══════════════════════════════════════════════
+DB_BRIDGE_URL=https://beliefs-jill-dentists-possibly.trycloudflare.com
+DB_DIRECT_URL=postgresql://lexuser:LexSuite2024x@192.168.0.38:5432/lexsuite
+
+# ═══════════════════════════════════════════════
+# ANTHROPIC — FALLBACK PREMIUM
+# ═══════════════════════════════════════════════
+ANTHROPIC_API_KEY=sk-ant-SUA_CHAVE_AQUI
+ANTHROPIC_MODEL=claude-sonnet-4-5-20251001
+
+# ═══════════════════════════════════════════════
+# AUTENTICAÇÃO
+# ═══════════════════════════════════════════════
+JWT_SECRET_KEY=gere-uma-chave-aleatoria-aqui
+JWT_EXPIRATION_HOURS=8
+
+# ═══════════════════════════════════════════════
+# MÓDULOS
+# ═══════════════════════════════════════════════
+LEX_MODULOS_DISPONIVEIS=rural,executivo
+LEX_MODO_LLM=local
+# local = usa Ollama | cloud = usa Anthropic | hibrido = local extração + cloud parecer
+
+# ═══════════════════════════════════════════════
+# PROMPTS (ajustáveis sem redeploy)
+# ═══════════════════════════════════════════════
+PROMPT_RURAL_EXTRACAO=Extraia do documento jurídico os seguintes elementos relevantes para análise rural: tipo de contrato, partes envolvidas, área em hectares, localização, prazo, valor, cláusulas especiais, garantias, pendências e irregularidades. Retorne em JSON estruturado.
+PROMPT_RURAL_PARECER=Com base no resumo fornecido do contrato rural, emita parecer jurídico analisando: validade legal, conformidade com o Estatuto da Terra, riscos identificados, recomendações e conclusão. Seja objetivo e técnico.
+PROMPT_EXECUTIVO_EXTRACAO=Extraia do documento de execução fiscal: número do processo, partes, valor executado, bens penhorados, fases processuais, prazos, certidões e irregularidades formais.
+PROMPT_EXECUTIVO_PARECER=Analise a execução fiscal e emita parecer sobre: regularidade processual, possibilidades de defesa, riscos de constrição patrimonial, estratégias recomendadas e conclusão.
+
+# ═══════════════════════════════════════════════
+# UPLOAD
+# ═══════════════════════════════════════════════
+MAX_UPLOAD_MB=50
+ALLOWED_EXTENSIONS=pdf,doc,docx,jpg,jpeg,png
+UPLOAD_FOLDER=./uploads
+```
+
+---
+
+## 7. CÓDIGO PRINCIPAL — app.py
+
+```python
+from flask import Flask, render_template, request, jsonify, session
+from flask_cors import CORS
+import os
+from config.settings import Settings
+from core.auth import auth_bp
+from modules.lex_rural.routes import rural_bp
+from modules.lex_executivo.routes import executivo_bp
+
+app = Flask(__name__)
+CORS(app)
+app.secret_key = os.getenv("JWT_SECRET_KEY", "dev-secret")
+
+# Registrar blueprints
+app.register_blueprint(auth_bp, url_prefix="/auth")
+app.register_blueprint(rural_bp, url_prefix="/rural")
+app.register_blueprint(executivo_bp, url_prefix="/executivo")
+
+@app.route("/")
+def index():
+    return render_template("login.html")
+
+@app.route("/dashboard")
+def dashboard():
+    modulos = os.getenv("LEX_MODULOS_DISPONIVEIS", "").split(",")
+    return render_template("dashboard.html", modulos=modulos)
+
+@app.route("/health")
+def health():
+    return jsonify({"status": "ok", "version": "1.0"})
+
+if __name__ == "__main__":
+    app.run(debug=True, port=5000)
+```
+
+---
+
+## 8. CÓDIGO — core/llm_client.py
+
+```python
+import os, requests
+from anthropic import Anthropic
+
+OLLAMA_URL = os.getenv("OLLAMA_BASE_URL")
+ANTHROPIC_KEY = os.getenv("ANTHROPIC_API_KEY")
+MODO = os.getenv("LEX_MODO_LLM", "hibrido")
+
+def extrair_conteudo(texto: str, prompt_sistema: str) -> str:
+    """Usa LLM local (qwen2) para extrair e resumir o documento."""
+    model = os.getenv("OLLAMA_MODEL_EXTRACAO", "qwen2:7b")
+    resp = requests.post(f"{OLLAMA_URL}/api/generate", json={
+        "model": model,
+        "prompt": f"{prompt_sistema}\n\nDOCUMENTO:\n{texto}",
+        "stream": False
+    }, timeout=120)
+    return resp.json().get("response", "")
+
+def gerar_parecer(resumo: str, prompt_sistema: str, usar_cloud=False) -> str:
+    """Gera parecer final — local ou Anthropic."""
+    if usar_cloud or MODO == "cloud":
+        client = Anthropic(api_key=ANTHROPIC_KEY)
+        msg = client.messages.create(
+            model=os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-5-20251001"),
+            max_tokens=4096,
+            messages=[{"role": "user", "content": f"{prompt_sistema}\n\nRESUMO:\n{resumo}"}]
+        )
+        return msg.content[0].text
+    else:
+        model = os.getenv("OLLAMA_MODEL_PARECER", "deepseek-r1:7b")
+        resp = requests.post(f"{OLLAMA_URL}/api/generate", json={
+            "model": model,
+            "prompt": f"{prompt_sistema}\n\nRESUMO:\n{resumo}",
+            "stream": False
+        }, timeout=300)
+        return resp.json().get("response", "")
+```
+
+---
+
+## 9. CÓDIGO — core/db_client.py
+
+```python
+import os, requests
+
+BRIDGE_URL = os.getenv("DB_BRIDGE_URL")
+
+def query(sql: str, params: list = []) -> list:
+    """Executa query no PostgreSQL via bridge HTTP."""
+    resp = requests.post(f"{BRIDGE_URL}/query", json={
+        "sql": sql,
+        "params": params
+    }, timeout=30)
+    return resp.json().get("rows", [])
+
+def execute(sql: str, params: list = []) -> bool:
+    """Executa INSERT/UPDATE/DELETE via bridge."""
+    try:
+        query(sql, params)
+        return True
+    except:
+        return False
+```
+
+---
+
+## 10. SCHEMA DO BANCO (executar no PostgreSQL)
+
+```sql
+-- Usuários e autenticação
+CREATE TABLE usuarios (
+    id SERIAL PRIMARY KEY,
+    email VARCHAR(255) UNIQUE NOT NULL,
+    senha_hash VARCHAR(255) NOT NULL,
+    nome VARCHAR(255),
+    ativo BOOLEAN DEFAULT true,
+    criado_em TIMESTAMP DEFAULT NOW()
+);
+
+-- Licenças de módulos por usuário
+CREATE TABLE licencas (
+    id SERIAL PRIMARY KEY,
+    usuario_id INTEGER REFERENCES usuarios(id),
+    modulo VARCHAR(50) NOT NULL,
+    ativo BOOLEAN DEFAULT true,
+    validade DATE,
+    criado_em TIMESTAMP DEFAULT NOW()
+);
+
+-- Casos/processos
+CREATE TABLE casos (
+    id SERIAL PRIMARY KEY,
+    usuario_id INTEGER REFERENCES usuarios(id),
+    modulo VARCHAR(50) NOT NULL,
+    titulo VARCHAR(500),
+    status VARCHAR(50) DEFAULT 'pendente',
+    criado_em TIMESTAMP DEFAULT NOW(),
+    atualizado_em TIMESTAMP DEFAULT NOW()
+);
+
+-- Documentos carregados
+CREATE TABLE documentos (
+    id SERIAL PRIMARY KEY,
+    caso_id INTEGER REFERENCES casos(id),
+    nome_arquivo VARCHAR(500),
+    tipo_arquivo VARCHAR(50),
+    tamanho_bytes INTEGER,
+    texto_extraido TEXT,
+    resumo_llm TEXT,
+    criado_em TIMESTAMP DEFAULT NOW()
+);
+
+-- Pareceres gerados
+CREATE TABLE pareceres (
+    id SERIAL PRIMARY KEY,
+    caso_id INTEGER REFERENCES casos(id),
+    modelo_usado VARCHAR(100),
+    prompt_usado TEXT,
+    parecer TEXT,
+    tokens_estimados INTEGER,
+    criado_em TIMESTAMP DEFAULT NOW()
+);
+
+-- Índices
+CREATE INDEX idx_casos_usuario ON casos(usuario_id);
+CREATE INDEX idx_licencas_usuario ON licencas(usuario_id, modulo);
+CREATE INDEX idx_documentos_caso ON documentos(caso_id);
+```
+
+---
+
+## 11. SETUP PERMANENTE DOS TÚNEIS (produção)
+
+Para que as URLs não mudem a cada reinicialização, configure serviços systemd:
+
+### Serviço Ollama Tunnel
+```bash
+sudo tee /etc/systemd/system/cf-ollama.service > /dev/null << 'EOF'
+[Unit]
+Description=Cloudflare Tunnel Ollama
+After=network-online.target ollama.service
+
+[Service]
+Type=simple
+User=leonardo
+ExecStart=/usr/bin/cloudflared tunnel --url http://localhost:11434
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+EOF
+```
+
+### Serviço DB Bridge
+```bash
+# Primeiro criar o serviço do uvicorn
+sudo tee /etc/systemd/system/lexbridge.service > /dev/null << 'EOF'
+[Unit]
+Description=Lex Suite DB Bridge
+After=network-online.target postgresql.service
+
+[Service]
+Type=simple
+User=leonardo
+WorkingDirectory=/home/leonardo
+ExecStart=/home/leonardo/lexbridge/bin/uvicorn db_bridge:app --host 0.0.0.0 --port 8765
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# Túnel do bridge
+sudo tee /etc/systemd/system/cf-bridge.service > /dev/null << 'EOF'
+[Unit]
+Description=Cloudflare Tunnel DB Bridge
+After=network-online.target lexbridge.service
+
+[Service]
+Type=simple
+User=leonardo
+ExecStart=/usr/bin/cloudflared tunnel --url http://localhost:8765
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+EOF
+```
+
+> ⚠️ Com túneis temporários (trycloudflare.com), a URL muda. Para produção, use Cloudflare Zero Trust com conta e domínio próprio para URLs fixas.
+
+---
+
+## 12. REQUIREMENTS.TXT
+
+```
+flask==3.1.1
+flask-cors==4.0.0
+anthropic==0.49.0
+requests==2.31.0
+python-jose==3.3.0
+bcrypt==4.1.2
+python-dotenv==1.0.0
+PyMuPDF==1.24.0
+python-docx==1.1.0
+Pillow==10.3.0
+gunicorn==21.2.0
+```
+
+---
+
+## 13. CHECKLIST PARA O REPLIT
+
+### Antes de começar
+- [ ] Ter as URLs dos túneis Cloudflare atualizadas nos Secrets
+- [ ] Mini PC ligado e serviços ativos (Ollama + PostgreSQL + Bridge)
+- [ ] ANTHROPIC_API_KEY configurada
+
+### No Replit
+- [ ] Criar projeto Python Flask
+- [ ] Colar estrutura de pastas acima
+- [ ] Configurar todos os Secrets da Seção 6
+- [ ] Executar schema SQL da Seção 10 no PostgreSQL via bridge
+- [ ] Testar endpoint /health
+- [ ] Testar extração com arquivo PDF simples
+
+### Deploy no Render
+- [ ] Conectar repositório GitHub
+- [ ] Configurar mesmos Secrets
+- [ ] Start command: `gunicorn app:app`
+- [ ] Verificar logs de conexão com Mini PC
+
+---
+
+## 14. PROMPT PARA O REPLIT (copie e cole)
+
+```
+Crie uma aplicação Flask chamada Lex Suite com as seguintes características:
+
+STACK: Python 3.12 + Flask 3.1.1 + PostgreSQL (via HTTP bridge) + Ollama (LLM local)
+
+MÓDULOS: O sistema é modular. Cada usuário tem licença por módulo (Lex Rural, Lex Executivo). O dashboard mostra apenas os módulos licenciados.
+
+AUTENTICAÇÃO: JWT com bcrypt para senha. Middleware verifica token e módulo licenciado em cada rota.
+
+FLUXO PRINCIPAL:
+1. Usuário faz upload de PDF/DOC
+2. Backend extrai texto (PyMuPDF / python-docx)
+3. Envia para LLM local (Ollama via OLLAMA_BASE_URL) com prompt de extração configurado em variável de ambiente
+4. Salva resumo no banco via DB_BRIDGE_URL (API HTTP)
+5. Gera parecer com deepseek-r1:7b local ou Anthropic Claude (configurável por LEX_MODO_LLM)
+6. Retorna parecer formatado para o usuário
+
+VARIÁVEIS DE AMBIENTE: Todas as configurações em .env conforme documento anexo. Prompts são variáveis de ambiente ajustáveis.
+
+BANCO: Acesso via HTTP bridge (POST /query com {sql, params}). Schema conforme documento.
+
+ESTRUTURA: Use blueprints Flask por módulo. Código limpo e comentado em português.
+
+LAYOUT: Bootstrap 5, sidebar com módulos, área principal com upload e resultado, design profissional em azul escuro e branco.
+```
+
+---
+
+*Documento gerado em 26/04/2026 | Lex Suite v1.0*

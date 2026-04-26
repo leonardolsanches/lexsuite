@@ -2,10 +2,41 @@ import { Router, type IRouter } from "express";
 import { db, sessionsTable, promptsTable, workflowsTable, documentsTable, userModulesTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
 import { requireAuth } from "../lib/auth";
-import { getAnthropicClient, isAnthropicConfigured, DEFAULT_MODEL, MAX_TOKENS } from "../lib/anthropic";
+import { isAnyLlmConfigured, getLlmStatusMessage, streamAnalysis, getLlmMode } from "../lib/llm";
+import { isOllamaConfigured, getOllamaBaseUrl, listOllamaModels, pingOllama } from "../lib/ollama";
 import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
+
+router.get("/llm-status", requireAuth, async (req, res): Promise<void> => {
+  const mode = getLlmMode();
+  const ollamaUrl = getOllamaBaseUrl();
+  let ollamaOnline = false;
+  let ollamaModels: string[] = [];
+
+  if (ollamaUrl) {
+    ollamaOnline = await pingOllama(ollamaUrl);
+    if (ollamaOnline) {
+      ollamaModels = await listOllamaModels(ollamaUrl);
+    }
+  }
+
+  res.json({
+    mode,
+    anthropic: {
+      configured: !!process.env.ANTHROPIC_API_KEY,
+      model: process.env.ANTHROPIC_MODEL ?? "claude-sonnet-4-5",
+    },
+    ollama: {
+      configured: isOllamaConfigured(),
+      url: ollamaUrl,
+      online: ollamaOnline,
+      models: ollamaModels,
+      modelParecer: process.env.OLLAMA_MODEL_PARECER ?? "deepseek-r1:7b",
+      modelExtracao: process.env.OLLAMA_MODEL_EXTRACAO ?? "qwen2:7b",
+    },
+  });
+});
 
 router.post("/analyze", requireAuth, async (req, res): Promise<void> => {
   const userId = (req as any).userId as string;
@@ -16,12 +47,12 @@ router.post("/analyze", requireAuth, async (req, res): Promise<void> => {
     return;
   }
 
-  if (!isAnthropicConfigured()) {
+  if (!isAnyLlmConfigured()) {
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache");
     res.setHeader("Connection", "keep-alive");
     res.flushHeaders();
-    res.write(`data: ${JSON.stringify({ type: "error", message: "Motor de IA não configurado. Configure ANTHROPIC_API_KEY ou conecte um modelo local para ativar o processamento." })}\n\n`);
+    res.write(`data: ${JSON.stringify({ type: "error", message: getLlmStatusMessage() })}\n\n`);
     res.end();
     return;
   }
@@ -94,28 +125,12 @@ router.post("/analyze", requireAuth, async (req, res): Promise<void> => {
   let fullOutput = "";
 
   try {
-    const messages: Array<{ role: "user" | "assistant"; content: string }> = [
-      { role: "user", content: fullPrompt }
-    ];
-    if (continueFrom) {
-      messages.push({ role: "assistant", content: continueFrom });
-      messages.push({ role: "user", content: "Continue a análise do ponto onde parou." });
-    }
-
-    const anthropic = getAnthropicClient();
-    const stream = anthropic.messages.stream({
-      model: DEFAULT_MODEL,
-      max_tokens: MAX_TOKENS,
-      messages,
-    });
-
-    for await (const chunk of stream) {
-      if (chunk.type === "content_block_delta" && chunk.delta.type === "text_delta") {
-        const text = chunk.delta.text;
-        fullOutput += text;
-        res.write(`data: ${JSON.stringify({ type: "text", text })}\n\n`);
-      }
-    }
+    await streamAnalysis(
+      fullPrompt,
+      res,
+      (text) => { fullOutput += text; },
+      continueFrom
+    );
 
     res.write(`data: ${JSON.stringify({ type: "done" })}\n\n`);
     res.end();

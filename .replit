@@ -23,6 +23,9 @@ timeoutMs = 20000
 
 [userenv.shared]
 VITE_CLERK_PUBLISHABLE_KEY = "pk_test_YXdha2UtbW91c2UtMi5jbGVyay5hY2NvdW50cy5kZXYk"
+LEX_MODO_LLM = "hibrido"
+OLLAMA_MODEL_PARECER = "deepseek-r1:7b"
+OLLAMA_MODEL_EXTRACAO = "qwen2:7b"
 
 [[ports]]
 localPort = 8080
