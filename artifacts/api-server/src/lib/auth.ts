@@ -10,6 +10,18 @@ export const requireAuth = async (req: Request, res: Response, next: NextFunctio
     return;
   }
   (req as any).userId = userId;
+
+  const userEmail =
+    (auth as any)?.sessionClaims?.email as string | undefined ??
+    (auth as any)?.sessionClaims?.primaryEmail as string | undefined ??
+    `${userId}@unknown.com`;
+  const userName =
+    (auth as any)?.sessionClaims?.name as string | undefined ??
+    (auth as any)?.sessionClaims?.firstName as string | undefined ??
+    null;
+
+  getOrCreateUser(userId, userEmail, userName).catch(() => {});
+
   next();
 };
 

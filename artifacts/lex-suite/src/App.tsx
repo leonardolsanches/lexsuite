@@ -1,16 +1,20 @@
 
 import { useState, useEffect, useRef } from "react";
-import { ClerkProvider, SignIn, SignUp, AuthenticateWithRedirectCallback, Show, useClerk, useUser } from '@clerk/react';
+import { ClerkProvider, SignIn, SignUp, AuthenticateWithRedirectCallback, Show, useClerk, useUser, useAuth } from '@clerk/react';
 import { shadcn } from '@clerk/themes';
 import { Switch, Route, useLocation, Router as WouterRouter, Redirect } from 'wouter';
 import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { setAuthTokenGetter, setBaseUrl } from "@workspace/api-client-react";
 import NotFound from "@/pages/not-found";
 import Landing from "@/pages/Landing";
 import Dashboard from "@/pages/Dashboard";
 import ModuleView from "@/pages/ModuleView";
 import Documents from "@/pages/Documents";
+
+const apiUrl = import.meta.env.VITE_API_URL as string | undefined;
+if (apiUrl) setBaseUrl(apiUrl);
 
 const queryClient = new QueryClient();
 
@@ -93,6 +97,15 @@ function SignUpPage() {
   );
 }
 
+function ApiClientSetup() {
+  const { getToken } = useAuth();
+  useEffect(() => {
+    setAuthTokenGetter(() => getToken());
+    return () => setAuthTokenGetter(null);
+  }, [getToken]);
+  return null;
+}
+
 function ClerkQueryClientCacheInvalidator() {
   const { addListener } = useClerk();
   const qc = useQueryClient();
@@ -173,6 +186,7 @@ function ClerkProviderWithRoutes() {
       routerReplace={(to) => setLocation(stripBase(to), { replace: true })}
     >
       <QueryClientProvider client={queryClient}>
+        <ApiClientSetup />
         <ClerkQueryClientCacheInvalidator />
         <TooltipProvider>
           <Switch>
