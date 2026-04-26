@@ -2,14 +2,13 @@ import { Router, type IRouter } from "express";
 import { db, sessionsTable, promptsTable, workflowsTable, documentsTable, userModulesTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
 import { requireAuth } from "../lib/auth";
-import { isAnyLlmConfigured, getLlmStatusMessage, streamAnalysis, getLlmMode } from "../lib/llm";
-import { isOllamaConfigured, getOllamaBaseUrl, listOllamaModels, pingOllama } from "../lib/ollama";
+import { isAnyLlmConfigured, getLlmStatusMessage, streamAnalysis } from "../lib/llm";
+import { isOllamaConfigured, getOllamaBaseUrl, listOllamaModels, pingOllama, getOllamaModelParecer, getOllamaModelExtraction } from "../lib/ollama";
 import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
 
-router.get("/llm-status", requireAuth, async (req, res): Promise<void> => {
-  const mode = getLlmMode();
+router.get("/llm-status", requireAuth, async (_req, res): Promise<void> => {
   const ollamaUrl = getOllamaBaseUrl();
   let ollamaOnline = false;
   let ollamaModels: string[] = [];
@@ -22,19 +21,13 @@ router.get("/llm-status", requireAuth, async (req, res): Promise<void> => {
   }
 
   res.json({
-    mode,
-    anthropic: {
-      configured: !!process.env.ANTHROPIC_API_KEY,
-      model: process.env.ANTHROPIC_MODEL ?? "claude-sonnet-4-5",
-    },
-    ollama: {
-      configured: isOllamaConfigured(),
-      url: ollamaUrl,
-      online: ollamaOnline,
-      models: ollamaModels,
-      modelParecer: process.env.OLLAMA_MODEL_PARECER ?? "deepseek-r1:7b",
-      modelExtracao: process.env.OLLAMA_MODEL_EXTRACAO ?? "qwen2:7b",
-    },
+    provider: "ollama",
+    configured: isOllamaConfigured(),
+    online: ollamaOnline,
+    url: ollamaUrl ? "configured" : null,
+    models: ollamaModels,
+    modelParecer: getOllamaModelParecer(),
+    modelExtracao: getOllamaModelExtraction(),
   });
 });
 
@@ -69,7 +62,7 @@ router.post("/analyze", requireAuth, async (req, res): Promise<void> => {
     .where(eq(promptsTable.key, workflowKey))
     .limit(1);
 
-  const [workflow] = await db.select().from(workflowsTable)
+  await db.select().from(workflowsTable)
     .where(eq(workflowsTable.key, workflowKey))
     .limit(1);
 
@@ -147,7 +140,7 @@ router.post("/analyze", requireAuth, async (req, res): Promise<void> => {
       await db.update(sessionsTable).set({ status: "error" }).where(eq(sessionsTable.id, sessionRecord.id));
     }
     if (!res.writableEnded) {
-      res.write(`data: ${JSON.stringify({ type: "error", message: err.message ?? "Analysis failed" })}\n\n`);
+      res.write(`data: ${JSON.stringify({ type: "error", message: err.message ?? "Falha na análise" })}\n\n`);
       res.end();
     }
   }

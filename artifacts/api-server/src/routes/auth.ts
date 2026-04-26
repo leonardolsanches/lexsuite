@@ -3,7 +3,7 @@ import { getAuth } from "@clerk/express";
 import { db, usersTable, userModulesTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { requireAuth, getOrCreateUser } from "../lib/auth";
-import { isAnthropicConfigured } from "../lib/anthropic";
+import { isOllamaConfigured, getOllamaBaseUrl, getOllamaModelParecer } from "../lib/ollama";
 
 const router: IRouter = Router();
 
@@ -60,7 +60,10 @@ router.post("/modules/:module/activate", requireAuth, async (req, res): Promise<
 
 router.get("/api-config", requireAuth, async (_req, res): Promise<void> => {
   res.json({
-    anthropicConfigured: isAnthropicConfigured(),
+    llmConfigured: isOllamaConfigured(),
+    llmProvider: "ollama",
+    llmModel: getOllamaModelParecer(),
+    llmUrl: getOllamaBaseUrl() ? "configured" : null,
     availableModules: ["executio", "rural"],
     maxSessionsPerUser: 8,
   });
