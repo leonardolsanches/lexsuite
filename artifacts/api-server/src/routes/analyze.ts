@@ -4,6 +4,8 @@ import { eq, and } from "drizzle-orm";
 import { requireAuth } from "../lib/auth";
 import { isAnyLlmConfigured, getLlmStatusMessage, streamAnalysis } from "../lib/llm";
 import { isOllamaConfigured, getOllamaBaseUrl, listOllamaModels, pingOllama, getOllamaModelParecer, getOllamaModelExtraction } from "../lib/ollama";
+import { isDbBridgeConfigured, pingDbBridge, getDbBridgeUrl } from "../lib/embedding";
+import { searchRelevantChunks, buildRagContext } from "../lib/rag";
 import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
@@ -20,6 +22,9 @@ router.get("/llm-status", requireAuth, async (_req, res): Promise<void> => {
     }
   }
 
+  const dbBridgeConfigured = isDbBridgeConfigured();
+  const dbBridgeOnline = dbBridgeConfigured ? await pingDbBridge() : false;
+
   res.json({
     provider: "ollama",
     configured: isOllamaConfigured(),
@@ -28,6 +33,12 @@ router.get("/llm-status", requireAuth, async (_req, res): Promise<void> => {
     models: ollamaModels,
     modelParecer: getOllamaModelParecer(),
     modelExtracao: getOllamaModelExtraction(),
+    rag: {
+      configured: dbBridgeConfigured,
+      online: dbBridgeOnline,
+      url: getDbBridgeUrl() ? "configured" : null,
+      embeddingModel: process.env.OLLAMA_MODEL_EMBEDDING ?? "nomic-embed-text",
+    },
   });
 });
 
@@ -54,7 +65,7 @@ router.post("/analyze", requireAuth, async (req, res): Promise<void> => {
     .where(eq(userModulesTable.userId, userId));
   const hasModule = activeModules.some(m => m.module === module);
   if (!hasModule) {
-    res.status(403).json({ error: `Module '${module}' is not activated for your account` });
+    res.status(403).json({ error: `Module '${module}' não está ativado para sua conta` });
     return;
   }
 
@@ -62,17 +73,10 @@ router.post("/analyze", requireAuth, async (req, res): Promise<void> => {
     .where(eq(promptsTable.key, workflowKey))
     .limit(1);
 
-  await db.select().from(workflowsTable)
-    .where(eq(workflowsTable.key, workflowKey))
-    .limit(1);
-
   if (!prompt) {
-    res.status(404).json({ error: "Prompt not found for workflow" });
+    res.status(404).json({ error: "Prompt não encontrado para o workflow" });
     return;
   }
-
-  const userDocs = await db.select().from(documentsTable)
-    .where(and(eq(documentsTable.userId, userId), eq(documentsTable.module, module), eq(documentsTable.status, "ready")));
 
   let dataSection = "";
   if (pasteText) {
@@ -90,9 +94,28 @@ router.post("/analyze", requireAuth, async (req, res): Promise<void> => {
   if (observations) {
     dataSection += `OBSERVAÇÕES ADICIONAIS:\n${observations}\n\n`;
   }
-  if (userDocs.length > 0) {
-    const docsContext = userDocs.map(d => `[${d.filename}]: ${d.content.slice(0, 2000)}`).join("\n\n");
-    dataSection += `BASE DE CONHECIMENTO (documentos indexados):\n${docsContext}\n\n`;
+
+  let ragContext = "";
+  if (isDbBridgeConfigured()) {
+    const queryText = [pasteText, observations, dataSection].filter(Boolean).join(" ").slice(0, 1000);
+    if (queryText.trim().length > 20) {
+      const chunks = await searchRelevantChunks(queryText, module, 5);
+      if (chunks.length > 0) {
+        ragContext = buildRagContext(chunks);
+        logger.info({ chunkCount: chunks.length, module }, "RAG: contexto recuperado");
+      }
+    }
+  } else {
+    const userDocs = await db.select().from(documentsTable)
+      .where(and(eq(documentsTable.userId, userId), eq(documentsTable.module, module), eq(documentsTable.status, "ready")));
+    if (userDocs.length > 0) {
+      const docsContext = userDocs.map(d => `[${d.filename}]: ${d.content.slice(0, 2000)}`).join("\n\n");
+      ragContext = `BASE DE CONHECIMENTO (documentos indexados):\n${docsContext}\n\n`;
+    }
+  }
+
+  if (ragContext) {
+    dataSection = ragContext + dataSection;
   }
 
   const fullPrompt = prompt.content.replace("{{DADOS}}", dataSection || "(nenhum dado fornecido)");
@@ -112,7 +135,10 @@ router.post("/analyze", requireAuth, async (req, res): Promise<void> => {
   }
 
   if (sessionRecord) {
-    await db.update(sessionsTable).set({ status: "running", formData: formData ? JSON.stringify(formData) : null }).where(eq(sessionsTable.id, sessionRecord.id));
+    await db.update(sessionsTable).set({
+      status: "running",
+      formData: formData ? JSON.stringify(formData) : null,
+    }).where(eq(sessionsTable.id, sessionRecord.id));
   }
 
   let fullOutput = "";
@@ -135,7 +161,7 @@ router.post("/analyze", requireAuth, async (req, res): Promise<void> => {
       }).where(eq(sessionsTable.id, sessionRecord.id));
     }
   } catch (err: any) {
-    logger.error({ err }, "Error during analysis stream");
+    logger.error({ err }, "Erro durante streaming de análise");
     if (sessionRecord) {
       await db.update(sessionsTable).set({ status: "error" }).where(eq(sessionsTable.id, sessionRecord.id));
     }
