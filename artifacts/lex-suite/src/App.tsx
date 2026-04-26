@@ -16,7 +16,17 @@ import Documents from "@/pages/Documents";
 const apiUrl = import.meta.env.VITE_API_URL as string | undefined;
 if (apiUrl) setBaseUrl(apiUrl);
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: (failureCount, error: any) => {
+        if (error?.status === 401 && failureCount < 2) return true;
+        return false;
+      },
+      retryDelay: 500,
+    },
+  },
+});
 
 const clerkPubKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
 const clerkProxyUrl = import.meta.env.VITE_CLERK_PROXY_URL;
@@ -99,10 +109,10 @@ function SignUpPage() {
 
 function ApiClientSetup() {
   const { getToken } = useAuth();
-  useEffect(() => {
-    setAuthTokenGetter(() => getToken());
-    return () => setAuthTokenGetter(null);
-  }, [getToken]);
+  // Set synchronously during render so sibling queries have the token available
+  // on their first fetch (useEffect would be too late — queries fire before effects run)
+  setAuthTokenGetter(() => getToken());
+  useEffect(() => () => setAuthTokenGetter(null), []);
   return null;
 }
 
