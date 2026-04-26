@@ -40,12 +40,18 @@ app.use("/api", router);
 
 app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
   const message = err instanceof Error ? err.message : "Erro interno do servidor";
-  const isBridgeError = message.includes("DB_BRIDGE_URL") || message.includes("DB Bridge");
+  const isBridgeError =
+    message.includes("DB_BRIDGE_URL") ||
+    message.includes("DB Bridge") ||
+    message.includes("fetch failed") ||
+    message.includes("ECONNREFUSED") ||
+    message.includes("ETIMEDOUT") ||
+    message.includes("AbortError");
   const status = isBridgeError ? 503 : 500;
-  logger.error({ err }, "Unhandled error");
+  logger.error({ err, message }, "Unhandled error");
   res.status(status).json({
     error: isBridgeError
-      ? "Banco de dados indisponível. DB_BRIDGE_URL não está configurado ou o serviço está offline."
+      ? `DB Bridge indisponível: ${message}`
       : message,
   });
 });
