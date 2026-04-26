@@ -26,18 +26,19 @@ export const requireAuth = async (req: Request, res: Response, next: NextFunctio
 };
 
 export async function getOrCreateUser(clerkUserId: string, email: string, name?: string | null) {
-  const existing = await bridgeQueryOne(
-    "SELECT id, email, name, role, created_at FROM users WHERE id = $1",
-    [clerkUserId]
-  );
-  if (existing) return existing;
-
   const user = await bridgeQueryOne(
     `INSERT INTO users (id, email, name, role)
      VALUES ($1, $2, $3, 'user')
      ON CONFLICT (id) DO UPDATE SET email = EXCLUDED.email
      RETURNING id, email, name, role, created_at`,
     [clerkUserId, email, name ?? null]
+  );
+
+  await bridgeQuery(
+    `INSERT INTO user_modules (user_id, module)
+     VALUES ($1, 'rural'), ($1, 'executio')
+     ON CONFLICT (user_id, module) DO NOTHING`,
+    [clerkUserId]
   );
 
   return user!;
