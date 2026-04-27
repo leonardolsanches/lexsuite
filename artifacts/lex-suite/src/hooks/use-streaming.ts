@@ -1,6 +1,13 @@
 import { useState, useCallback, useRef } from 'react';
 import { useAuth } from '@clerk/react';
 
+export type ExecStep = {
+  id: string;
+  label: string;
+  icon: string;
+  at: number;
+};
+
 export function useStreaming() {
   const [isStreaming, setIsStreaming] = useState(false);
   const { getToken } = useAuth();
@@ -13,9 +20,9 @@ export function useStreaming() {
   const startStream = useCallback(async (
     requestData: any,
     onComplete?: (fullContent: string) => void,
-    onChunk?: (partialContent: string) => void
+    onChunk?: (partialContent: string) => void,
+    onStep?: (step: ExecStep) => void
   ) => {
-    // Cancel any existing stream first
     abortControllerRef.current?.abort('replaced');
     const controller = new AbortController();
     abortControllerRef.current = controller;
@@ -59,7 +66,9 @@ export function useStreaming() {
           if (!raw) continue;
           try {
             const parsed = JSON.parse(raw);
-            if (parsed.type === 'text' && parsed.text) {
+            if (parsed.type === 'step') {
+              onStep?.({ id: parsed.id, label: parsed.label, icon: parsed.icon, at: Date.now() });
+            } else if (parsed.type === 'text' && parsed.text) {
               fullContent += parsed.text;
               onChunk?.(fullContent);
             } else if (parsed.type === 'error') {
@@ -71,15 +80,11 @@ export function useStreaming() {
         }
       }
 
-      // Only call onComplete if not aborted
       if (!controller.signal.aborted) {
         onComplete?.(fullContent);
       }
     } catch (e: any) {
-      if (e?.name === 'AbortError' || controller.signal.aborted) {
-        // Silently swallow — cancelled intentionally
-        return;
-      }
+      if (e?.name === 'AbortError' || controller.signal.aborted) return;
       throw e;
     } finally {
       setIsStreaming(false);

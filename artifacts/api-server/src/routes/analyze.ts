@@ -50,17 +50,33 @@ router.post("/analyze", requireAuth, async (req, res): Promise<void> => {
     return;
   }
 
-  if (!isAnyLlmConfigured()) {
-    res.setHeader("Content-Type", "text/event-stream");
-    res.setHeader("Cache-Control", "no-cache");
-    res.setHeader("Connection", "keep-alive");
-    res.flushHeaders();
-    res.write(`data: ${JSON.stringify({ type: "error", message: getLlmStatusMessage() })}\n\n`);
+  // Open the SSE stream immediately so progress events reach the client
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+  res.setHeader("X-Accel-Buffering", "no");
+  res.flushHeaders();
+
+  /** Emit a named progress step to the client */
+  const sendStep = (id: string, label: string, icon: string) => {
+    res.write(`data: ${JSON.stringify({ type: "step", id, label, icon })}\n\n`);
+  };
+
+  /** Emit a terminal error and close the stream */
+  const sendError = (message: string) => {
+    res.write(`data: ${JSON.stringify({ type: "error", message })}\n\n`);
     res.end();
+  };
+
+  // ── 1. Check LLM availability ────────────────────────────────────────────
+  sendStep("llm", "Verificando motor de linguagem...", "cpu");
+  if (!isAnyLlmConfigured()) {
+    sendError(getLlmStatusMessage());
     return;
   }
 
-  // Module access check — fail-open when DB Bridge is unavailable
+  // ── 2. Module access check (fail-open when bridge offline) ────────────────
+  sendStep("module", "Verificando acesso ao módulo...", "shield");
   try {
     const activeModules = await bridgeQuery(
       "SELECT module FROM user_modules WHERE user_id = $1",
@@ -68,62 +84,49 @@ router.post("/analyze", requireAuth, async (req, res): Promise<void> => {
     );
     const hasModule = activeModules.some(m => m.module === module);
     if (!hasModule && activeModules.length > 0) {
-      res.status(403).json({ error: `Módulo '${module}' não está ativado para sua conta` });
+      sendError(`Módulo '${module}' não está ativado para sua conta.`);
       return;
     }
-    // If activeModules is empty it may mean the user record doesn't exist yet — allow
-  } catch (bridgeErr: any) {
-    logger.warn({ err: bridgeErr }, "DB Bridge indisponível para verificação de módulo — permitindo acesso");
+  } catch (err: any) {
+    logger.warn({ err }, "DB Bridge indisponível para verificação de módulo — permitindo acesso");
   }
 
-  // Prompt lookup — requires bridge; surface a clear SSE error if unavailable
+  // ── 3. Prompt lookup ──────────────────────────────────────────────────────
+  sendStep("prompt", "Carregando instruções do workflow...", "file-text");
   let prompt: { key: unknown; content: unknown; module: unknown } | null = null;
   try {
     prompt = await bridgeQueryOne(
       "SELECT key, content, module FROM prompts WHERE key = $1",
       [workflowKey]
     );
-  } catch (bridgeErr: any) {
-    logger.warn({ err: bridgeErr, workflowKey }, "DB Bridge indisponível — não foi possível carregar o prompt");
-    res.setHeader("Content-Type", "text/event-stream");
-    res.setHeader("Cache-Control", "no-cache");
-    res.setHeader("Connection", "keep-alive");
-    res.flushHeaders();
-    res.write(`data: ${JSON.stringify({
-      type: "error",
-      message: "🔌 DB Bridge offline — o Mini PC está desconectado. Ligue o servidor local e aguarde o túnel Cloudflare reconectar para que as análises funcionem."
-    })}\n\n`);
-    res.end();
+  } catch (err: any) {
+    logger.warn({ err, workflowKey }, "DB Bridge indisponível — prompt não carregado");
+    sendError(
+      "🔌 DB Bridge offline — o Mini PC está desconectado.\n" +
+      "Ligue o servidor local e aguarde o túnel Cloudflare reconectar."
+    );
     return;
   }
 
   if (!prompt) {
-    res.setHeader("Content-Type", "text/event-stream");
-    res.setHeader("Cache-Control", "no-cache");
-    res.setHeader("Connection", "keep-alive");
-    res.flushHeaders();
-    res.write(`data: ${JSON.stringify({ type: "error", message: `Prompt não encontrado para o workflow '${workflowKey}'.` })}\n\n`);
-    res.end();
+    sendError(`Prompt não encontrado para o workflow '${workflowKey}'.`);
     return;
   }
 
+  // ── 4. Build data payload ─────────────────────────────────────────────────
   let dataSection = "";
-  if (pasteText) {
-    dataSection = `TEXTO COLADO PELO USUÁRIO:\n${pasteText}\n\n`;
-  }
+  if (pasteText) dataSection = `TEXTO COLADO PELO USUÁRIO:\n${pasteText}\n\n`;
   if (formData && typeof formData === "object") {
     const fields = Object.entries(formData)
       .filter(([_, v]) => v !== "" && v != null)
       .map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(", ") : v}`)
       .join("\n");
-    if (fields) {
-      dataSection += `DADOS DO FORMULÁRIO:\n${fields}\n\n`;
-    }
+    if (fields) dataSection += `DADOS DO FORMULÁRIO:\n${fields}\n\n`;
   }
-  if (observations) {
-    dataSection += `OBSERVAÇÕES ADICIONAIS:\n${observations}\n\n`;
-  }
+  if (observations) dataSection += `OBSERVAÇÕES ADICIONAIS:\n${observations}\n\n`;
 
+  // ── 5. RAG / document context (optional, fail-open) ───────────────────────
+  sendStep("context", "Buscando contexto relevante...", "search");
   let ragContext = "";
   try {
     if (isDbBridgeConfigured()) {
@@ -147,22 +150,15 @@ router.post("/analyze", requireAuth, async (req, res): Promise<void> => {
         ragContext = `BASE DE CONHECIMENTO (documentos indexados):\n${docsContext}\n\n`;
       }
     }
-  } catch (ragErr: any) {
-    logger.warn({ err: ragErr }, "DB Bridge indisponível para RAG/docs — prosseguindo sem contexto");
+  } catch (err: any) {
+    logger.warn({ err }, "DB Bridge indisponível para RAG/docs — prosseguindo sem contexto");
   }
 
-  if (ragContext) {
-    dataSection = ragContext + dataSection;
-  }
+  if (ragContext) dataSection = ragContext + dataSection;
 
   const fullPrompt = String(prompt.content).replace("{{DADOS}}", dataSection || "(nenhum dado fornecido)");
 
-  res.setHeader("Content-Type", "text/event-stream");
-  res.setHeader("Cache-Control", "no-cache");
-  res.setHeader("Connection", "keep-alive");
-  res.setHeader("X-Accel-Buffering", "no");
-  res.flushHeaders();
-
+  // ── 6. Session tracking (optional, fail-open) ─────────────────────────────
   let sessionRecord: { id: number } | null = null;
   if (sessionId) {
     try {
@@ -172,7 +168,7 @@ router.post("/analyze", requireAuth, async (req, res): Promise<void> => {
       );
       if (s) sessionRecord = { id: s.id as number };
     } catch {
-      logger.warn("DB Bridge indisponível — sessão não atualizada");
+      logger.warn("DB Bridge indisponível — sessão não rastreada");
     }
   }
 
@@ -183,9 +179,12 @@ router.post("/analyze", requireAuth, async (req, res): Promise<void> => {
         [sessionRecord.id, formData ? JSON.stringify(formData) : null]
       );
     } catch {
-      sessionRecord = null; // skip further session updates
+      sessionRecord = null;
     }
   }
+
+  // ── 7. Stream from LLM ────────────────────────────────────────────────────
+  sendStep("model", "Aguardando resposta do modelo...", "brain");
 
   let fullOutput = "";
 
@@ -201,18 +200,22 @@ router.post("/analyze", requireAuth, async (req, res): Promise<void> => {
     res.end();
 
     if (sessionRecord) {
-      await bridgeExecute(
-        "UPDATE sessions SET status = 'done', output_html = $2, updated_at = NOW() WHERE id = $1",
-        [sessionRecord.id, fullOutput]
-      );
+      try {
+        await bridgeExecute(
+          "UPDATE sessions SET status = 'done', output_html = $2, updated_at = NOW() WHERE id = $1",
+          [sessionRecord.id, fullOutput]
+        );
+      } catch { /* bridge offline, skip */ }
     }
   } catch (err: any) {
     logger.error({ err }, "Erro durante streaming de análise");
     if (sessionRecord) {
-      await bridgeExecute(
-        "UPDATE sessions SET status = 'error', updated_at = NOW() WHERE id = $1",
-        [sessionRecord.id]
-      );
+      try {
+        await bridgeExecute(
+          "UPDATE sessions SET status = 'error', updated_at = NOW() WHERE id = $1",
+          [sessionRecord.id]
+        );
+      } catch { /* skip */ }
     }
     if (!res.writableEnded) {
       res.write(`data: ${JSON.stringify({ type: "error", message: err.message ?? "Falha na análise" })}\n\n`);

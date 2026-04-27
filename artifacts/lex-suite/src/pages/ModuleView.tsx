@@ -36,9 +36,15 @@ import {
   CheckCircle2,
   AlertCircle,
   Clock,
-  Loader2
+  Loader2,
+  Brain,
+  Shield,
+  Search,
+  Cpu,
+  Zap,
+  FileText as FileTextIcon
 } from 'lucide-react';
-import { useStreaming } from '@/hooks/use-streaming';
+import { useStreaming, type ExecStep } from '@/hooks/use-streaming';
 import { usePdf } from '@/hooks/use-pdf';
 
 type ModuleViewProps = {
@@ -54,6 +60,7 @@ type ProcessTab = {
   phase?: 'extracting' | 'streaming';
   startedAt?: number;
   endedAt?: number;
+  execSteps: ExecStep[];
   mode: 'form' | 'paste' | 'pdf';
   formData: Record<string, any>;
   pasteText: string;
@@ -110,6 +117,7 @@ export default function ModuleView({ module }: ModuleViewProps) {
       workflowKey: null,
       label: `Processo ${tabs.length + 1}`,
       status: 'idle',
+      execSteps: [],
       mode: 'form',
       formData: {},
       pasteText: '',
@@ -202,7 +210,7 @@ export default function ModuleView({ module }: ModuleViewProps) {
     if (!tab || !tab.workflowKey) return;
     if (tab.status === 'running') return;
 
-    updateTab(tabId, { status: 'running', outputHtml: '', startedAt: Date.now(), phase: 'extracting' });
+    updateTab(tabId, { status: 'running', outputHtml: '', startedAt: Date.now(), phase: 'extracting', execSteps: [] });
 
     // Extract PDF text — either from dedicated pdf mode or pdfs attached in form mode
     let pdfExtractedText = '';
@@ -261,9 +269,15 @@ export default function ModuleView({ module }: ModuleViewProps) {
         (fullContent) => {
           updateTab(tabId, { status: 'done', outputHtml: fullContent, endedAt: Date.now() });
         },
-        // onChunk — live streaming to the correct tab, directly by tabId
+        // onChunk — live streaming to the correct tab
         (partial) => {
           updateTab(tabId, { outputHtml: partial, phase: 'streaming' });
+        },
+        // onStep — append a new execution step to the activity log
+        (step) => {
+          setTabs(prev => prev.map(t =>
+            t.id === tabId ? { ...t, execSteps: [...t.execSteps, step] } : t
+          ));
         }
       );
 
@@ -347,6 +361,20 @@ export default function ModuleView({ module }: ModuleViewProps) {
   const handleResumeQueue = () => {
     queuePausedRef.current = false;
     setQueuePaused(false);
+  };
+
+  // Map server-sent icon names to Lucide components
+  const stepIcon = (icon: string, cls = 'w-4 h-4') => {
+    const props = { className: cls };
+    switch (icon) {
+      case 'cpu': return <Cpu {...props} />;
+      case 'shield': return <Shield {...props} />;
+      case 'file-text': return <FileTextIcon {...props} />;
+      case 'search': return <Search {...props} />;
+      case 'brain': return <Brain {...props} />;
+      case 'zap': return <Zap {...props} />;
+      default: return <Loader2 {...props} />;
+    }
   };
 
   // Group workflows by category
@@ -933,38 +961,87 @@ export default function ModuleView({ module }: ModuleViewProps) {
                 
                 <ScrollArea className="flex-1">
                   <div className="p-8 max-w-4xl mx-auto w-full">
-                    {activeTab.outputHtml ? (
-                      <div 
+                    {/* ── Activity Log (visible when running, before or during text) ── */}
+                    {activeTab.status === 'running' && activeTab.execSteps.length > 0 && (
+                      <div className={`mb-6 ${activeTab.outputHtml ? 'pb-4 border-b border-border/50' : 'py-8'}`}>
+                        {/* Steps list */}
+                        <div className={`space-y-1 ${activeTab.outputHtml ? 'max-w-full' : 'max-w-sm mx-auto'}`}>
+                          {activeTab.execSteps.map((step, idx) => {
+                            const isDone = idx < activeTab.execSteps.length - 1 || !!activeTab.outputHtml;
+                            const isActive = idx === activeTab.execSteps.length - 1 && !activeTab.outputHtml;
+                            return (
+                              <div key={step.id} className={`flex items-center gap-3 rounded-lg px-3 py-2 transition-all ${
+                                isActive
+                                  ? 'bg-primary/8 border border-primary/20 text-primary'
+                                  : isDone
+                                  ? 'text-muted-foreground'
+                                  : 'text-muted-foreground/40'
+                              }`}>
+                                <span className={`shrink-0 ${isActive ? 'text-primary' : isDone ? 'text-emerald-500' : ''}`}>
+                                  {isActive
+                                    ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                    : isDone
+                                    ? <CheckCircle2 className="w-3.5 h-3.5" />
+                                    : stepIcon(step.icon, 'w-3.5 h-3.5 opacity-30')}
+                                </span>
+                                <span className={`text-xs ${isActive ? 'font-medium' : ''} flex-1`}>{step.label}</span>
+                                {isDone && (
+                                  <span className="text-[10px] tabular-nums text-muted-foreground/50 shrink-0">
+                                    {idx + 1 < activeTab.execSteps.length
+                                      ? `${Math.floor((activeTab.execSteps[idx + 1].at - step.at) / 100) / 10}s`
+                                      : ''}
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          })}
+                          {/* "Receiving" row — appears once text starts flowing */}
+                          {activeTab.outputHtml && (
+                            <div className="flex items-center gap-3 rounded-lg px-3 py-2 bg-primary/8 border border-primary/20 text-primary">
+                              <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
+                              <span className="text-xs font-medium flex-1">Recebendo resposta do modelo...</span>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Skeleton placeholder — only before text arrives */}
+                        {!activeTab.outputHtml && (
+                          <div className="space-y-3 max-w-2xl mx-auto mt-8 opacity-10">
+                            {[100, 82, 94, 68, 88, 55].map((w, i) => (
+                              <div key={i} className="h-3 rounded bg-foreground animate-pulse" style={{ width: `${w}%`, animationDelay: `${i * 0.15}s` }} />
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* PDF extraction phase — no SSE steps yet */}
+                    {activeTab.status === 'running' && activeTab.execSteps.length === 0 && activeTab.phase === 'extracting' && (
+                      <div className="flex flex-col items-center gap-4 text-center py-16">
+                        <div className="w-14 h-14 rounded-full border border-primary/30 flex items-center justify-center bg-primary/5 relative">
+                          <span className="font-serif italic text-2xl text-primary">ℓ</span>
+                          <span className="absolute inset-0 rounded-full border border-primary/20 animate-ping" />
+                        </div>
+                        <p className="text-sm font-medium text-foreground">Extraindo texto dos PDFs...</p>
+                        <p className="text-xs text-muted-foreground">Processando {activeTab.pdfs.length} documento(s)</p>
+                      </div>
+                    )}
+
+                    {/* Streaming output text */}
+                    {activeTab.outputHtml && (
+                      <div
                         className="prose prose-sm dark:prose-invert max-w-none font-serif leading-relaxed text-[15px]"
                         dangerouslySetInnerHTML={{ __html: activeTab.outputHtml.replace(/\n/g, '<br/>') }}
                       />
-                    ) : activeTab.status === 'running' ? (
-                      <div className="space-y-6 py-12">
-                        {/* Phase indicator */}
-                        <div className="flex flex-col items-center gap-4 text-center">
-                          <div className="w-14 h-14 rounded-full border border-primary/30 flex items-center justify-center bg-primary/5 relative">
-                            <span className="font-serif italic text-2xl text-primary">ℓ</span>
-                            <span className="absolute inset-0 rounded-full border border-primary/20 animate-ping" />
-                          </div>
-                          <div className="space-y-1">
-                            <p className="text-sm font-medium text-foreground">
-                              {activeTab.phase === 'extracting' ? 'Extraindo texto dos PDFs...' : 'Aguardando resposta da IA...'}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {activeTab.phase === 'extracting'
-                                ? 'Processando ' + (activeTab.pdfs.length) + ' documento(s)'
-                                : 'O modelo está gerando a análise jurídica'}
-                            </p>
-                          </div>
-                        </div>
-                        {/* Skeleton lines */}
-                        <div className="space-y-3 max-w-2xl mx-auto opacity-20">
-                          {[100, 85, 92, 70, 88, 60].map((w, i) => (
-                            <div key={i} className="h-3 rounded bg-muted animate-pulse" style={{ width: `${w}%`, animationDelay: `${i * 0.15}s` }} />
-                          ))}
-                        </div>
-                      </div>
-                    ) : (
+                    )}
+
+                    {/* Done — activity log summary collapsed */}
+                    {activeTab.status === 'done' && activeTab.execSteps.length > 0 && !activeTab.outputHtml && (
+                      <div className="py-8 text-center text-muted-foreground text-sm">Análise concluída sem conteúdo.</div>
+                    )}
+
+                    {/* Idle empty state */}
+                    {activeTab.status !== 'running' && !activeTab.outputHtml && activeTab.status !== 'done' && (
                       <div className="h-full flex flex-col items-center justify-center text-muted-foreground py-32 space-y-4 opacity-50">
                         <div className="w-16 h-16 rounded-full border border-border flex items-center justify-center bg-card">
                           <span className="font-serif italic text-2xl">ℓ</span>
