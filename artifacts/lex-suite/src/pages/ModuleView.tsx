@@ -29,7 +29,14 @@ import {
   LogOut, 
   ArrowLeft,
   Settings,
-  Database
+  Database,
+  Square,
+  Pause,
+  RefreshCw,
+  CheckCircle2,
+  AlertCircle,
+  Clock,
+  Loader2
 } from 'lucide-react';
 import { useStreaming } from '@/hooks/use-streaming';
 import { usePdf } from '@/hooks/use-pdf';
@@ -63,6 +70,9 @@ export default function ModuleView({ module }: ModuleViewProps) {
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
   const [tabs, setTabs] = useState<ProcessTab[]>([]);
   const [isRunningAll, setIsRunningAll] = useState(false);
+  const [queuePaused, setQueuePaused] = useState(false);
+  const queuePausedRef = useRef(false);
+  const stopQueueRef = useRef(false);
   
   const { data: workflows = [] } = useListWorkflows({ 
     query: { queryKey: getListWorkflowsQueryKey() } 
@@ -72,7 +82,7 @@ export default function ModuleView({ module }: ModuleViewProps) {
   
   const createSession = useCreateSession();
   
-  const { isStreaming, startStream } = useStreaming();
+  const { isStreaming, startStream, cancelStream } = useStreaming();
   const { isLoaded: pdfLoaded, extractText } = usePdf();
 
   // Keep a ref to always-fresh tabs for use inside async callbacks
@@ -132,6 +142,37 @@ export default function ModuleView({ module }: ModuleViewProps) {
 
   const updateActiveTab = (updates: Partial<ProcessTab>) => {
     if (activeTabId) updateTab(activeTabId, updates);
+  };
+
+  // Formats elapsed time for a tab: live when running, fixed when done
+  const formatElapsed = (tab: ProcessTab): string => {
+    if (!tab.startedAt) return '';
+    const endMs = tab.endedAt ?? Date.now();
+    const totalSec = Math.floor((endMs - tab.startedAt) / 1000);
+    const mm = Math.floor(totalSec / 60);
+    const ss = totalSec % 60;
+    return mm > 0 ? `${mm}:${String(ss).padStart(2, '0')}` : `${ss}s`;
+  };
+
+  // Abort the currently running stream and mark the tab as cancelled
+  const handleCancelTab = (tabId: string) => {
+    const tab = tabsRef.current.find(t => t.id === tabId);
+    if (tab?.status !== 'running') return;
+    cancelStream();
+    stopQueueRef.current = true; // signals the queue loop to exit after this
+    updateTab(tabId, { status: 'error', phase: undefined, endedAt: Date.now(), outputHtml: '' });
+    queuePausedRef.current = false;
+    setQueuePaused(false);
+    // isRunningAll will be cleared by handleRunAll's finally block
+  };
+
+  // Reset a tab and re-run its analysis
+  const handleRestartTab = (tabId: string) => {
+    const tab = tabsRef.current.find(t => t.id === tabId);
+    if (!tab || !tab.workflowKey || tab.status === 'running') return;
+    updateTab(tabId, { status: 'idle', outputHtml: '', startedAt: undefined, endedAt: undefined, phase: undefined });
+    setActiveTabId(tabId);
+    setTimeout(() => handleRunAnalysisForTab(tabId), 80);
   };
 
   const closeTab = (e: React.MouseEvent, id: string) => {
@@ -253,15 +294,55 @@ export default function ModuleView({ module }: ModuleViewProps) {
       toast({ title: 'Nenhum processo configurado', description: 'Configure pelo menos um processo com workflow selecionado.', variant: 'destructive' });
       return;
     }
+    queuePausedRef.current = false;
+    stopQueueRef.current = false;
+    setQueuePaused(false);
     setIsRunningAll(true);
-    for (const tab of withWorkflow) {
-      setActiveTabId(tab.id);
-      // Give React a tick to re-render before starting the next stream
-      await new Promise(r => setTimeout(r, 100));
-      await handleRunAnalysisForTab(tab.id);
+    let completed = 0;
+    try {
+      for (const tab of withWorkflow) {
+        if (stopQueueRef.current) break; // user cancelled
+
+        // Wait if queue is paused — poll every 400ms
+        while (queuePausedRef.current && !stopQueueRef.current) {
+          await new Promise(r => setTimeout(r, 400));
+        }
+        if (stopQueueRef.current) break;
+
+        // Skip closed tabs
+        if (!tabsRef.current.some(t => t.id === tab.id)) continue;
+
+        setActiveTabId(tab.id);
+        await new Promise(r => setTimeout(r, 100));
+        await handleRunAnalysisForTab(tab.id);
+
+        if (stopQueueRef.current) break;
+        completed++;
+      }
+    } finally {
+      setIsRunningAll(false);
+      queuePausedRef.current = false;
+      stopQueueRef.current = false;
+      setQueuePaused(false);
     }
-    setIsRunningAll(false);
-    toast({ title: `${withWorkflow.length} processo(s) concluído(s)!`, description: 'Todas as análises foram finalizadas.' });
+    if (completed > 0) {
+      toast({
+        title: `${completed} processo(s) concluído(s)!`,
+        description: completed < withWorkflow.length
+          ? 'Fila interrompida antes do fim.'
+          : 'Todas as análises foram finalizadas.'
+      });
+    }
+  };
+
+  const handlePauseQueue = () => {
+    queuePausedRef.current = true;
+    setQueuePaused(true);
+  };
+
+  const handleResumeQueue = () => {
+    queuePausedRef.current = false;
+    setQueuePaused(false);
   };
 
   // Group workflows by category
@@ -467,25 +548,32 @@ export default function ModuleView({ module }: ModuleViewProps) {
               <div 
                 key={tab.id}
                 onClick={() => setActiveTabId(tab.id)}
-                className={`group flex items-center gap-2 h-9 px-3 min-w-[140px] max-w-[200px] border-r border-l border-t rounded-t-md mx-0.5 cursor-pointer transition-colors ${
+                className={`group flex items-center gap-1.5 h-9 px-3 min-w-[140px] max-w-[220px] border-r border-l border-t rounded-t-md mx-0.5 cursor-pointer transition-colors ${
                   activeTabId === tab.id 
                     ? 'bg-background border-border text-foreground' 
                     : 'bg-card border-transparent text-muted-foreground hover:bg-muted/50'
                 }`}
               >
-                <span className="text-xs font-mono opacity-50">P{idx + 1}</span>
+                <span className={`text-[10px] font-mono shrink-0 ${
+                  tab.status === 'running' ? 'text-primary' :
+                  tab.status === 'done' ? 'text-emerald-500' :
+                  tab.status === 'error' ? 'text-destructive' : 'opacity-40'
+                }`}>P{idx + 1}</span>
                 <span className="text-sm truncate flex-1">{tab.label}</span>
                 
                 {tab.status === 'running' && (
-                  <span className="relative flex h-2 w-2 shrink-0">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
-                  </span>
+                  <span className="font-mono text-[10px] text-primary shrink-0 tabular-nums">{formatElapsed(tab)}</span>
+                )}
+                {tab.status === 'done' && (
+                  <CheckCircle2 className="w-3 h-3 text-emerald-500 shrink-0" />
+                )}
+                {tab.status === 'error' && (
+                  <AlertCircle className="w-3 h-3 text-destructive shrink-0" />
                 )}
                 
                 <button 
                   onClick={(e) => closeTab(e, tab.id)}
-                  className="w-4 h-4 rounded-sm flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-muted transition-all"
+                  className="w-4 h-4 rounded-sm flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-muted transition-all shrink-0"
                 >
                   <X className="w-3 h-3" />
                 </button>
@@ -495,25 +583,50 @@ export default function ModuleView({ module }: ModuleViewProps) {
               variant="ghost" 
               size="sm" 
               onClick={handleNewProcess}
-              className="ml-2 text-muted-foreground h-8 px-2"
+              className="ml-2 text-muted-foreground h-8 px-2 shrink-0"
             >
               <Plus className="w-4 h-4 mr-1" /> Novo
             </Button>
             <div className="flex-1"></div>
+
+            {/* Queue controls — visible only when a sequential run is active */}
+            {isRunningAll && (
+              <div className="flex items-center gap-1 mr-2 shrink-0">
+                {queuePaused ? (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleResumeQueue}
+                    className="h-8 px-2 gap-1.5 text-xs text-emerald-500 hover:text-emerald-400 hover:bg-emerald-500/10"
+                    title="Continuar fila"
+                  >
+                    <Play className="w-3 h-3 fill-current" /> Continuar
+                  </Button>
+                ) : (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handlePauseQueue}
+                    className="h-8 px-2 gap-1.5 text-xs text-amber-500 hover:text-amber-400 hover:bg-amber-500/10"
+                    title="Pausar após processo atual"
+                  >
+                    <Pause className="w-3 h-3" /> Pausar Fila
+                  </Button>
+                )}
+              </div>
+            )}
+
             <Button
               variant="outline"
               size="sm"
               onClick={handleRunAll}
               disabled={isStreaming || isRunningAll || tabs.filter(t => t.workflowKey).length === 0}
-              className="h-8 gap-2 ml-2 border-primary/40 text-primary hover:bg-primary/10"
+              className="h-8 gap-2 shrink-0 border-primary/40 text-primary hover:bg-primary/10"
               data-testid="btn-executar-todos"
               title="Executa todos os processos de P1 a Pn em sequência"
             >
               {isRunningAll ? (
-                <span className="relative flex h-2 w-2 shrink-0">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
-                </span>
+                <Loader2 className="w-3 h-3 animate-spin" />
               ) : (
                 <Play className="w-3 h-3 fill-primary" />
               )}
@@ -524,13 +637,98 @@ export default function ModuleView({ module }: ModuleViewProps) {
               size="sm"
               onClick={handleRunAnalysis}
               disabled={!activeTab?.workflowKey || activeTab?.status === 'running' || isRunningAll}
-              className="h-8 gap-2 ml-2"
+              className="h-8 gap-2 ml-2 shrink-0"
               data-testid="btn-executar"
             >
               <Play className="w-3 h-3" />
               Executar
             </Button>
           </div>
+
+          {/* Process Manager Panel — visible when 2+ tabs exist */}
+          {tabs.length > 1 && (
+            <div className="border-b border-border bg-card/40 px-3 py-1.5 shrink-0 flex items-center gap-3 overflow-x-auto no-scrollbar">
+              <span className="text-[9px] font-bold text-muted-foreground/60 uppercase tracking-widest shrink-0">Processos</span>
+              <div className="flex items-center gap-2 flex-1">
+                {tabs.map((tab, idx) => {
+                  const isActive = tab.id === activeTabId;
+                  const elapsed = formatElapsed(tab);
+                  return (
+                    <div
+                      key={tab.id}
+                      className={`flex items-center gap-1.5 shrink-0 rounded-md px-2 py-1 text-xs border transition-all ${
+                        tab.status === 'running'
+                          ? 'border-primary/50 bg-primary/5 text-primary'
+                          : tab.status === 'done'
+                          ? 'border-emerald-500/30 bg-emerald-500/5 text-emerald-500'
+                          : tab.status === 'error'
+                          ? 'border-destructive/30 bg-destructive/5 text-destructive'
+                          : isActive
+                          ? 'border-border bg-muted/30 text-foreground'
+                          : 'border-border/50 bg-transparent text-muted-foreground'
+                      }`}
+                    >
+                      {/* Status icon */}
+                      {tab.status === 'running' && <Loader2 className="w-3 h-3 animate-spin shrink-0" />}
+                      {tab.status === 'done' && <CheckCircle2 className="w-3 h-3 shrink-0" />}
+                      {tab.status === 'error' && <AlertCircle className="w-3 h-3 shrink-0" />}
+                      {tab.status === 'idle' && <Clock className="w-3 h-3 shrink-0 opacity-40" />}
+
+                      {/* Label */}
+                      <button
+                        onClick={() => setActiveTabId(tab.id)}
+                        className="font-mono text-[10px] shrink-0 hover:underline"
+                        title={tab.label}
+                      >
+                        P{idx + 1}
+                      </button>
+                      <span className="max-w-[90px] truncate text-[10px] opacity-80">{tab.label}</span>
+
+                      {/* Elapsed time */}
+                      {elapsed && (
+                        <span className="font-mono text-[10px] tabular-nums opacity-70 shrink-0">{elapsed}</span>
+                      )}
+
+                      {/* Action: cancel if running */}
+                      {tab.status === 'running' && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleCancelTab(tab.id); }}
+                          title="Cancelar processo"
+                          className="ml-0.5 rounded p-0.5 hover:bg-destructive/20 text-destructive/70 hover:text-destructive transition-colors shrink-0"
+                        >
+                          <Square className="w-2.5 h-2.5 fill-current" />
+                        </button>
+                      )}
+
+                      {/* Action: restart if error or done */}
+                      {(tab.status === 'error' || tab.status === 'done') && tab.workflowKey && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleRestartTab(tab.id); }}
+                          title="Reiniciar análise"
+                          className="ml-0.5 rounded p-0.5 hover:bg-primary/20 opacity-60 hover:opacity-100 transition-all shrink-0"
+                        >
+                          <RefreshCw className="w-2.5 h-2.5" />
+                        </button>
+                      )}
+
+                      {/* Queue paused indicator */}
+                      {tab.status === 'idle' && queuePaused && isRunningAll && idx > 0 && (
+                        <span className="text-[9px] text-amber-500 shrink-0">em espera</span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Queue paused banner */}
+              {queuePaused && isRunningAll && (
+                <div className="flex items-center gap-1.5 shrink-0 text-amber-500">
+                  <Pause className="w-3 h-3" />
+                  <span className="text-[10px]">Fila pausada</span>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Split View */}
           {activeTab ? (
@@ -687,7 +885,29 @@ export default function ModuleView({ module }: ModuleViewProps) {
                       );
                     })()}
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5">
+                    {activeTab.status === 'running' && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleCancelTab(activeTab.id)}
+                        className="h-8 gap-1.5 text-destructive/70 hover:text-destructive hover:bg-destructive/10"
+                        title="Cancelar análise em andamento"
+                      >
+                        <Square className="w-3 h-3 fill-current" /> Cancelar
+                      </Button>
+                    )}
+                    {(activeTab.status === 'error' || activeTab.status === 'done') && activeTab.workflowKey && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleRestartTab(activeTab.id)}
+                        className="h-8 gap-1.5 text-muted-foreground hover:text-foreground"
+                        title="Reiniciar análise"
+                      >
+                        <RefreshCw className="w-3 h-3" /> Reiniciar
+                      </Button>
+                    )}
                     <Button variant="ghost" size="sm" className="h-8 gap-2 text-muted-foreground hover:text-foreground">
                       <Copy className="w-3.5 h-3.5" /> Copiar
                     </Button>
