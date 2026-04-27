@@ -1,8 +1,0 @@
-uploads = []
-generated = []
-
-[[outputs]]
-id = "li89KiJqdxCkvSARyhQlm"
-uri = "file://.local/outputs/Lex-Suite-Orchestrator.pptx"
-type = "slides"
-title = "Lex Suite Orchestrator.pptx"
