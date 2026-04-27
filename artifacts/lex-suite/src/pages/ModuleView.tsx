@@ -59,6 +59,7 @@ export default function ModuleView({ module }: ModuleViewProps) {
   
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
   const [tabs, setTabs] = useState<ProcessTab[]>([]);
+  const [isRunningAll, setIsRunningAll] = useState(false);
   
   const { data: workflows = [] } = useListWorkflows({ 
     query: { queryKey: getListWorkflowsQueryKey() } 
@@ -70,6 +71,10 @@ export default function ModuleView({ module }: ModuleViewProps) {
   
   const { isStreaming, streamContent, startStream, setStreamContent } = useStreaming();
   const { isLoaded: pdfLoaded, extractText } = usePdf();
+
+  // Keep a ref to always-fresh tabs for use inside async callbacks
+  const tabsRef = useRef<ProcessTab[]>([]);
+  useEffect(() => { tabsRef.current = tabs; }, [tabs]);
 
   // Create a new tab
   const handleNewProcess = () => {
@@ -109,8 +114,12 @@ export default function ModuleView({ module }: ModuleViewProps) {
 
   const activeTab = tabs.find(t => t.id === activeTabId) || tabs[0];
 
+  const updateTab = (id: string, updates: Partial<ProcessTab>) => {
+    setTabs(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t));
+  };
+
   const updateActiveTab = (updates: Partial<ProcessTab>) => {
-    setTabs(prev => prev.map(t => t.id === activeTabId ? { ...t, ...updates } : t));
+    if (activeTabId) updateTab(activeTabId, updates);
   };
 
   const closeTab = (e: React.MouseEvent, id: string) => {
@@ -135,61 +144,65 @@ export default function ModuleView({ module }: ModuleViewProps) {
     });
   };
 
-  const handleRunAnalysis = async () => {
-    if (!activeTab || !activeTab.workflowKey) {
-      toast({ title: 'Selecione um workflow primeiro', variant: 'destructive' });
-      return;
-    }
+  const handleRunAnalysisForTab = async (tabId: string) => {
+    const tab = tabsRef.current.find(t => t.id === tabId);
+    if (!tab || !tab.workflowKey) return;
+    if (tab.status === 'running') return;
 
-    if (activeTab.status === 'running' || isStreaming) return;
+    updateTab(tabId, { status: 'running', outputHtml: '' });
 
-    updateActiveTab({ status: 'running', outputHtml: '' });
-    
-    // Extract PDF text if mode is pdf
+    // Extract PDF text — either from dedicated pdf mode or pdfs attached in form mode
     let pdfExtractedText = '';
-    if (activeTab.mode === 'pdf' && activeTab.pdfs.length > 0) {
+    const pdfsToExtract = tab.mode === 'pdf' ? tab.pdfs : (tab.pdfs.length > 0 ? tab.pdfs : []);
+    if (pdfsToExtract.length > 0 && (tab.mode === 'pdf' || tab.mode === 'form')) {
       try {
         toast({ title: 'Extraindo texto dos PDFs...', description: 'Pode levar alguns instantes dependendo do tamanho.' });
-        for (const file of activeTab.pdfs) {
+        for (const file of pdfsToExtract) {
           const text = await extractText(file);
           pdfExtractedText += `\n\n--- Documento: ${file.name} ---\n\n${text}`;
         }
       } catch (err) {
         toast({ title: 'Falha na extração do PDF', variant: 'destructive' });
-        updateActiveTab({ status: 'error' });
+        updateTab(tabId, { status: 'error' });
         return;
       }
     }
 
-    let payloadFormData = { ...activeTab.formData };
-    
+    const payloadFormData = { ...tab.formData };
+
     const requestData = {
-      workflowKey: activeTab.workflowKey,
+      workflowKey: tab.workflowKey,
       module,
-      mode: activeTab.mode,
-      formData: activeTab.mode === 'form' ? payloadFormData : undefined,
-      pasteText: activeTab.mode === 'paste' ? activeTab.pasteText : (activeTab.mode === 'pdf' ? pdfExtractedText : undefined)
+      mode: tab.mode,
+      formData: tab.mode === 'form' ? payloadFormData : undefined,
+      pasteText: tab.mode === 'paste'
+        ? tab.pasteText
+        : (tab.mode === 'pdf' || pdfExtractedText ? pdfExtractedText : undefined),
     };
 
     try {
-      // First create session in DB if it doesn't exist
-      let sessionId = activeTab.sessionId;
+      // Try to create/reuse session — fail silently if DB Bridge is unavailable
+      let sessionId = tab.sessionId;
       if (!sessionId) {
-        const session = await createSession.mutateAsync({
-          data: {
-            workflowKey: activeTab.workflowKey,
-            module,
-            label: activeTab.label,
-            mode: activeTab.mode,
-            formData: JSON.stringify(payloadFormData)
-          }
-        });
-        sessionId = session.id;
-        updateActiveTab({ sessionId });
+        try {
+          const session = await createSession.mutateAsync({
+            data: {
+              workflowKey: tab.workflowKey,
+              module,
+              label: tab.label,
+              mode: tab.mode,
+              formData: JSON.stringify(payloadFormData),
+            }
+          });
+          sessionId = session.id;
+          updateTab(tabId, { sessionId });
+        } catch {
+          // DB Bridge offline or no permissions — continue without session persistence
+        }
       }
 
       await startStream({ ...requestData, sessionId }, (fullContent) => {
-        updateActiveTab({ status: 'done', outputHtml: fullContent });
+        updateTab(tabId, { status: 'done', outputHtml: fullContent });
       });
 
     } catch (err: any) {
@@ -199,8 +212,35 @@ export default function ModuleView({ module }: ModuleViewProps) {
       } else {
         toast({ title: 'Erro na análise', description: msg || 'Tente novamente.', variant: 'destructive' });
       }
-      updateActiveTab({ status: 'error' });
+      updateTab(tabId, { status: 'error' });
     }
+  };
+
+  const handleRunAnalysis = async () => {
+    if (!activeTab || !activeTab.workflowKey) {
+      toast({ title: 'Selecione um workflow primeiro', variant: 'destructive' });
+      return;
+    }
+    if (isStreaming || isRunningAll) return;
+    await handleRunAnalysisForTab(activeTab.id);
+  };
+
+  const handleRunAll = async () => {
+    if (isStreaming || isRunningAll) return;
+    const withWorkflow = tabsRef.current.filter(t => t.workflowKey);
+    if (withWorkflow.length === 0) {
+      toast({ title: 'Nenhum processo configurado', description: 'Configure pelo menos um processo com workflow selecionado.', variant: 'destructive' });
+      return;
+    }
+    setIsRunningAll(true);
+    for (const tab of withWorkflow) {
+      setActiveTabId(tab.id);
+      // Give React a tick to re-render before starting the next stream
+      await new Promise(r => setTimeout(r, 100));
+      await handleRunAnalysisForTab(tab.id);
+    }
+    setIsRunningAll(false);
+    toast({ title: `${withWorkflow.length} processo(s) concluído(s)!`, description: 'Todas as análises foram finalizadas.' });
   };
 
   // Sync streaming content to active tab if running
@@ -446,12 +486,31 @@ export default function ModuleView({ module }: ModuleViewProps) {
               <Plus className="w-4 h-4 mr-1" /> Novo
             </Button>
             <div className="flex-1"></div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleRunAll}
+              disabled={isStreaming || isRunningAll || tabs.filter(t => t.workflowKey).length === 0}
+              className="h-8 gap-2 ml-2 border-primary/40 text-primary hover:bg-primary/10"
+              data-testid="btn-executar-todos"
+              title="Executa todos os processos de P1 a Pn em sequência"
+            >
+              {isRunningAll ? (
+                <span className="relative flex h-2 w-2 shrink-0">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
+                </span>
+              ) : (
+                <Play className="w-3 h-3 fill-primary" />
+              )}
+              Executar Todos
+            </Button>
             <Button 
               variant="default" 
               size="sm"
               onClick={handleRunAnalysis}
-              disabled={!activeTab?.workflowKey || activeTab?.status === 'running'}
-              className="h-8 gap-2 ml-4"
+              disabled={!activeTab?.workflowKey || activeTab?.status === 'running' || isRunningAll}
+              className="h-8 gap-2 ml-2"
               data-testid="btn-executar"
             >
               <Play className="w-3 h-3" />
@@ -480,8 +539,45 @@ export default function ModuleView({ module }: ModuleViewProps) {
                   <div className="flex-1 overflow-hidden">
                     <ScrollArea className="h-full">
                       <div className="p-6">
-                        <TabsContent value="form" className="m-0 border-0 p-0">
+                        <TabsContent value="form" className="m-0 border-0 p-0 space-y-6">
                           {renderFormFields()}
+                          {/* PDF attachment within guided form */}
+                          <div className="space-y-3 pt-2 border-t border-border/50">
+                            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Anexar PDFs ao formulário (opcional)</p>
+                            <div className="flex items-center gap-3">
+                              <Input 
+                                type="file" 
+                                accept="application/pdf" 
+                                multiple 
+                                className="hidden" 
+                                id={`form-pdf-upload-${activeTab?.id}`}
+                                onChange={handlePdfUpload}
+                              />
+                              <Button variant="outline" size="sm" asChild className="text-xs border-dashed">
+                                <label htmlFor={`form-pdf-upload-${activeTab?.id}`} className="cursor-pointer gap-2 flex items-center">
+                                  <FileText className="w-3.5 h-3.5" /> Selecionar PDFs
+                                </label>
+                              </Button>
+                              {activeTab && activeTab.pdfs.length > 0 && (
+                                <span className="text-xs text-primary font-medium">{activeTab.pdfs.length} arquivo(s) anexado(s)</span>
+                              )}
+                            </div>
+                            {activeTab && activeTab.pdfs.length > 0 && (
+                              <div className="space-y-1.5">
+                                {activeTab.pdfs.map((pdf, i) => (
+                                  <div key={i} className="flex items-center justify-between px-3 py-2 bg-background border border-border rounded-md">
+                                    <div className="flex items-center gap-2 overflow-hidden">
+                                      <FileText className="w-3.5 h-3.5 text-primary shrink-0" />
+                                      <span className="text-xs truncate">{pdf.name}</span>
+                                    </div>
+                                    <button onClick={() => updateActiveTab({ pdfs: activeTab.pdfs.filter((_, j) => j !== i) })} className="text-muted-foreground hover:text-destructive shrink-0 ml-2">
+                                      <X className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
                         </TabsContent>
                         
                         <TabsContent value="paste" className="m-0 border-0 p-0 h-full flex flex-col space-y-4">
