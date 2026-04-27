@@ -72,21 +72,21 @@ export default function ModuleView({ module }: ModuleViewProps) {
   
   const createSession = useCreateSession();
   
-  const { isStreaming, streamContent, startStream, setStreamContent } = useStreaming();
+  const { isStreaming, startStream } = useStreaming();
   const { isLoaded: pdfLoaded, extractText } = usePdf();
 
   // Keep a ref to always-fresh tabs for use inside async callbacks
   const tabsRef = useRef<ProcessTab[]>([]);
   useEffect(() => { tabsRef.current = tabs; }, [tabs]);
 
-  // Tick every second while any tab is running (drives the live timer)
+  // Tick every second while any tab is running (drives the live elapsed timer)
   const [, setTick] = useState(0);
+  const anyRunning = tabs.some(t => t.status === 'running');
   useEffect(() => {
-    const isAnyRunning = tabs.some(t => t.status === 'running');
-    if (!isAnyRunning) return;
+    if (!anyRunning) return;
     const id = setInterval(() => setTick(n => n + 1), 1000);
     return () => clearInterval(id);
-  }, [tabs.some(t => t.status === 'running')]);
+  }, [anyRunning]);
 
   // Create a new tab
   const handleNewProcess = () => {
@@ -214,9 +214,17 @@ export default function ModuleView({ module }: ModuleViewProps) {
         }
       }
 
-      await startStream({ ...requestData, sessionId }, (fullContent) => {
-        updateTab(tabId, { status: 'done', outputHtml: fullContent, endedAt: Date.now() });
-      });
+      await startStream(
+        { ...requestData, sessionId },
+        // onComplete — final state, locks in result
+        (fullContent) => {
+          updateTab(tabId, { status: 'done', outputHtml: fullContent, endedAt: Date.now() });
+        },
+        // onChunk — live streaming to the correct tab, directly by tabId
+        (partial) => {
+          updateTab(tabId, { outputHtml: partial, phase: 'streaming' });
+        }
+      );
 
     } catch (err: any) {
       const msg = err?.message || '';
@@ -255,15 +263,6 @@ export default function ModuleView({ module }: ModuleViewProps) {
     setIsRunningAll(false);
     toast({ title: `${withWorkflow.length} processo(s) concluído(s)!`, description: 'Todas as análises foram finalizadas.' });
   };
-
-  // Sync streaming content to whichever tab is currently running (avoids stale closure)
-  useEffect(() => {
-    if (!isStreaming || !streamContent) return;
-    const runningTab = tabsRef.current.find(t => t.status === 'running');
-    if (runningTab) {
-      updateTab(runningTab.id, { outputHtml: streamContent, phase: 'streaming' });
-    }
-  }, [streamContent]);
 
   // Group workflows by category
   const categories = Array.from(new Set(moduleWorkflows.map(w => w.category || 'General')));

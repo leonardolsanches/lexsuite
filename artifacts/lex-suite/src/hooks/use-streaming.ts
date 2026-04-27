@@ -3,12 +3,14 @@ import { useAuth } from '@clerk/react';
 
 export function useStreaming() {
   const [isStreaming, setIsStreaming] = useState(false);
-  const [streamContent, setStreamContent] = useState('');
   const { getToken } = useAuth();
 
-  const startStream = useCallback(async (requestData: any, onComplete?: (fullContent: string) => void) => {
+  const startStream = useCallback(async (
+    requestData: any,
+    onComplete?: (fullContent: string) => void,
+    onChunk?: (partialContent: string) => void
+  ) => {
     setIsStreaming(true);
-    setStreamContent('');
     let fullContent = '';
 
     const token = await getToken();
@@ -53,24 +55,21 @@ export function useStreaming() {
             const parsed = JSON.parse(raw);
             if (parsed.type === 'text' && parsed.text) {
               fullContent += parsed.text;
-              setStreamContent(prev => prev + parsed.text);
+              onChunk?.(fullContent);
             } else if (parsed.type === 'error') {
               throw new Error(parsed.message || 'Erro durante análise');
             }
-            // type === 'done' — ignore, loop will end naturally
           } catch (e: any) {
             if (e.message && !e.message.includes('JSON')) throw e;
           }
         }
       }
 
-      if (onComplete) {
-        onComplete(fullContent);
-      }
+      onComplete?.(fullContent);
     } finally {
       setIsStreaming(false);
     }
   }, [getToken]);
 
-  return { isStreaming, streamContent, startStream, setStreamContent };
+  return { isStreaming, startStream };
 }
