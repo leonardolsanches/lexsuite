@@ -75,7 +75,7 @@ export default function ModuleView({ module }: ModuleViewProps) {
   const [location, setLocation] = useLocation();
   const { user } = useUser();
   const { signOut } = useClerk();
-  const { getToken } = useAuth();
+  const { isLoaded: authLoaded } = useAuth();
   const { toast } = useToast();
   
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
@@ -106,18 +106,16 @@ export default function ModuleView({ module }: ModuleViewProps) {
   const checkLlm = useCallback(async () => {
     setLlmStatus('checking');
     try {
-      const token = await getToken();
-      const res = await fetch('/api/llm-status', {
-        headers: token ? { Authorization: `Bearer ${token}` } : {}
-      });
-      if (!res.ok) { setLlmStatus('unconfigured'); return; }
+      const res = await fetch('/api/llm-status');
+      if (!res.ok) { setLlmStatus('offline'); return; }
       const data = await res.json() as { configured: boolean; online: boolean };
       if (!data.configured) setLlmStatus('unconfigured');
       else if (data.online) setLlmStatus('online');
       else setLlmStatus('offline');
     } catch { setLlmStatus('offline'); }
-  }, [getToken]);
-  useEffect(() => { checkLlm(); }, [checkLlm]);
+  }, []);
+  // Wait for Clerk to be fully loaded before first check
+  useEffect(() => { if (authLoaded) checkLlm(); }, [authLoaded, checkLlm]);
 
   // Tick every second while any tab is running (drives the live elapsed timer)
   const [, setTick] = useState(0);

@@ -10,7 +10,7 @@ import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
 
-router.get("/llm-status", requireAuth, async (_req, res): Promise<void> => {
+router.get("/llm-status", async (_req, res): Promise<void> => {
   const ollamaUrl = getOllamaBaseUrl();
   let ollamaOnline = false;
   let ollamaModels: string[] = [];
