@@ -39,11 +39,14 @@ type ModuleViewProps = {
 };
 
 type ProcessTab = {
-  id: string; // temp id for UI
+  id: string;
   sessionId?: number;
   workflowKey: string | null;
   label: string;
   status: 'idle' | 'running' | 'done' | 'error';
+  phase?: 'extracting' | 'streaming';
+  startedAt?: number;
+  endedAt?: number;
   mode: 'form' | 'paste' | 'pdf';
   formData: Record<string, any>;
   pasteText: string;
@@ -75,6 +78,15 @@ export default function ModuleView({ module }: ModuleViewProps) {
   // Keep a ref to always-fresh tabs for use inside async callbacks
   const tabsRef = useRef<ProcessTab[]>([]);
   useEffect(() => { tabsRef.current = tabs; }, [tabs]);
+
+  // Tick every second while any tab is running (drives the live timer)
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const isAnyRunning = tabs.some(t => t.status === 'running');
+    if (!isAnyRunning) return;
+    const id = setInterval(() => setTick(n => n + 1), 1000);
+    return () => clearInterval(id);
+  }, [tabs.some(t => t.status === 'running')]);
 
   // Create a new tab
   const handleNewProcess = () => {
@@ -149,14 +161,13 @@ export default function ModuleView({ module }: ModuleViewProps) {
     if (!tab || !tab.workflowKey) return;
     if (tab.status === 'running') return;
 
-    updateTab(tabId, { status: 'running', outputHtml: '' });
+    updateTab(tabId, { status: 'running', outputHtml: '', startedAt: Date.now(), phase: 'extracting' });
 
     // Extract PDF text — either from dedicated pdf mode or pdfs attached in form mode
     let pdfExtractedText = '';
     const pdfsToExtract = tab.mode === 'pdf' ? tab.pdfs : (tab.pdfs.length > 0 ? tab.pdfs : []);
     if (pdfsToExtract.length > 0 && (tab.mode === 'pdf' || tab.mode === 'form')) {
       try {
-        toast({ title: 'Extraindo texto dos PDFs...', description: 'Pode levar alguns instantes dependendo do tamanho.' });
         for (const file of pdfsToExtract) {
           const text = await extractText(file);
           pdfExtractedText += `\n\n--- Documento: ${file.name} ---\n\n${text}`;
@@ -167,6 +178,8 @@ export default function ModuleView({ module }: ModuleViewProps) {
         return;
       }
     }
+
+    updateTab(tabId, { phase: 'streaming' });
 
     const payloadFormData = { ...tab.formData };
 
@@ -202,7 +215,7 @@ export default function ModuleView({ module }: ModuleViewProps) {
       }
 
       await startStream({ ...requestData, sessionId }, (fullContent) => {
-        updateTab(tabId, { status: 'done', outputHtml: fullContent });
+        updateTab(tabId, { status: 'done', outputHtml: fullContent, endedAt: Date.now() });
       });
 
     } catch (err: any) {
@@ -243,10 +256,12 @@ export default function ModuleView({ module }: ModuleViewProps) {
     toast({ title: `${withWorkflow.length} processo(s) concluído(s)!`, description: 'Todas as análises foram finalizadas.' });
   };
 
-  // Sync streaming content to active tab if running
+  // Sync streaming content to whichever tab is currently running (avoids stale closure)
   useEffect(() => {
-    if (activeTab && activeTab.status === 'running' && isStreaming) {
-      updateActiveTab({ outputHtml: streamContent });
+    if (!isStreaming || !streamContent) return;
+    const runningTab = tabsRef.current.find(t => t.status === 'running');
+    if (runningTab) {
+      updateTab(runningTab.id, { outputHtml: streamContent, phase: 'streaming' });
     }
   }, [streamContent]);
 
@@ -642,15 +657,36 @@ export default function ModuleView({ module }: ModuleViewProps) {
 
               {/* Right Panel: Output */}
               <div className="flex-1 flex flex-col bg-background min-w-0 relative">
+                {/* Output header */}
                 <div className="h-12 border-b border-border bg-card flex items-center justify-between px-4 shrink-0">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-3">
                     <span className="text-sm font-medium text-foreground">Resultado da Análise</span>
-                    {activeTab.status === 'running' && (
-                      <span className="text-xs text-muted-foreground flex items-center gap-2">
-                        <span className="animate-pulse w-2 h-2 rounded-full bg-primary inline-block"></span>
-                        Gerando...
-                      </span>
-                    )}
+                    {activeTab.status === 'running' && (() => {
+                      const elapsedSec = activeTab.startedAt ? Math.floor((Date.now() - activeTab.startedAt) / 1000) : 0;
+                      const mm = String(Math.floor(elapsedSec / 60)).padStart(2, '0');
+                      const ss = String(elapsedSec % 60).padStart(2, '0');
+                      const phase = activeTab.phase;
+                      return (
+                        <div className="flex items-center gap-2">
+                          <span className="relative flex h-2 w-2">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
+                          </span>
+                          <span className="text-xs text-primary font-mono font-medium">{mm}:{ss}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {phase === 'extracting' ? '· Extraindo PDFs...' : '· Gerando análise...'}
+                          </span>
+                        </div>
+                      );
+                    })()}
+                    {activeTab.status === 'done' && activeTab.startedAt && activeTab.endedAt && (() => {
+                      const totalSec = Math.floor((activeTab.endedAt - activeTab.startedAt) / 1000);
+                      return (
+                        <span className="text-xs text-muted-foreground">
+                          ✓ Concluído em {Math.floor(totalSec / 60) > 0 ? `${Math.floor(totalSec / 60)}min ` : ''}{totalSec % 60}s
+                        </span>
+                      );
+                    })()}
                   </div>
                   <div className="flex items-center gap-2">
                     <Button variant="ghost" size="sm" className="h-8 gap-2 text-muted-foreground hover:text-foreground">
@@ -661,6 +697,16 @@ export default function ModuleView({ module }: ModuleViewProps) {
                     </Button>
                   </div>
                 </div>
+
+                {/* Live indeterminate progress bar when running */}
+                {activeTab.status === 'running' && (
+                  <div className="h-0.5 w-full bg-border overflow-hidden shrink-0 relative">
+                    <div
+                      className="absolute h-full w-1/3 bg-primary"
+                      style={{ animation: 'indeterminate-bar 1.8s ease-in-out infinite' }}
+                    />
+                  </div>
+                )}
                 
                 <ScrollArea className="flex-1">
                   <div className="p-8 max-w-4xl mx-auto w-full">
@@ -669,6 +715,32 @@ export default function ModuleView({ module }: ModuleViewProps) {
                         className="prose prose-sm dark:prose-invert max-w-none font-serif leading-relaxed text-[15px]"
                         dangerouslySetInnerHTML={{ __html: activeTab.outputHtml.replace(/\n/g, '<br/>') }}
                       />
+                    ) : activeTab.status === 'running' ? (
+                      <div className="space-y-6 py-12">
+                        {/* Phase indicator */}
+                        <div className="flex flex-col items-center gap-4 text-center">
+                          <div className="w-14 h-14 rounded-full border border-primary/30 flex items-center justify-center bg-primary/5 relative">
+                            <span className="font-serif italic text-2xl text-primary">ℓ</span>
+                            <span className="absolute inset-0 rounded-full border border-primary/20 animate-ping" />
+                          </div>
+                          <div className="space-y-1">
+                            <p className="text-sm font-medium text-foreground">
+                              {activeTab.phase === 'extracting' ? 'Extraindo texto dos PDFs...' : 'Aguardando resposta da IA...'}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {activeTab.phase === 'extracting'
+                                ? 'Processando ' + (activeTab.pdfs.length) + ' documento(s)'
+                                : 'O modelo está gerando a análise jurídica'}
+                            </p>
+                          </div>
+                        </div>
+                        {/* Skeleton lines */}
+                        <div className="space-y-3 max-w-2xl mx-auto opacity-20">
+                          {[100, 85, 92, 70, 88, 60].map((w, i) => (
+                            <div key={i} className="h-3 rounded bg-muted animate-pulse" style={{ width: `${w}%`, animationDelay: `${i * 0.15}s` }} />
+                          ))}
+                        </div>
+                      </div>
                     ) : (
                       <div className="h-full flex flex-col items-center justify-center text-muted-foreground py-32 space-y-4 opacity-50">
                         <div className="w-16 h-16 rounded-full border border-border flex items-center justify-center bg-card">
