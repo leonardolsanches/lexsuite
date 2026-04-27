@@ -69,10 +69,24 @@ router.post("/analyze", requireAuth, async (req, res): Promise<void> => {
     res.end();
   };
 
-  // ── 1. Check LLM availability ────────────────────────────────────────────
+  // ── 1. Check LLM availability — actually ping Ollama ─────────────────────
   sendStep("llm", "Verificando motor de linguagem...", "cpu");
   if (!isAnyLlmConfigured()) {
-    sendError(getLlmStatusMessage());
+    sendError("⚙️ Motor de IA não configurado. Adicione a URL do Ollama em OLLAMA_BASE_URL.");
+    return;
+  }
+  const ollamaUrl = getOllamaBaseUrl()!;
+  const ollamaOnline = await pingOllama(ollamaUrl);
+  if (!ollamaOnline) {
+    sendError(
+      "🔌 Motor de IA offline\n\n" +
+      "O servidor Ollama não está respondendo no endereço configurado.\n\n" +
+      "Para usar o sistema:\n" +
+      "1. Ligue o Mini PC\n" +
+      "2. Aguarde o túnel Cloudflare reconectar\n" +
+      "3. Tente novamente\n\n" +
+      `URL configurada: ${ollamaUrl.replace(/https?:\/\//, '').split('/')[0]}`
+    );
     return;
   }
 

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useLocation, Link } from 'wouter';
 import { 
   useListWorkflows, 
@@ -15,7 +15,7 @@ import { Card } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
-import { useUser, useClerk } from '@clerk/react';
+import { useUser, useClerk, useAuth } from '@clerk/react';
 import { 
   Wheat, 
   Scale, 
@@ -42,6 +42,8 @@ import {
   Search,
   Cpu,
   Zap,
+  WifiOff,
+  Wifi,
   FileText as FileTextIcon
 } from 'lucide-react';
 import { useStreaming, type ExecStep } from '@/hooks/use-streaming';
@@ -57,6 +59,7 @@ type ProcessTab = {
   workflowKey: string | null;
   label: string;
   status: 'idle' | 'running' | 'done' | 'error';
+  errorMessage?: string;
   phase?: 'extracting' | 'streaming';
   startedAt?: number;
   endedAt?: number;
@@ -72,6 +75,7 @@ export default function ModuleView({ module }: ModuleViewProps) {
   const [location, setLocation] = useLocation();
   const { user } = useUser();
   const { signOut } = useClerk();
+  const { getToken } = useAuth();
   const { toast } = useToast();
   
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
@@ -95,6 +99,25 @@ export default function ModuleView({ module }: ModuleViewProps) {
   // Keep a ref to always-fresh tabs for use inside async callbacks
   const tabsRef = useRef<ProcessTab[]>([]);
   useEffect(() => { tabsRef.current = tabs; }, [tabs]);
+
+  // ── LLM connectivity status ───────────────────────────────────────────────
+  type LlmStatus = 'checking' | 'online' | 'offline' | 'unconfigured';
+  const [llmStatus, setLlmStatus] = useState<LlmStatus>('checking');
+  const checkLlm = useCallback(async () => {
+    setLlmStatus('checking');
+    try {
+      const token = await getToken();
+      const res = await fetch('/api/llm-status', {
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      });
+      if (!res.ok) { setLlmStatus('unconfigured'); return; }
+      const data = await res.json() as { configured: boolean; online: boolean };
+      if (!data.configured) setLlmStatus('unconfigured');
+      else if (data.online) setLlmStatus('online');
+      else setLlmStatus('offline');
+    } catch { setLlmStatus('offline'); }
+  }, [getToken]);
+  useEffect(() => { checkLlm(); }, [checkLlm]);
 
   // Tick every second while any tab is running (drives the live elapsed timer)
   const [, setTick] = useState(0);
@@ -283,16 +306,9 @@ export default function ModuleView({ module }: ModuleViewProps) {
 
     } catch (err: any) {
       const msg = err?.message || 'Erro desconhecido';
-      const errorHtml = `<div style="color: var(--destructive, #f87171); font-family: sans-serif;">
-        <strong>⚠ Análise não pôde ser concluída</strong><br/><br/>
-        ${msg.replace(/\n/g, '<br/>')}
-      </div>`;
-      if (msg.includes('não configurad') || msg.includes('not configured')) {
-        toast({ title: 'IA não configurada', description: 'Configure o motor de IA nas preferências do sistema.', variant: 'destructive' });
-      } else if (!msg.includes('DB Bridge')) {
-        toast({ title: 'Erro na análise', description: msg.slice(0, 120), variant: 'destructive' });
-      }
-      updateTab(tabId, { status: 'error', outputHtml: errorHtml, endedAt: Date.now() });
+      updateTab(tabId, { status: 'error', errorMessage: msg, outputHtml: '', endedAt: Date.now() });
+      // Trigger LLM status re-check so badge updates
+      checkLlm();
     }
   };
 
@@ -518,6 +534,23 @@ export default function ModuleView({ module }: ModuleViewProps) {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {/* LLM status indicator */}
+          <button
+            onClick={checkLlm}
+            title={llmStatus === 'online' ? 'Motor de IA online — clique para verificar' : 'Motor de IA offline — clique para verificar'}
+            className={`flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border transition-all ${
+              llmStatus === 'online'
+                ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-500'
+                : llmStatus === 'checking'
+                ? 'border-muted-foreground/20 bg-muted/30 text-muted-foreground'
+                : 'border-destructive/30 bg-destructive/10 text-destructive'
+            }`}
+          >
+            {llmStatus === 'online' && <><Wifi className="w-3 h-3" /> IA online</>}
+            {llmStatus === 'offline' && <><WifiOff className="w-3 h-3" /> IA offline</>}
+            {llmStatus === 'unconfigured' && <><WifiOff className="w-3 h-3" /> IA não configurada</>}
+            {llmStatus === 'checking' && <><Loader2 className="w-3 h-3 animate-spin" /> Verificando...</>}
+          </button>
           <Link href={`/app/${module}/documents`}>
             <Button variant="ghost" size="sm" className="text-muted-foreground gap-2">
               <Database className="w-4 h-4" />
@@ -529,6 +562,21 @@ export default function ModuleView({ module }: ModuleViewProps) {
           </Button>
         </div>
       </header>
+
+      {/* Offline warning banner */}
+      {(llmStatus === 'offline' || llmStatus === 'unconfigured') && (
+        <div className="shrink-0 bg-destructive/10 border-b border-destructive/20 px-4 py-2 flex items-center gap-3">
+          <WifiOff className="w-4 h-4 text-destructive shrink-0" />
+          <div className="flex-1 text-sm text-destructive">
+            {llmStatus === 'offline'
+              ? 'Motor de IA offline — o Mini PC está desligado ou o túnel Cloudflare está inativo. As análises não serão processadas até que o servidor esteja acessível.'
+              : 'OLLAMA_BASE_URL não configurado — adicione a URL do túnel nas configurações do servidor.'}
+          </div>
+          <button onClick={checkLlm} className="text-xs text-destructive/70 hover:text-destructive underline shrink-0">
+            Verificar novamente
+          </button>
+        </div>
+      )}
 
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar */}
@@ -1027,7 +1075,36 @@ export default function ModuleView({ module }: ModuleViewProps) {
                       </div>
                     )}
 
-                    {/* Streaming output text */}
+                    {/* Error state — prominent card */}
+                    {activeTab.status === 'error' && activeTab.errorMessage && (
+                      <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-6 space-y-4">
+                        <div className="flex items-start gap-3">
+                          <AlertCircle className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
+                          <div className="flex-1 space-y-3">
+                            <p className="font-semibold text-destructive text-sm">Análise não pôde ser concluída</p>
+                            <pre className="text-sm text-destructive/80 whitespace-pre-wrap font-sans leading-relaxed">
+                              {activeTab.errorMessage}
+                            </pre>
+                          </div>
+                        </div>
+                        {(activeTab.errorMessage.includes('offline') || activeTab.errorMessage.includes('ENOTFOUND') || activeTab.errorMessage.includes('Ollama')) && (
+                          <div className="border-t border-destructive/20 pt-4 flex items-center gap-3">
+                            <button
+                              onClick={() => { checkLlm(); handleRestartTab(activeTab.id); }}
+                              className="text-xs text-destructive underline hover:text-destructive/80"
+                            >
+                              Tentar novamente após reconexão
+                            </button>
+                            <span className="text-destructive/40 text-xs">•</span>
+                            <button onClick={checkLlm} className="text-xs text-destructive/60 underline hover:text-destructive/80">
+                              Verificar status da IA
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Streaming / done output text */}
                     {activeTab.outputHtml && (
                       <div
                         className="prose prose-sm dark:prose-invert max-w-none font-serif leading-relaxed text-[15px]"
@@ -1035,13 +1112,13 @@ export default function ModuleView({ module }: ModuleViewProps) {
                       />
                     )}
 
-                    {/* Done — activity log summary collapsed */}
-                    {activeTab.status === 'done' && activeTab.execSteps.length > 0 && !activeTab.outputHtml && (
+                    {/* Done — no content */}
+                    {activeTab.status === 'done' && !activeTab.outputHtml && (
                       <div className="py-8 text-center text-muted-foreground text-sm">Análise concluída sem conteúdo.</div>
                     )}
 
                     {/* Idle empty state */}
-                    {activeTab.status !== 'running' && !activeTab.outputHtml && activeTab.status !== 'done' && (
+                    {activeTab.status !== 'running' && activeTab.status !== 'error' && !activeTab.outputHtml && activeTab.status !== 'done' && (
                       <div className="h-full flex flex-col items-center justify-center text-muted-foreground py-32 space-y-4 opacity-50">
                         <div className="w-16 h-16 rounded-full border border-border flex items-center justify-center bg-card">
                           <span className="font-serif italic text-2xl">ℓ</span>
