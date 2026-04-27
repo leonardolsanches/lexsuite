@@ -5,6 +5,7 @@ import { isOllamaConfigured, getOllamaBaseUrl, listOllamaModels, pingOllama, get
 import { isDbBridgeConfigured, dbBridgeSearchChunks } from "../lib/embedding";
 import { pingDbBridge, getDbBridgeUrl, bridgeQuery, bridgeQueryOne, bridgeExecute } from "../lib/bridge";
 import { searchRelevantChunks, buildRagContext } from "../lib/rag";
+import { getLocalPrompt } from "../lib/prompts-registry";
 import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
@@ -91,7 +92,7 @@ router.post("/analyze", requireAuth, async (req, res): Promise<void> => {
     logger.warn({ err }, "DB Bridge indisponível para verificação de módulo — permitindo acesso");
   }
 
-  // ── 3. Prompt lookup ──────────────────────────────────────────────────────
+  // ── 3. Prompt lookup — bridge first, local registry as fallback ───────────
   sendStep("prompt", "Carregando instruções do workflow...", "file-text");
   let prompt: { key: unknown; content: unknown; module: unknown } | null = null;
   try {
@@ -100,16 +101,20 @@ router.post("/analyze", requireAuth, async (req, res): Promise<void> => {
       [workflowKey]
     );
   } catch (err: any) {
-    logger.warn({ err, workflowKey }, "DB Bridge indisponível — prompt não carregado");
-    sendError(
-      "🔌 DB Bridge offline — o Mini PC está desconectado.\n" +
-      "Ligue o servidor local e aguarde o túnel Cloudflare reconectar."
-    );
-    return;
+    logger.warn({ err, workflowKey }, "DB Bridge indisponível — tentando registro local de prompts");
+  }
+
+  // Fallback: use prompts embedded directly in the server
+  if (!prompt) {
+    const local = getLocalPrompt(workflowKey);
+    if (local) {
+      prompt = local;
+      logger.info({ workflowKey }, "Prompt carregado do registro local (bridge offline)");
+    }
   }
 
   if (!prompt) {
-    sendError(`Prompt não encontrado para o workflow '${workflowKey}'.`);
+    sendError(`Prompt não encontrado para o workflow '${workflowKey}'. Verifique se o Mini PC está online ou se o workflow está cadastrado.`);
     return;
   }
 
