@@ -60,23 +60,50 @@ router.post("/analyze", requireAuth, async (req, res): Promise<void> => {
     return;
   }
 
-  const activeModules = await bridgeQuery(
-    "SELECT module FROM user_modules WHERE user_id = $1",
-    [userId]
-  );
-  const hasModule = activeModules.some(m => m.module === module);
-  if (!hasModule) {
-    res.status(403).json({ error: `Module '${module}' não está ativado para sua conta` });
+  // Module access check — fail-open when DB Bridge is unavailable
+  try {
+    const activeModules = await bridgeQuery(
+      "SELECT module FROM user_modules WHERE user_id = $1",
+      [userId]
+    );
+    const hasModule = activeModules.some(m => m.module === module);
+    if (!hasModule && activeModules.length > 0) {
+      res.status(403).json({ error: `Módulo '${module}' não está ativado para sua conta` });
+      return;
+    }
+    // If activeModules is empty it may mean the user record doesn't exist yet — allow
+  } catch (bridgeErr: any) {
+    logger.warn({ err: bridgeErr }, "DB Bridge indisponível para verificação de módulo — permitindo acesso");
+  }
+
+  // Prompt lookup — requires bridge; surface a clear SSE error if unavailable
+  let prompt: { key: unknown; content: unknown; module: unknown } | null = null;
+  try {
+    prompt = await bridgeQueryOne(
+      "SELECT key, content, module FROM prompts WHERE key = $1",
+      [workflowKey]
+    );
+  } catch (bridgeErr: any) {
+    logger.warn({ err: bridgeErr, workflowKey }, "DB Bridge indisponível — não foi possível carregar o prompt");
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+    res.flushHeaders();
+    res.write(`data: ${JSON.stringify({
+      type: "error",
+      message: "🔌 DB Bridge offline — o Mini PC está desconectado. Ligue o servidor local e aguarde o túnel Cloudflare reconectar para que as análises funcionem."
+    })}\n\n`);
+    res.end();
     return;
   }
 
-  const prompt = await bridgeQueryOne(
-    "SELECT key, content, module FROM prompts WHERE key = $1",
-    [workflowKey]
-  );
-
   if (!prompt) {
-    res.status(404).json({ error: "Prompt não encontrado para o workflow" });
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+    res.flushHeaders();
+    res.write(`data: ${JSON.stringify({ type: "error", message: `Prompt não encontrado para o workflow '${workflowKey}'.` })}\n\n`);
+    res.end();
     return;
   }
 
@@ -98,26 +125,30 @@ router.post("/analyze", requireAuth, async (req, res): Promise<void> => {
   }
 
   let ragContext = "";
-  if (isDbBridgeConfigured()) {
-    const queryText = [pasteText, observations, dataSection].filter(Boolean).join(" ").slice(0, 1000);
-    if (queryText.trim().length > 20) {
-      const chunks = await searchRelevantChunks(queryText, module, 5);
-      if (chunks.length > 0) {
-        ragContext = buildRagContext(chunks);
-        logger.info({ chunkCount: chunks.length, module }, "RAG: contexto recuperado");
+  try {
+    if (isDbBridgeConfigured()) {
+      const queryText = [pasteText, observations, dataSection].filter(Boolean).join(" ").slice(0, 1000);
+      if (queryText.trim().length > 20) {
+        const chunks = await searchRelevantChunks(queryText, module, 5);
+        if (chunks.length > 0) {
+          ragContext = buildRagContext(chunks);
+          logger.info({ chunkCount: chunks.length, module }, "RAG: contexto recuperado");
+        }
+      }
+    } else {
+      const userDocs = await bridgeQuery(
+        "SELECT filename, content FROM documents WHERE user_id = $1 AND module = $2 AND status = 'ready'",
+        [userId, module]
+      );
+      if (userDocs.length > 0) {
+        const docsContext = userDocs
+          .map(d => `[${d.filename}]: ${String(d.content).slice(0, 2000)}`)
+          .join("\n\n");
+        ragContext = `BASE DE CONHECIMENTO (documentos indexados):\n${docsContext}\n\n`;
       }
     }
-  } else {
-    const userDocs = await bridgeQuery(
-      "SELECT filename, content FROM documents WHERE user_id = $1 AND module = $2 AND status = 'ready'",
-      [userId, module]
-    );
-    if (userDocs.length > 0) {
-      const docsContext = userDocs
-        .map(d => `[${d.filename}]: ${String(d.content).slice(0, 2000)}`)
-        .join("\n\n");
-      ragContext = `BASE DE CONHECIMENTO (documentos indexados):\n${docsContext}\n\n`;
-    }
+  } catch (ragErr: any) {
+    logger.warn({ err: ragErr }, "DB Bridge indisponível para RAG/docs — prosseguindo sem contexto");
   }
 
   if (ragContext) {
@@ -134,18 +165,26 @@ router.post("/analyze", requireAuth, async (req, res): Promise<void> => {
 
   let sessionRecord: { id: number } | null = null;
   if (sessionId) {
-    const s = await bridgeQueryOne(
-      "SELECT id FROM sessions WHERE id = $1 AND user_id = $2",
-      [sessionId, userId]
-    );
-    if (s) sessionRecord = { id: s.id as number };
+    try {
+      const s = await bridgeQueryOne(
+        "SELECT id FROM sessions WHERE id = $1 AND user_id = $2",
+        [sessionId, userId]
+      );
+      if (s) sessionRecord = { id: s.id as number };
+    } catch {
+      logger.warn("DB Bridge indisponível — sessão não atualizada");
+    }
   }
 
   if (sessionRecord) {
-    await bridgeExecute(
-      "UPDATE sessions SET status = 'running', form_data = $2, updated_at = NOW() WHERE id = $1",
-      [sessionRecord.id, formData ? JSON.stringify(formData) : null]
-    );
+    try {
+      await bridgeExecute(
+        "UPDATE sessions SET status = 'running', form_data = $2, updated_at = NOW() WHERE id = $1",
+        [sessionRecord.id, formData ? JSON.stringify(formData) : null]
+      );
+    } catch {
+      sessionRecord = null; // skip further session updates
+    }
   }
 
   let fullOutput = "";

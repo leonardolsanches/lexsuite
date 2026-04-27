@@ -268,13 +268,17 @@ export default function ModuleView({ module }: ModuleViewProps) {
       );
 
     } catch (err: any) {
-      const msg = err?.message || '';
+      const msg = err?.message || 'Erro desconhecido';
+      const errorHtml = `<div style="color: var(--destructive, #f87171); font-family: sans-serif;">
+        <strong>⚠ Análise não pôde ser concluída</strong><br/><br/>
+        ${msg.replace(/\n/g, '<br/>')}
+      </div>`;
       if (msg.includes('não configurad') || msg.includes('not configured')) {
         toast({ title: 'IA não configurada', description: 'Configure o motor de IA nas preferências do sistema.', variant: 'destructive' });
-      } else {
-        toast({ title: 'Erro na análise', description: msg || 'Tente novamente.', variant: 'destructive' });
+      } else if (!msg.includes('DB Bridge')) {
+        toast({ title: 'Erro na análise', description: msg.slice(0, 120), variant: 'destructive' });
       }
-      updateTab(tabId, { status: 'error' });
+      updateTab(tabId, { status: 'error', outputHtml: errorHtml, endedAt: Date.now() });
     }
   };
 
