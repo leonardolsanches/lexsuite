@@ -1,0 +1,35 @@
+(lexbridge) leonardo@agile-ai-experts-server:~$ sudo journalctl -u lexbridge.service -n 30 --no-pager
+abr 28 22:37:49 agile-ai-experts-server uvicorn[152010]:     return self._loop.run_until_complete(task)
+abr 28 22:37:49 agile-ai-experts-server uvicorn[152010]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+abr 28 22:37:49 agile-ai-experts-server uvicorn[152010]:   File "/usr/lib/python3.12/asyncio/base_events.py", line 687, in run_until_complete
+abr 28 22:37:49 agile-ai-experts-server uvicorn[152010]:     return future.result()
+abr 28 22:37:49 agile-ai-experts-server uvicorn[152010]:            ^^^^^^^^^^^^^^^
+abr 28 22:37:49 agile-ai-experts-server uvicorn[152010]:   File "/home/leonardo/lexbridge/lib/python3.12/site-packages/uvicorn/server.py", line 79, in serve
+abr 28 22:37:49 agile-ai-experts-server uvicorn[152010]:     await self._serve(sockets)
+abr 28 22:37:49 agile-ai-experts-server uvicorn[152010]:   File "/home/leonardo/lexbridge/lib/python3.12/site-packages/uvicorn/server.py", line 86, in _serve
+abr 28 22:37:49 agile-ai-experts-server uvicorn[152010]:     config.load()
+abr 28 22:37:49 agile-ai-experts-server uvicorn[152010]:   File "/home/leonardo/lexbridge/lib/python3.12/site-packages/uvicorn/config.py", line 449, in load
+abr 28 22:37:49 agile-ai-experts-server uvicorn[152010]:     self.loaded_app = import_from_string(self.app)
+abr 28 22:37:49 agile-ai-experts-server uvicorn[152010]:                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+abr 28 22:37:49 agile-ai-experts-server uvicorn[152010]:   File "/home/leonardo/lexbridge/lib/python3.12/site-packages/uvicorn/importer.py", line 19, in import_from_string
+abr 28 22:37:49 agile-ai-experts-server uvicorn[152010]:     module = importlib.import_module(module_str)
+abr 28 22:37:49 agile-ai-experts-server uvicorn[152010]:              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+abr 28 22:37:49 agile-ai-experts-server uvicorn[152010]:   File "/usr/lib/python3.12/importlib/__init__.py", line 90, in import_module
+abr 28 22:37:49 agile-ai-experts-server uvicorn[152010]:     return _bootstrap._gcd_import(name[level:], package, level)
+abr 28 22:37:49 agile-ai-experts-server uvicorn[152010]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+abr 28 22:37:49 agile-ai-experts-server uvicorn[152010]:   File "<frozen importlib._bootstrap>", line 1387, in _gcd_import
+abr 28 22:37:49 agile-ai-experts-server uvicorn[152010]:   File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+abr 28 22:37:49 agile-ai-experts-server uvicorn[152010]:   File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+abr 28 22:37:49 agile-ai-experts-server uvicorn[152010]:   File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+abr 28 22:37:49 agile-ai-experts-server uvicorn[152010]:   File "<frozen importlib._bootstrap_external>", line 995, in exec_module
+abr 28 22:37:49 agile-ai-experts-server uvicorn[152010]:   File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+abr 28 22:37:49 agile-ai-experts-server uvicorn[152010]:   File "/home/leonardo/db_bridge.py", line 86, in <module>
+abr 28 22:37:49 agile-ai-experts-server uvicorn[152010]:     async def ollama_proxy_stream(request: Request):
+abr 28 22:37:49 agile-ai-experts-server uvicorn[152010]:                                            ^^^^^^^
+abr 28 22:37:49 agile-ai-experts-server uvicorn[152010]: NameError: name 'Request' is not defined
+abr 28 22:37:49 agile-ai-experts-server systemd[1]: lexbridge.service: Main process exited, code=exited, status=1/FAILURE
+abr 28 22:37:49 agile-ai-experts-server systemd[1]: lexbridge.service: Failed with result 'exit-code'.
+(lexbridge) leonardo@agile-ai-experts-server:~$
+
+
+
