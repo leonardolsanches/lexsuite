@@ -1,5 +1,6 @@
 import type { Response } from "express";
 import {
+  ensureModelLoaded,
   getOllamaBaseUrl,
   getOllamaModelParecer,
   isOllamaConfigured,
@@ -22,7 +23,8 @@ export async function streamAnalysis(
   prompt: string,
   res: Response,
   onChunk: (text: string) => void,
-  continueFrom?: string
+  continueFrom?: string,
+  onStatus?: (msg: string) => void
 ): Promise<void> {
   if (!isOllamaConfigured()) {
     throw new Error("OLLAMA_BASE_URL não configurado.");
@@ -32,6 +34,9 @@ export async function streamAnalysis(
   const model = getOllamaModelParecer();
 
   logger.info({ model, baseUrl }, "Streaming via Ollama local");
+
+  // Ensure model is in memory before streaming (handles cold-start gracefully)
+  await ensureModelLoaded(baseUrl, model, onStatus);
 
   let fullPrompt = prompt;
   if (continueFrom) {

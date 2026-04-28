@@ -203,16 +203,23 @@ router.post("/analyze", requireAuth, async (req, res): Promise<void> => {
   }
 
   // ── 7. Stream from LLM ────────────────────────────────────────────────────
-  sendStep("model", "Aguardando resposta do modelo...", "brain");
+  sendStep("model", "Verificando se modelo está na memória...", "brain");
 
   let fullOutput = "";
+
+  const onModelStatus = (msg: string) => {
+    if (!res.writableEnded) {
+      res.write(`data: ${JSON.stringify({ type: "step", id: "model", label: msg, icon: "brain" })}\n\n`);
+    }
+  };
 
   try {
     await streamAnalysis(
       fullPrompt,
       res,
       (text) => { fullOutput += text; },
-      continueFrom
+      continueFrom,
+      onModelStatus
     );
 
     res.write(`data: ${JSON.stringify({ type: "done" })}\n\n`);

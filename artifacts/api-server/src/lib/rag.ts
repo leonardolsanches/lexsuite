@@ -4,8 +4,10 @@ import {
   dbBridgeInsertChunk,
   dbBridgeSearchChunks,
   isDbBridgeConfigured,
+  getEmbeddingModel,
   type ChunkSearchResult,
 } from "./embedding";
+import { getOllamaBaseUrl, ensureModelLoaded } from "./ollama";
 
 const CHUNK_CHARS = 2000;
 const OVERLAP_CHARS = 200;
@@ -50,6 +52,16 @@ export async function indexDocument(
 ): Promise<number> {
   const chunks = chunkText(text);
   logger.info({ documentId, chunks: chunks.length }, "Iniciando indexação RAG");
+
+  // Ensure embedding model is loaded before processing chunks
+  const ollamaBaseUrl = getOllamaBaseUrl();
+  if (ollamaBaseUrl) {
+    try {
+      await ensureModelLoaded(ollamaBaseUrl, getEmbeddingModel());
+    } catch (err) {
+      logger.warn({ err }, "Embedding model não carregou — indexação pode falhar");
+    }
+  }
 
   let indexed = 0;
   for (let i = 0; i < chunks.length; i++) {
