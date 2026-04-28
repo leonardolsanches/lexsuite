@@ -125,10 +125,14 @@ export async function* streamOllama(
     ? `${bridgeUrl}/ollama-proxy/stream`
     : `${baseUrl}/api/generate`;
 
+  // num_ctx: 16384 ensures the full prompt (system instructions + data + RAG) is never
+  // silently truncated by the model. deepseek-r1 default is 4096 which cuts long prompts.
+  const ollamaPayload = { model, prompt, stream: true, keep_alive: "30m", num_ctx: 16384 };
+
   let response = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ model, prompt, stream: true, keep_alive: "30m" }),
+    body: JSON.stringify(ollamaPayload),
   });
 
   // If bridge proxy not yet installed, fall back to direct Ollama URL
@@ -137,7 +141,7 @@ export async function* streamOllama(
     response = await fetch(`${baseUrl}/api/generate`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ model, prompt, stream: true, keep_alive: "30m" }),
+      body: JSON.stringify(ollamaPayload),
     });
   }
 
