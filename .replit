@@ -28,8 +28,8 @@ OLLAMA_MODEL_PARECER = "deepseek-r1:7b"
 OLLAMA_MODEL_EXTRACAO = "qwen2:7b"
 
 [userenv.development]
-OLLAMA_BASE_URL = "https://pressing-liabilities-baseline-vertical.trycloudflare.com"
-DB_BRIDGE_URL = "https://brass-crossing-mesh-cap.trycloudflare.com"
+OLLAMA_BASE_URL = "https://moderator-hood-jenny-mia.trycloudflare.com"
+DB_BRIDGE_URL = "https://sensors-hiring-accent-fossil.trycloudflare.com"
 
 [[ports]]
 localPort = 8080
