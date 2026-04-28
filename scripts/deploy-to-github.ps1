@@ -16,6 +16,17 @@ function Fail($msg) {
     exit 1
 }
 
+# Caracteres invalidos no Windows para nomes de arquivo/pasta
+$invalidChars = [System.IO.Path]::GetInvalidFileNameChars() + [System.IO.Path]::GetInvalidPathChars() | Select-Object -Unique
+$invalidPattern = ($invalidChars | ForEach-Object { [regex]::Escape($_) }) -join '|'
+
+function SanitizePath($path) {
+    # Preservar separadores de pasta, sanitizar apenas cada segmento
+    $parts = $path -split '[/\\]'
+    $safe  = $parts | ForEach-Object { $_ -replace $invalidPattern, '_' }
+    return $safe -join '\'
+}
+
 # ── 1. Encontrar o ZIP mais recente ──────────────────────────────────────────
 Write-Host ""
 Write-Host "[1/5] Procurando ZIP em '$ZipFolder'..." -ForegroundColor Cyan
@@ -30,23 +41,55 @@ if (-not $zip) { Fail "Nenhum arquivo .zip encontrado em '$ZipFolder'" }
 
 Write-Host "  ZIP: $($zip.Name)  ($([math]::Round($zip.Length/1MB,1)) MB)" -ForegroundColor Green
 
-# ── 2. Extrair ZIP ────────────────────────────────────────────────────────────
+# ── 2. Extrair ZIP (com sanitizacao de nomes invalidos no Windows) ────────────
 Write-Host ""
 Write-Host "[2/5] Extraindo ZIP..." -ForegroundColor Cyan
+
+Add-Type -AssemblyName System.IO.Compression.FileSystem
 
 $extractDir = Join-Path $WorkDir "extracted"
 if (Test-Path $extractDir) { Remove-Item $extractDir -Recurse -Force }
 New-Item -ItemType Directory -Path $extractDir -Force | Out-Null
 
 try {
-    Expand-Archive -Path $zip.FullName -DestinationPath $extractDir -Force
+    $zipArchive = [System.IO.Compression.ZipFile]::OpenRead($zip.FullName)
+    $total = $zipArchive.Entries.Count
+    $extracted = 0
+    $skipped = 0
+
+    foreach ($entry in $zipArchive.Entries) {
+        $safeName = SanitizePath $entry.FullName
+        $destPath = Join-Path $extractDir $safeName
+
+        if ($entry.Name -eq '') {
+            # E uma pasta
+            New-Item -ItemType Directory -Path $destPath -Force | Out-Null
+        } else {
+            $destDir = Split-Path $destPath -Parent
+            if (-not (Test-Path $destDir)) {
+                New-Item -ItemType Directory -Path $destDir -Force | Out-Null
+            }
+            try {
+                $stream = $entry.Open()
+                $outStream = [System.IO.File]::Create($destPath)
+                $stream.CopyTo($outStream)
+                $outStream.Close()
+                $stream.Close()
+                $extracted++
+            } catch {
+                $skipped++
+            }
+        }
+    }
+    $zipArchive.Dispose()
+    Write-Host "  Extraidos: $extracted arquivos ($skipped ignorados de $total entradas)" -ForegroundColor Green
 } catch {
-    Fail "Falha ao extrair ZIP: $_"
+    Fail "Falha ao abrir ZIP: $_"
 }
 
-# Detectar raiz do projeto: se houver exatamente uma subpasta, usa ela
-$innerDirs  = Get-ChildItem -Path $extractDir -Directory -Force
-$innerFiles = Get-ChildItem -Path $extractDir -File -Force
+# Detectar raiz do projeto: se houver exatamente uma subpasta e zero arquivos na raiz
+$innerDirs  = Get-ChildItem -Path $extractDir -Directory
+$innerFiles = Get-ChildItem -Path $extractDir -File
 $sourceRoot = if ($innerDirs.Count -eq 1 -and $innerFiles.Count -eq 0) {
     $innerDirs[0].FullName
 } else {
@@ -54,10 +97,9 @@ $sourceRoot = if ($innerDirs.Count -eq 1 -and $innerFiles.Count -eq 0) {
 }
 
 $totalSource = (Get-ChildItem -Path $sourceRoot -Recurse -Force).Count
-Write-Host "  Raiz do projeto: $sourceRoot" -ForegroundColor Green
-Write-Host "  Itens no ZIP: $totalSource" -ForegroundColor Green
+Write-Host "  Raiz do projeto: $sourceRoot ($totalSource itens)" -ForegroundColor Green
 
-if ($totalSource -eq 0) { Fail "ZIP parece estar vazio apos extracao." }
+if ($totalSource -eq 0) { Fail "Nenhum arquivo encontrado apos extracao." }
 
 # ── 3. Clonar repositorio ────────────────────────────────────────────────────
 Write-Host ""
@@ -75,22 +117,18 @@ Write-Host "  Repositorio clonado." -ForegroundColor Green
 Write-Host ""
 Write-Host "[4/5] Sincronizando arquivos..." -ForegroundColor Cyan
 
-# Remover tudo exceto .git
 Get-ChildItem -Path $repoDir -Force |
     Where-Object { $_.Name -ne ".git" } |
     Remove-Item -Recurse -Force
 
-# robocopy copia tudo incluindo arquivos ocultos e subdiretorios
-# /E = subdiretorios incluindo vazios | /NFL /NDL /NJH /NJS = silencioso
 $roboOut = robocopy $sourceRoot $repoDir /E /NFL /NDL /NJH /NJS /NC /NS /NP 2>&1
-# robocopy retorna 0-7 em sucesso (bit flags), apenas >= 8 e erro real
 if ($LASTEXITCODE -ge 8) { Fail "Copia de arquivos falhou (robocopy exit $LASTEXITCODE): $roboOut" }
 
 $fileCount = (Get-ChildItem -Path $repoDir -Recurse -Force -File |
               Where-Object { $_.FullName -notlike "*\.git\*" }).Count
-Write-Host "  $fileCount arquivos copiados." -ForegroundColor Green
+Write-Host "  $fileCount arquivos copiados para o repositorio." -ForegroundColor Green
 
-if ($fileCount -eq 0) { Fail "Nenhum arquivo foi copiado para o repositorio." }
+if ($fileCount -eq 0) { Fail "Nenhum arquivo foi copiado." }
 
 # ── 5. Commit e Push ──────────────────────────────────────────────────────────
 Write-Host ""
@@ -109,7 +147,7 @@ if (-not $status) {
     exit 0
 }
 
-Write-Host "  Arquivos alterados: $(($status | Measure-Object).Count)" -ForegroundColor Green
+Write-Host "  Alteracoes detectadas: $(($status | Measure-Object).Count) arquivo(s)" -ForegroundColor Green
 
 $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm"
 $commitMsg = "deploy: Replit export $timestamp (ZIP: $($zip.Name))"

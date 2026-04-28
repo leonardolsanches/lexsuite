@@ -63,19 +63,22 @@ export async function ensureModelLoaded(
   }
 
   logger.info({ model }, "Modelo frio — iniciando carregamento via trigger");
-  onStatus?.(`Carregando modelo ${model} na memória (aguarde até 5 minutos)...`);
+  onStatus?.(`Carregando modelo ${model} na memória (aguarde até 15 minutos na 1ª carga)...`);
 
-  // Fire-and-forget load trigger. Cloudflare will kill it after 100 s but
-  // Ollama keeps working. We do NOT await this.
-  fetch(`${baseUrl}/api/generate`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ model, prompt: ".", stream: false, keep_alive: "30m", num_predict: 0 }),
-    signal: AbortSignal.timeout(110_000),
-  }).catch(() => { /* expected 524/timeout — Ollama continues in background */ });
+  // Fire-and-forget load trigger. Cloudflare kills it after 100 s but
+  // Ollama continues loading in the background. We do NOT await this.
+  const triggerLoad = () => {
+    fetch(`${baseUrl}/api/generate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ model, prompt: ".", stream: false, keep_alive: "30m", num_predict: 0 }),
+      signal: AbortSignal.timeout(110_000),
+    }).catch(() => { /* expected 524/timeout — Ollama continues in background */ });
+  };
+  triggerLoad();
 
-  // Poll /api/ps until model appears (max 8 minutes)
-  const deadline = Date.now() + 8 * 60_000;
+  // Poll /api/ps every 5 s until model appears (max 15 minutes for large models like 32b)
+  const deadline = Date.now() + 15 * 60_000;
   let dots = 0;
 
   while (Date.now() < deadline) {
@@ -90,23 +93,18 @@ export async function ensureModelLoaded(
     }
 
     const elapsed = Math.round(dots * 5);
-    const msg = `Aguardando modelo carregar... ${elapsed}s`;
-    onStatus?.(msg);
+    const mins = Math.floor(elapsed / 60);
+    const secs = elapsed % 60;
+    const timeStr = mins > 0 ? `${mins}m${secs}s` : `${secs}s`;
+    onStatus?.(`Aguardando modelo carregar... ${timeStr}`);
     logger.debug({ model, elapsed }, "Modelo ainda carregando");
 
-    // Re-trigger every ~90 s in case the previous load was aborted
-    if (dots % 18 === 0) {
-      fetch(`${baseUrl}/api/generate`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ model, prompt: ".", stream: false, keep_alive: "30m", num_predict: 0 }),
-        signal: AbortSignal.timeout(110_000),
-      }).catch(() => {});
-    }
+    // Re-trigger every 90 s in case the previous load was aborted by Cloudflare
+    if (dots % 18 === 0) triggerLoad();
   }
 
   throw new Error(
-    `Modelo ${model} não carregou após 8 minutos. Verifique se o Ollama está rodando no Mini PC e o túnel Cloudflare está ativo.`
+    `Modelo ${model} não carregou após 15 minutos. Verifique se o Ollama está rodando no Mini PC e o túnel Cloudflare está ativo.`
   );
 }
 
