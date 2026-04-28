@@ -552,7 +552,7 @@ export default function ModuleView({ module }: ModuleViewProps) {
           <Link href={`/app/${module}/documents`}>
             <Button variant="ghost" size="sm" className="text-muted-foreground gap-2">
               <Database className="w-4 h-4" />
-              Base de Docs
+              Curador RAG
             </Button>
           </Link>
           <Button variant="ghost" size="icon" onClick={() => signOut()} title="Sair">

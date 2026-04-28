@@ -119,15 +119,27 @@ export async function* streamOllama(
   // Route through DB Bridge proxy when available.
   // The bridge calls Ollama on localhost and sends heartbeat "\n" bytes every 8s,
   // preventing Cloudflare from returning 524 during deepseek-r1's silent thinking phase.
-  const url = bridgeUrl
+  // Falls back to direct Ollama URL if the proxy endpoint is not yet installed (404).
+  const useBridge = !!bridgeUrl;
+  const url = useBridge
     ? `${bridgeUrl}/ollama-proxy/stream`
     : `${baseUrl}/api/generate`;
 
-  const response = await fetch(url, {
+  let response = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ model, prompt, stream: true, keep_alive: "30m" }),
   });
+
+  // If bridge proxy not yet installed, fall back to direct Ollama URL
+  if (useBridge && response.status === 404) {
+    logger.warn("Bridge proxy /ollama-proxy/stream não encontrado — usando Ollama direto");
+    response = await fetch(`${baseUrl}/api/generate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ model, prompt, stream: true, keep_alive: "30m" }),
+    });
+  }
 
   if (!response.ok) {
     const body = await response.text().catch(() => response.statusText);
