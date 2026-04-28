@@ -28,8 +28,8 @@ OLLAMA_MODEL_PARECER = "deepseek-r1:32b"
 OLLAMA_MODEL_EXTRACAO = "qwen2:7b"
 
 [userenv.development]
-OLLAMA_BASE_URL = "https://bled-decide-settings.trycloudflare.com"
 DB_BRIDGE_URL = "https://naval-banners-naturals-fioricet.trycloudflare.com"
+OLLAMA_BASE_URL = "https://seal-progress-stomach-configuration.trycloudflare.com"
 
 [[ports]]
 localPort = 8080
