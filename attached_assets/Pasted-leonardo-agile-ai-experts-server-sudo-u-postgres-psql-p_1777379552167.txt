@@ -1,0 +1,294 @@
+leonardo@agile-ai-experts-server:~$ sudo -u postgres psql
+psql (16.13 (Ubuntu 16.13-0ubuntu0.24.04.1))
+Type "help" for help.
+
+postgres=# -- Ver string de conexão ativa do bridge agora:
+SELECT usename, datname, application_name
+FROM pg_stat_activity
+WHERE pid != pg_backend_pid();
+ usename  | datname | application_name
+----------+---------+------------------
+          |         |
+ postgres |         |
+          |         |
+          |         |
+          |         |
+(5 rows)
+
+postgres=# GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO leonardo;
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO leonardo;
+GRANT
+GRANT
+postgres=# \q
+leonardo@agile-ai-experts-server:~$ grep -i "database\|user\|password\|host" /home/leonardo/lexbridge/db_bridge.py | head -10
+grep: /home/leonardo/lexbridge/db_bridge.py: No such file or directory
+leonardo@agile-ai-experts-server:~$ # Ver o serviço completo (WorkingDirectory + Environment):
+cat /etc/systemd/system/lexbridge.service
+
+# Encontrar o arquivo db_bridge.py de verdade:
+find /home/leonardo /opt /srv -name "db_bridge.py" 2>/dev/null
+[Unit]
+Description=Lex Suite DB Bridge
+After=network-online.target postgresql.service
+
+[Service]
+Type=simple
+User=leonardo
+WorkingDirectory=/home/leonardo
+ExecStart=/home/leonardo/lexbridge/bin/uvicorn db_bridge:app --host 0.0.0.0 --port 8765
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+/home/leonardo/db_bridge.py
+leonardo@agile-ai-experts-server:~$ grep -i "database\|user\|password\|host\|dsn\|connect" <DIRETORIO>/db_bridge.py | head -20
+-bash: DIRETORIO: No such file or directory
+leonardo@agile-ai-experts-server:~$ grep -i "database\|user\|password\|host\|dsn\|connect" /home/leonardo/db_bridge.py | head -20
+DB = "postgresql://lexuser:LexSuite2024x@localhost/lexsuite"
+    conn = await asyncpg.connect(DB)
+    return {"status": "ok", "db": "connected", "pgvector": "0.6.0"}
+    conn = await asyncpg.connect(DB)
+    conn = await asyncpg.connect(DB)
+    conn = await asyncpg.connect(DB)
+leonardo@agile-ai-experts-server:~$ sudo -u postgres psql
+psql (16.13 (Ubuntu 16.13-0ubuntu0.24.04.1))
+Type "help" for help.
+
+postgres=# -- Ver todos os bancos existentes:
+\l
+
+-- Conectar no banco que provavelmente tem as tabelas (substitua 'lexai' se for diferente):
+\c lexai
+
+-- Verificar se a tabela documents existe aqui:
+\dt
+
+-- Aplicar os grants no banco correto:
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO leonardo;
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO leonardo;
+                                            List of databases
+ Name | Owner | Encoding | Locale Provider | Collate | Ctype | ICU Locale | ICU Rules | Access privileges
+------+-------+----------+-----------------+---------+-------+------------+-----------+-------------------
+(0 rows)
+
+\l: extra argument "Conectar" ignored
+\l: extra argument "no" ignored
+\l: extra argument "banco" ignored
+\l: extra argument "que" ignored
+\l: extra argument "provavelmente" ignored
+\l: extra argument "tem" ignored
+\l: extra argument "as" ignored
+\l: extra argument "tabelas" ignored
+\l: extra argument "(substitua" ignored
+\l: extra argument "lexai" ignored
+\l: extra argument "se" ignored
+\l: extra argument "for" ignored
+\l: extra argument "diferente):" ignored
+invalid integer value "se" for connection option "port"
+Previous connection kept
+postgres=#
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
