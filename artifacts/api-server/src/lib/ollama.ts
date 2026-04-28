@@ -1,7 +1,7 @@
 import { logger } from "./logger";
 
 export const OLLAMA_DEFAULT_MODEL_EXTRACTION = "qwen2:7b";
-export const OLLAMA_DEFAULT_MODEL_PARECER = "deepseek-r1:7b";
+export const OLLAMA_DEFAULT_MODEL_PARECER = "deepseek-r1:32b";
 export const OLLAMA_DEFAULT_MODEL_EMBEDDING = "nomic-embed-text";
 
 export function getOllamaBaseUrl(): string | null {
