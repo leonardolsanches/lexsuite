@@ -1,0 +1,62 @@
+leonardo@agile-ai-experts-server:~$ # Corrige a porta no script
+sed -i 's|http://localhost:8000|http://localhost:8765|g' ~/start-tunnels.sh
+
+# Confirma a correção
+grep 8765 ~/start-tunnels.sh
+
+# Reinicia o serviço (vai gerar novas URLs e atualizar o Render automaticamente)
+sudo systemctl restart lex-tunnels
+
+# Aguarda e confirma
+sleep 15 && journalctl -u lex-tunnels --no-pager -n 10
+cloudflared tunnel --url http://localhost:8765  > /tmp/bridge-tunnel.log 2>&1 &
+[1]   Done                    nohup cloudflared tunnel --url http://localhost:11434 > /tmp/ollama-tunnel.log 2>&1
+[2]   Done                    nohup cloudflared tunnel --url http://localhost:8000 > /tmp/bridge-tunnel.log 2>&1
+[3]-  Done                    nohup cloudflared tunnel --url http://localhost:11434 > /tmp/ollama-tunnel.log 2>&1
+[4]+  Done                    nohup cloudflared tunnel --url http://localhost:8000 > /tmp/bridge-tunnel.log 2>&1
+abr 28 01:33:43 agile-ai-experts-server systemd[1]: lex-tunnels.service: Consumed 4.213s CPU time, 38.9M memory peak, 0B memory swap peak.
+abr 28 01:33:43 agile-ai-experts-server systemd[1]: Started lex-tunnels.service - Lex Suite Cloudflare Tunnels.
+abr 28 01:33:45 agile-ai-experts-server start-tunnels.sh[51834]: Aguardando URLs dos tuneis...
+abr 28 01:33:51 agile-ai-experts-server start-tunnels.sh[51834]: Ollama URL: https://alabama-induction-shepherd-lease.trycloudflare.com
+abr 28 01:33:51 agile-ai-experts-server start-tunnels.sh[51834]: Bridge URL: https://work-automobiles-oregon-priest.trycloudflare.com
+abr 28 01:33:51 agile-ai-experts-server start-tunnels.sh[51834]: Atualizando lex-api...
+abr 28 01:33:51 agile-ai-experts-server start-tunnels.sh[51834]: lex-api status: 200
+abr 28 01:33:51 agile-ai-experts-server start-tunnels.sh[51834]: Atualizando lexsuite...
+abr 28 01:33:52 agile-ai-experts-server start-tunnels.sh[51834]: lexsuite status: 200
+abr 28 01:33:52 agile-ai-experts-server start-tunnels.sh[51834]: Render atualizado com sucesso!
+leonardo@agile-ai-experts-server:~$
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
