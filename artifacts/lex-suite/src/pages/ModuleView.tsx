@@ -75,7 +75,7 @@ export default function ModuleView({ module }: ModuleViewProps) {
   const [location, setLocation] = useLocation();
   const { user } = useUser();
   const { signOut } = useClerk();
-  const { isLoaded: authLoaded } = useAuth();
+  const { isLoaded: authLoaded, getToken } = useAuth();
   const { toast } = useToast();
   
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
@@ -304,8 +304,43 @@ export default function ModuleView({ module }: ModuleViewProps) {
         }
       );
 
+      // Recovery: if stream ended with no visible content, try to load saved session result
+      const tabAfter = tabsRef.current.find(t => t.id === tabId);
+      if (!tabAfter?.outputHtml && sessionId) {
+        try {
+          await new Promise(r => setTimeout(r, 1500));
+          const token = await getToken();
+          const resp = await fetch(`/api/sessions/${sessionId}`, {
+            headers: token ? { Authorization: `Bearer ${token}` } : {}
+          });
+          if (resp.ok) {
+            const saved = await resp.json();
+            if (saved.outputHtml) {
+              updateTab(tabId, { status: 'done', outputHtml: saved.outputHtml, endedAt: Date.now() });
+            }
+          }
+        } catch { /* silent — bridge pode estar offline */ }
+      }
+
     } catch (err: any) {
       const msg = err?.message || 'Erro desconhecido';
+      // Recovery: on error, try to load saved session result before showing error
+      if (sessionId) {
+        try {
+          await new Promise(r => setTimeout(r, 1500));
+          const token = await getToken();
+          const resp = await fetch(`/api/sessions/${sessionId}`, {
+            headers: token ? { Authorization: `Bearer ${token}` } : {}
+          });
+          if (resp.ok) {
+            const saved = await resp.json();
+            if (saved.outputHtml) {
+              updateTab(tabId, { status: 'done', outputHtml: saved.outputHtml, endedAt: Date.now() });
+              return;
+            }
+          }
+        } catch { /* silent */ }
+      }
       updateTab(tabId, { status: 'error', errorMessage: msg, outputHtml: '', endedAt: Date.now() });
       // Trigger LLM status re-check so badge updates
       checkLlm();
