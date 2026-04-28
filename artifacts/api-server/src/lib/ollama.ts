@@ -113,9 +113,17 @@ export async function ensureModelLoaded(
 export async function* streamOllama(
   prompt: string,
   model: string,
-  baseUrl: string
+  baseUrl: string,
+  bridgeUrl?: string | null
 ): AsyncGenerator<string> {
-  const response = await fetch(`${baseUrl}/api/generate`, {
+  // Route through DB Bridge proxy when available.
+  // The bridge calls Ollama on localhost and sends heartbeat "\n" bytes every 8s,
+  // preventing Cloudflare from returning 524 during deepseek-r1's silent thinking phase.
+  const url = bridgeUrl
+    ? `${bridgeUrl}/ollama-proxy/stream`
+    : `${baseUrl}/api/generate`;
+
+  const response = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ model, prompt, stream: true, keep_alive: "30m" }),

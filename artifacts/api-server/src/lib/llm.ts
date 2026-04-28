@@ -6,6 +6,7 @@ import {
   isOllamaConfigured,
   streamOllama,
 } from "./ollama";
+import { getDbBridgeUrl } from "./bridge";
 import { logger } from "./logger";
 
 export function isAnyLlmConfigured(): boolean {
@@ -43,7 +44,7 @@ export async function streamAnalysis(
     fullPrompt += `\n\n[RESPOSTA ANTERIOR]:\n${continueFrom}\n\nContinue a análise do ponto onde parou.`;
   }
 
-  for await (const text of streamOllama(fullPrompt, model, baseUrl)) {
+  for await (const text of streamOllama(fullPrompt, model, baseUrl, getDbBridgeUrl())) {
     onChunk(text);
     res.write(`data: ${JSON.stringify({ type: "text", text })}\n\n`);
   }
