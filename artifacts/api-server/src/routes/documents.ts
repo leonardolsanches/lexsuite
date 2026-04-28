@@ -8,8 +8,17 @@ import { indexDocument } from "../lib/rag";
 import { logger } from "../lib/logger";
 
 const _require = createRequire(import.meta.url);
-const pdfParse: (buffer: Buffer) => Promise<{ text: string }> = _require("pdf-parse");
-const mammoth: { extractRawText: (opts: { buffer: Buffer }) => Promise<{ value: string }> } = _require("mammoth");
+
+// pdf-parse v1 and mammoth export CJS directly; use a safe unwrap in case
+// the bundler wraps them differently across environments.
+function resolveCjsExport<T>(mod: unknown): T {
+  if (typeof mod === "function") return mod as unknown as T;
+  if (mod && typeof (mod as any).default === "function") return (mod as any).default as T;
+  return mod as T;
+}
+
+const pdfParse = resolveCjsExport<(buffer: Buffer) => Promise<{ text: string }>>(_require("pdf-parse"));
+const mammoth = resolveCjsExport<{ extractRawText: (opts: { buffer: Buffer }) => Promise<{ value: string }> }>(_require("mammoth"));
 
 const router: IRouter = Router();
 
