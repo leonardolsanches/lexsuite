@@ -13,25 +13,30 @@ const basePath = process.env.BASE_PATH ?? "/";
 
 // SPA fallback plugin for Vite 7 (server.historyApiFallback does not exist in v7)
 // Must be a PRE-hook (no return) so the rewrite happens before static file resolution.
+// Also covers vite preview (production/Render) via configurePreviewServer.
+function spaMiddleware(req: any, _res: any, next: () => void) {
+  const url: string = req.url ?? "/";
+  const accept: string = req.headers?.accept ?? "";
+  if (
+    req.method === "GET" &&
+    accept.includes("text/html") &&
+    !url.startsWith("/api") &&
+    !url.startsWith("/@") &&
+    !url.startsWith("/__") &&
+    !url.includes(".")
+  ) {
+    req.url = "/";
+  }
+  next();
+}
+
 const spaFallback = {
   name: "spa-fallback",
   configureServer(server: any) {
-    server.middlewares.use((req: any, _res: any, next: () => void) => {
-      const url: string = req.url ?? "/";
-      const accept: string = req.headers?.accept ?? "";
-      // Rewrite browser navigation requests to "/" so Vite serves index.html
-      if (
-        req.method === "GET" &&
-        accept.includes("text/html") &&
-        !url.startsWith("/api") &&
-        !url.startsWith("/@") &&
-        !url.startsWith("/__") &&
-        !url.includes(".")
-      ) {
-        req.url = "/";
-      }
-      next();
-    });
+    server.middlewares.use(spaMiddleware);
+  },
+  configurePreviewServer(server: any) {
+    server.middlewares.use(spaMiddleware);
   },
 };
 
