@@ -1,0 +1,933 @@
+O Windows PowerShell
+Copyright (C) Microsoft Corporation. Todos os direitos reservados.
+                                                                                                                        Instale o PowerShell mais recente para obter novos recursos e aprimoramentos! https://aka.ms/PSWindows                                                                                                                                          PS C:\WINDOWS\system32> D:                                                                                              PS D:\> cd 2026                                                                                                         PS D:\2026> cd lex*                                                                                                     PS D:\2026\Lex Suite> powershell -ExecutionPolicy Bypass -File ".\deploy-to-github.ps1"                                                                                                                                                         [1/5] Procurando ZIP em 'D:\2026\Lex Suite'...                                                                            ZIP: Lex-Suite-Orchestrator.zip  (204.3 MB)                                                                           
+[2/5] Extraindo ZIP...
+  Raiz do projeto: C:\Users\leonardo\AppData\Local\Temp\lexsuite-deploy\extracted
+  Itens no ZIP: 0
+
+ERRO: ZIP parece estar vazio apos extracao.
+PS D:\2026\Lex Suite> powershell -ExecutionPolicy Bypass -File ".\deploy-to-github.ps1"
+
+[1/5] Procurando ZIP em 'D:\2026\Lex Suite'...
+  ZIP: Lex-Suite-Orchestrator.zip  (205.3 MB)
+
+[2/5] Extraindo ZIP...
+  Raiz do projeto: C:\Users\leonardo\AppData\Local\Temp\lexsuite-deploy\extracted
+  Itens no ZIP: 0
+
+ERRO: ZIP parece estar vazio apos extracao.
+PS D:\2026\Lex Suite> powershell -ExecutionPolicy Bypass -File ".\deploy-to-github.ps1"
+
+[1/5] Procurando ZIP em 'D:\2026\Lex Suite'...
+  ZIP: Lex-Suite-Orchestrator.zip  (205.3 MB)
+
+[2/5] Extraindo ZIP...
+  Raiz do projeto: C:\Users\leonardo\AppData\Local\Temp\lexsuite-deploy\extracted
+  Itens no ZIP: 0
+
+ERRO: ZIP parece estar vazio apos extracao.
+PS D:\2026\Lex Suite> Add-Type -AssemblyName System.IO.Compression.FileSystem
+PS D:\2026\Lex Suite> [System.IO.Compression.ZipFile]::ExtractToDirectory("D:\2026\Lex Suite\Lex-Suite-Orchestrator.zip", "$env:TEMP\lextest")
+Exceção ao chamar "ExtractToDirectory" com "2" argumento(s): "Caracteres inválidos no caminho."
+No linha:1 caractere:1
++ [System.IO.Compression.ZipFile]::ExtractToDirectory("D:\2026\Lex Suit ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (:) [], MethodInvocationException
+    + FullyQualifiedErrorId : ArgumentException
+
+PS D:\2026\Lex Suite> (Get-ChildItem "$env:TEMP\lextest" -Recurse -Force).Count
+0
+PS D:\2026\Lex Suite>
+PS D:\2026\Lex Suite> ssh leonardo@192.168.0.38
+leonardo@192.168.0.38's password:
+Welcome to Ubuntu 24.04.4 LTS (GNU/Linux 6.8.0-110-generic x86_64)
+
+ * Documentation:  https://help.ubuntu.com
+ * Management:     https://landscape.canonical.com
+ * Support:        https://ubuntu.com/pro
+
+ System information as of ter 28 abr 2026 22:18:12 UTC
+
+  System load:           10.21
+  Usage of /:            15.9% of 491.58GB
+  Memory usage:          72%
+  Swap usage:            5%
+  Temperature:           85.0 C
+  Processes:             308
+  Users logged in:       1
+  IPv4 address for wlo1: 192.168.0.38
+  IPv6 address for wlo1: 2804:14d:7886:81c6:ee4c:8cff:fe21:acdc
+
+ * Strictly confined Kubernetes makes edge and IoT secure. Learn how MicroK8s
+   just raised the bar for easy, resilient and secure K8s cluster deployment.
+
+   https://ubuntu.com/engage/secure-kubernetes-at-the-edge
+
+Manutenção de Segurança Expandida para Applications não está ativa.
+
+48 as atualizações podem ser aplicadas imediatamente.
+Para ver as actualizações adicionais corre o comando: apt list --upgradable
+
+13 atualizações de segurança adicionais podem ser aplicadas com ESM Apps.
+Saiba mais sobre como ativar o serviço ESM Apps at https://ubuntu.com/esm
+
+
+Last login: Tue Apr 28 20:43:08 2026 from 192.168.0.34
+leonardo@agile-ai-experts-server:~$ bash /caminho/para/scripts/instalar-bridge-endpoint.sh
+bash: /caminho/para/scripts/instalar-bridge-endpoint.sh: No such file or directory
+leonardo@agile-ai-experts-server:~$ curl -fsSL https://raw.githubusercontent.com/leonardolsanches/lexsuite/main/scripts/instalar-bridge-endpoint.sh | bash
+curl: (22) The requested URL returned error: 404
+leonardo@agile-ai-experts-server:~$ source /home/leonardo/lexbridge/bin/activate && pip install httpx -q
+
+cat >> /home/leonardo/db_bridge.py << 'EOF'
+
+# Ollama proxy com heartbeat — evita Cloudflare 524
+import httpx, asyncio
+from starlette.responses import StreamingResponse as _SR
+
+@app.post("/ollama-proxy/stream")
+async def ollama_proxy_stream(request: Request):
+    body = await request.body()
+    async def _gen():
+        try:
+            async with httpx.AsyncClient(timeout=None) as c:
+                async with c.stream("POST","http://localhost:11434/api/generate",
+                                    content=body,headers={"Content-Type":"application/json"}) as r:
+                    last = asyncio.get_event_loop().time()
+                    async for chunk in r.aiter_bytes():
+                        yield chunk
+                        now = asyncio.get_event_loop().time()
+                        if now - last > 8:
+                            yield b"\n"
+                        last = now
+        except Exception as e:
+            yield f'{{"error":"{e}"}}\n'.encode()
+    return _SR(_gen(), media_type="application/x-ndjson")
+EOF
+
+sudo systemctl restart lexbridge.service && sleep 2 && sudo systemctl is-active lexbridge.service
+[sudo] password for leonardo:
+activating
+(lexbridge) leonardo@agile-ai-experts-server:~$ source /home/leonardo/lexbridge/bin/activate && pip install httpx -q
+
+cat >> /home/leonardo/db_bridge.py << 'EOF'
+
+# Ollama proxy com heartbeat — evita Cloudflare 524
+import httpx, asyncio
+from starlette.responses import StreamingResponse as _SR
+
+@app.post("/ollama-proxy/stream")
+async def ollama_proxy_stream(request: Request):
+    body = await request.body()
+    async def _gen():
+        try:
+            async with httpx.AsyncClient(timeout=None) as c:
+                async with c.stream("POST","http://localhost:11434/api/generate",
+                                    content=body,headers={"Content-Type":"application/json"}) as r:
+                    last = asyncio.get_event_loop().time()
+                    async for chunk in r.aiter_bytes():
+                        yield chunk
+                        now = asyncio.get_event_loop().time()
+                        if now - last > 8:
+                            yield b"\n"
+                        last = now
+        except Exception as e:
+            yield f'{{"error":"{e}"}}\n'.encode()
+    return _SR(_gen(), media_type="application/x-ndjson")
+EOF
+
+sudo systemctl restart lexbridge.service && sleep 2 && sudo systemctl is-active lexbridge.service
+activating
+(lexbridge) leonardo@agile-ai-experts-server:~$ curl -s -o /dev/null -w "%{http_code}" -X POST http://localhost:8765/ollama-proxy/stream \
+  -H "Content-Type: application/json" \
+  -d '{"model":"deepseek-r1:32b","prompt":".","stream":true,"num_predict":1}'
+000(lexbridge) leonardo@agile-ai-experts-server:~$ sudo journalctl -u lexbridge -n 20 --no-pager
+abr 28 22:25:16 agile-ai-experts-server uvicorn[149373]:     self.loaded_app = import_from_string(self.app)
+abr 28 22:25:16 agile-ai-experts-server uvicorn[149373]:                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+abr 28 22:25:16 agile-ai-experts-server uvicorn[149373]:   File "/home/leonardo/lexbridge/lib/python3.12/site-packages/uvicorn/importer.py", line 19, in import_from_string
+abr 28 22:25:16 agile-ai-experts-server uvicorn[149373]:     module = importlib.import_module(module_str)
+abr 28 22:25:16 agile-ai-experts-server uvicorn[149373]:              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+abr 28 22:25:16 agile-ai-experts-server uvicorn[149373]:   File "/usr/lib/python3.12/importlib/__init__.py", line 90, in import_module
+abr 28 22:25:16 agile-ai-experts-server uvicorn[149373]:     return _bootstrap._gcd_import(name[level:], package, level)
+abr 28 22:25:16 agile-ai-experts-server uvicorn[149373]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+abr 28 22:25:16 agile-ai-experts-server uvicorn[149373]:   File "<frozen importlib._bootstrap>", line 1387, in _gcd_import
+abr 28 22:25:16 agile-ai-experts-server uvicorn[149373]:   File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+abr 28 22:25:16 agile-ai-experts-server uvicorn[149373]:   File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+abr 28 22:25:16 agile-ai-experts-server uvicorn[149373]:   File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+abr 28 22:25:16 agile-ai-experts-server uvicorn[149373]:   File "<frozen importlib._bootstrap_external>", line 995, in exec_module
+abr 28 22:25:16 agile-ai-experts-server uvicorn[149373]:   File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+abr 28 22:25:16 agile-ai-experts-server uvicorn[149373]:   File "/home/leonardo/db_bridge.py", line 86, in <module>
+abr 28 22:25:16 agile-ai-experts-server uvicorn[149373]:     async def ollama_proxy_stream(request: Request):
+abr 28 22:25:16 agile-ai-experts-server uvicorn[149373]:                                            ^^^^^^^
+abr 28 22:25:16 agile-ai-experts-server uvicorn[149373]: NameError: name 'Request' is not defined
+abr 28 22:25:16 agile-ai-experts-server systemd[1]: lexbridge.service: Main process exited, code=exited, status=1/FAILURE
+abr 28 22:25:16 agile-ai-experts-server systemd[1]: lexbridge.service: Failed with result 'exit-code'.
+(lexbridge) leonardo@agile-ai-experts-server:~$ sudo journalctl -u lexbridge -n 20 --no-pager
+abr 28 22:25:22 agile-ai-experts-server uvicorn[149379]:   File "/home/leonardo/lexbridge/lib/python3.12/site-packages/uvicorn/importer.py", line 19, in import_from_string
+abr 28 22:25:22 agile-ai-experts-server uvicorn[149379]:     module = importlib.import_module(module_str)
+abr 28 22:25:22 agile-ai-experts-server uvicorn[149379]:              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+abr 28 22:25:22 agile-ai-experts-server uvicorn[149379]:   File "/usr/lib/python3.12/importlib/__init__.py", line 90, in import_module
+abr 28 22:25:22 agile-ai-experts-server uvicorn[149379]:     return _bootstrap._gcd_import(name[level:], package, level)
+abr 28 22:25:22 agile-ai-experts-server uvicorn[149379]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+abr 28 22:25:22 agile-ai-experts-server uvicorn[149379]:   File "<frozen importlib._bootstrap>", line 1387, in _gcd_import
+abr 28 22:25:22 agile-ai-experts-server uvicorn[149379]:   File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+abr 28 22:25:22 agile-ai-experts-server uvicorn[149379]:   File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+abr 28 22:25:22 agile-ai-experts-server uvicorn[149379]:   File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+abr 28 22:25:22 agile-ai-experts-server uvicorn[149379]:   File "<frozen importlib._bootstrap_external>", line 995, in exec_module
+abr 28 22:25:22 agile-ai-experts-server uvicorn[149379]:   File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+abr 28 22:25:22 agile-ai-experts-server uvicorn[149379]:   File "/home/leonardo/db_bridge.py", line 86, in <module>
+abr 28 22:25:22 agile-ai-experts-server uvicorn[149379]:     async def ollama_proxy_stream(request: Request):
+abr 28 22:25:22 agile-ai-experts-server uvicorn[149379]:                                            ^^^^^^^
+abr 28 22:25:22 agile-ai-experts-server uvicorn[149379]: NameError: name 'Request' is not defined
+abr 28 22:25:22 agile-ai-experts-server systemd[1]: lexbridge.service: Main process exited, code=exited, status=1/FAILURE
+abr 28 22:25:22 agile-ai-experts-server systemd[1]: lexbridge.service: Failed with result 'exit-code'.
+abr 28 22:25:28 agile-ai-experts-server systemd[1]: lexbridge.service: Scheduled restart job, restart counter is at 50.
+abr 28 22:25:28 agile-ai-experts-server systemd[1]: Started lexbridge.service - Lex Suite DB Bridge.
+(lexbridge) leonardo@agile-ai-experts-server:~$ sudo journalctl -u lexbridge -n 20 --no-pager
+abr 28 22:25:40 agile-ai-experts-server uvicorn[149400]:     self.loaded_app = import_from_string(self.app)
+abr 28 22:25:40 agile-ai-experts-server uvicorn[149400]:                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+abr 28 22:25:40 agile-ai-experts-server uvicorn[149400]:   File "/home/leonardo/lexbridge/lib/python3.12/site-packages/uvicorn/importer.py", line 19, in import_from_string
+abr 28 22:25:40 agile-ai-experts-server uvicorn[149400]:     module = importlib.import_module(module_str)
+abr 28 22:25:40 agile-ai-experts-server uvicorn[149400]:              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+abr 28 22:25:40 agile-ai-experts-server uvicorn[149400]:   File "/usr/lib/python3.12/importlib/__init__.py", line 90, in import_module
+abr 28 22:25:40 agile-ai-experts-server uvicorn[149400]:     return _bootstrap._gcd_import(name[level:], package, level)
+abr 28 22:25:40 agile-ai-experts-server uvicorn[149400]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+abr 28 22:25:40 agile-ai-experts-server uvicorn[149400]:   File "<frozen importlib._bootstrap>", line 1387, in _gcd_import
+abr 28 22:25:40 agile-ai-experts-server uvicorn[149400]:   File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+abr 28 22:25:40 agile-ai-experts-server uvicorn[149400]:   File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+abr 28 22:25:40 agile-ai-experts-server uvicorn[149400]:   File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+abr 28 22:25:40 agile-ai-experts-server uvicorn[149400]:   File "<frozen importlib._bootstrap_external>", line 995, in exec_module
+abr 28 22:25:40 agile-ai-experts-server uvicorn[149400]:   File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+abr 28 22:25:40 agile-ai-experts-server uvicorn[149400]:   File "/home/leonardo/db_bridge.py", line 86, in <module>
+abr 28 22:25:40 agile-ai-experts-server uvicorn[149400]:     async def ollama_proxy_stream(request: Request):
+abr 28 22:25:40 agile-ai-experts-server uvicorn[149400]:                                            ^^^^^^^
+abr 28 22:25:40 agile-ai-experts-server uvicorn[149400]: NameError: name 'Request' is not defined
+abr 28 22:25:40 agile-ai-experts-server systemd[1]: lexbridge.service: Main process exited, code=exited, status=1/FAILURE
+abr 28 22:25:40 agile-ai-experts-server systemd[1]: lexbridge.service: Failed with result 'exit-code'.
+(lexbridge) leonardo@agile-ai-experts-server:~$ # Remover as ultimas 23 linhas que adicionamos (o bloco com erro)
+head -n -23 /home/leonardo/db_bridge.py > /tmp/db_bridge_clean.py
+mv /tmp/db_bridge_clean.py /home/leonardo/db_bridge.py
+
+# Adicionar versao corrigida
+cat >> /home/leonardo/db_bridge.py << 'EOF'
+
+# Ollama proxy com heartbeat — evita Cloudflare 524
+import httpx
+from starlette.responses import StreamingResponse as _SR
+
+@app.post("/ollama-proxy/stream")
+async def ollama_proxy_stream(request: Request):
+    body = await request.body()
+    async def _gen():
+        try:
+            async with httpx.AsyncClient(timeout=None) as c:
+                async with c.stream(
+                    "POST",
+                    "http://localhost:11434/api/generate",
+                    content=body,
+                    headers={"Content-Type": "application/json"}
+                ) as r:
+                    async for chunk in r.aiter_bytes():
+                        yield chunk
+        except Exception as e:
+            yield f'{{"error":"{e}"}}\n'.encode()
+    return _SR(_gen(), media_type="application/x-ndjson")
+EOF
+
+sudo systemctl is-active lexbridge.service
+activating
+(lexbridge) leonardo@agile-ai-experts-server:~$ curl -s -o /dev/null -w "%{http_code}" -X POST http://localhost:8765/ollama-proxy/stream \
+  -H "Content-Type: application/json" \
+  -d '{"model":"deepseek-r1:32b","prompt":".","stream":true,"num_predict":1}'
+000(lexbridge) leonardo@agile-ai-experts-server:~$ o systemctl restart lexbridge.service && sleep 2 && sudo systemctl is-active lexbridge.service
+activating
+(lexbridge) leonardo@agile-ai-experts-server:~$ curl -s -o /dev/null -w "%{http_code}" -X POST http://localhost:8765/ollama-proxy/stream \
+  -H "Content-Type: application/json" \
+  -d '{"model":"deepseek-r1:32b","prompt":".","stream":true,"num_predict":1}'
+000(lexbridge) leonardo@agile-ai-experts-server:~$ sudo journalctl -u lexbridge -n 20 --no-pager
+abr 28 22:25:16 agile-ai-experts-server uvicorn[149373]:     self.loaded_app = import_from_string(self.app)
+abr 28 22:25:16 agile-ai-experts-server uvicorn[149373]:                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+abr 28 22:25:16 agile-ai-experts-server uvicorn[149373]:   File "/home/leonardo/lexbridge/lib/python3.12/site-packages/uvicorn/importer.py", line 19, in import_from_string
+abr 28 22:25:16 agile-ai-experts-server uvicorn[149373]:     module = importlib.import_module(module_str)
+abr 28 22:25:16 agile-ai-experts-server uvicorn[149373]:              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+abr 28 22:25:16 agile-ai-experts-server uvicorn[149373]:   File "/usr/lib/python3.12/importlib/__init__.py", line 90, in import_module
+abr 28 22:25:16 agile-ai-experts-server uvicorn[149373]:     return _bootstrap._gcd_import(name[level:], package, level)
+abr 28 22:25:16 agile-ai-experts-server uvicorn[149373]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+abr 28 22:25:16 agile-ai-experts-server uvicorn[149373]:   File "<frozen importlib._bootstrap>", line 1387, in _gcd_import
+abr 28 22:25:16 agile-ai-experts-server uvicorn[149373]:   File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+abr 28 22:25:16 agile-ai-experts-server uvicorn[149373]:   File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+abr 28 22:25:16 agile-ai-experts-server uvicorn[149373]:   File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+abr 28 22:25:16 agile-ai-experts-server uvicorn[149373]:   File "<frozen importlib._bootstrap_external>", line 995, in exec_module
+abr 28 22:25:16 agile-ai-experts-server uvicorn[149373]:   File "<frozen importlib._bootstrap>", line 488, in _call_with000(lexbridge) leonardo@agile-ai-experts-server:~$eam":true,"num_predict":1}'tp_code}" -X POST http://localhost:8765/oll
+o: command not found
+activating: command not found
+-bash: syntax error near unexpected token `leonardo@agile-ai-experts-server:~$'
+-H: command not found
+-bash: syntax error near unexpected token `lexbridge'
+-bash: syntax error near unexpected token `('
+Command 'abr' not found, did you mean:
+  command 'br' from deb bottlerocket (0.05b3-18)
+  command 'ab' from deb apache2-utils (2.4.58-1ubuntu8.11)
+  command 'amr' from deb acr (2.1.2-1)
+  command 'adr' from deb adr-tools (3.0.0-2)
+  command 'acr' from deb acr (2.1.2-1)
+  command 'bar' from deb bar (1.11.1-4)
+  command 'alr' from deb alire (1.2.1-1.1build1.1)
+  command 'abx' from deb abx (0.0~b1-1build1)
+  command 'abe' from deb abe (1.1+dfsg-5)
+  command 'pbr' from deb python3-pbr (5.11.1-0ubuntu1)
+  command 'arb' from deb arb (6.0.6-7)
+  command 'ar' from deb binutils (2.42-4ubuntu2.10)
+Try: sudo apt install <deb name>
+Command 'abr' not found, did you mean:
+  command 'ar' from deb binutils (2.42-4ubuntu2.10)
+  command 'abx' from deb abx (0.0~b1-1build1)
+  command 'arb' from deb arb (6.0.6-7)
+  command 'bar' from deb bar (1.11.1-4)
+  command 'alr' from deb alire (1.2.1-1.1build1.1)
+  command 'br' from deb bottlerocket (0.05b3-18)
+  command 'amr' from deb acr (2.1.2-1)
+  command 'abe' from deb abe (1.1+dfsg-5)
+  command 'ab' from deb apache2-utils (2.4.58-1ubuntu8.11)
+  command 'pbr' from deb python3-pbr (5.11.1-0ubuntu1)
+  command 'adr' from deb adr-tools (3.0.0-2)
+  command 'acr' from deb acr (2.1.2-1)
+Try: sudo apt install <deb name>
+-bash: syntax error near unexpected token `('
+Command 'abr' not found, did you mean:
+  command 'bar' from deb bar (1.11.1-4)
+  command 'alr' from deb alire (1.2.1-1.1build1.1)
+  command 'ar' from deb binutils (2.42-4ubuntu2.10)
+  command 'arb' from deb arb (6.0.6-7)
+  command 'abe' from deb abe (1.1+dfsg-5)
+  command 'br' from deb bottlerocket (0.05b3-18)
+  command 'ab' from deb apache2-utils (2.4.58-1ubuntu8.11)
+  command 'pbr' from deb python3-pbr (5.11.1-0ubuntu1)
+  command 'acr' from deb acr (2.1.2-1)
+  command 'abx' from deb abx (0.0~b1-1build1)
+  command 'adr' from deb adr-tools (3.0.0-2)
+  command 'amr' from deb acr (2.1.2-1)
+Try: sudo apt install <deb name>
+Command 'abr' not found, did you mean:
+  command 'arb' from deb arb (6.0.6-7)
+  command 'bar' from deb bar (1.11.1-4)
+  command 'ab' from deb apache2-utils (2.4.58-1ubuntu8.11)
+  command 'ar' from deb binutils (2.42-4ubuntu2.10)
+  command 'abe' from deb abe (1.1+dfsg-5)
+  command 'acr' from deb acr (2.1.2-1)
+  command 'adr' from deb adr-tools (3.0.0-2)
+  command 'br' from deb bottlerocket (0.05b3-18)
+  command 'abx' from deb abx (0.0~b1-1build1)
+  command 'amr' from deb acr (2.1.2-1)
+  command 'alr' from deb alire (1.2.1-1.1build1.1)
+  command 'pbr' from deb python3-pbr (5.11.1-0ubuntu1)
+Try: sudo apt install <deb name>
+-bash: syntax error near unexpected token `('
+Command 'abr' not found, did you mean:
+  command 'adr' from deb adr-tools (3.0.0-2)
+  command 'ar' from deb binutils (2.42-4ubuntu2.10)
+  command 'ab' from deb apache2-utils (2.4.58-1ubuntu8.11)
+  command 'abx' from deb abx (0.0~b1-1build1)
+  command 'abe' from deb abe (1.1+dfsg-5)
+  command 'bar' from deb bar (1.11.1-4)
+  command 'alr' from deb alire (1.2.1-1.1build1.1)
+  command 'acr' from deb acr (2.1.2-1)
+  command 'pbr' from deb python3-pbr (5.11.1-0ubuntu1)
+  command 'br' from deb bottlerocket (0.05b3-18)
+  command 'amr' from deb acr (2.1.2-1)
+  command 'arb' from deb arb (6.0.6-7)
+Try: sudo apt install <deb name>
+Command 'abr' not found, did you mean:
+  command 'ar' from deb binutils (2.42-4ubuntu2.10)
+  command 'abx' from deb abx (0.0~b1-1build1)
+  command 'adr' from deb adr-tools (3.0.0-2)
+  command 'bar' from deb bar (1.11.1-4)
+  command 'arb' from deb arb (6.0.6-7)
+  command 'amr' from deb acr (2.1.2-1)
+  command 'br' from deb bottlerocket (0.05b3-18)
+  command 'acr' from deb acr (2.1.2-1)
+  command 'alr' from deb alire (1.2.1-1.1build1.1)
+  command 'abe' from deb abe (1.1+dfsg-5)
+  command 'ab' from deb apache2-utils (2.4.58-1ubuntu8.11)
+  command 'pbr' from deb python3-pbr (5.11.1-0ubuntu1)
+Try: sudo apt install <deb name>
+Command 'abr' not found, did you mean:
+  command 'alr' from deb alire (1.2.1-1.1build1.1)
+  command 'amr' from deb acr (2.1.2-1)
+  command 'pbr' from deb python3-pbr (5.11.1-0ubuntu1)
+  command 'arb' from deb arb (6.0.6-7)
+  command 'abx' from deb abx (0.0~b1-1build1)
+  command 'ar' from deb binutils (2.42-4ubuntu2.10)
+  command 'abe' from deb abe (1.1+dfsg-5)
+  command 'bar' from deb bar (1.11.1-4)
+  command 'ab' from deb apache2-utils (2.4.58-1ubuntu8.11)
+  command 'acr' from deb acr (2.1.2-1)
+  command 'br' from deb bottlerocket (0.05b3-18)
+  command 'adr' from deb adr-tools (3.0.0-2)
+Try: sudo apt install <deb name>
+Command 'abr' not found, did you mean:
+  command 'br' from deb bottlerocket (0.05b3-18)
+  command 'acr' from deb acr (2.1.2-1)
+  command 'adr' from deb adr-tools (3.0.0-2)
+  command 'abe' from deb abe (1.1+dfsg-5)
+  command 'ar' from deb binutils (2.42-4ubuntu2.10)
+  command 'alr' from deb alire (1.2.1-1.1build1.1)
+  command 'amr' from deb acr (2.1.2-1)
+  command 'pbr' from deb python3-pbr (5.11.1-0ubuntu1)
+  command 'arb' from deb arb (6.0.6-7)
+  command 'abx' from deb abx (0.0~b1-1build1)
+  command 'bar' from deb bar (1.11.1-4)
+  command 'ab' from deb apache2-utils (2.4.58-1ubuntu8.11)
+Try: sudo apt install <deb name>
+Command 'abr' not found, did you mean:
+  command 'arb' from deb arb (6.0.6-7)
+  command 'abe' from deb abe (1.1+dfsg-5)
+  command 'ab' from deb apache2-utils (2.4.58-1ubuntu8.11)
+  command 'acr' from deb acr (2.1.2-1)
+  command 'amr' from deb acr (2.1.2-1)
+  command 'ar' from deb binutils (2.42-4ubuntu2.10)
+  command 'bar' from deb bar (1.11.1-4)
+  command 'alr' from deb alire (1.2.1-1.1build1.1)
+  command 'br' from deb bottlerocket (0.05b3-18)
+  command 'pbr' from deb python3-pbr (5.11.1-0ubuntu1)
+  command 'abx' from deb abx (0.0~b1-1build1)
+  command 'adr' from deb adr-tools (3.0.0-2)
+Try: sudo apt install <deb name>
+Command 'abr' not found, did you mean:
+  command 'abx' from deb abx (0.0~b1-1build1)
+  command 'abe' from deb abe (1.1+dfsg-5)
+  command 'ab' from deb apache2-utils (2.4.58-1ubuntu8.11)
+  command 'bar' from deb bar (1.11.1-4)
+  command 'pbr' from deb python3-pbr (5.11.1-0ubuntu1)
+  command 'amr' from deb acr (2.1.2-1)
+  command 'alr' from deb alire (1.2.1-1.1build1.1)
+  command 'ar' from deb binutils (2.42-4ubuntu2.10)
+  command 'br' from deb bottlerocket (0.05b3-18)
+  command 'adr' from deb adr-tools (3.0.0-2)
+  command 'arb' from deb arb (6.0.6-7)
+  command 'acr' from deb acr (2.1.2-1)
+Try: sudo apt install <deb name>
+Command 'abr' not found, did you mean:
+  command 'pbr' from deb python3-pbr (5.11.1-0ubuntu1)
+  command 'bar' from deb bar (1.11.1-4)
+  command 'abx' from deb abx (0.0~b1-1build1)
+  command 'ab' from deb apache2-utils (2.4.58-1ubuntu8.11)
+  command 'adr' from deb adr-tools (3.0.0-2)
+  command 'ar' from deb binutils (2.42-4ubuntu2.10)
+  command 'amr' from deb acr (2.1.2-1)
+  command 'br' from deb bottlerocket (0.05b3-18)
+  command 'abe' from deb abe (1.1+dfsg-5)
+  command 'arb' from deb arb (6.0.6-7)
+  command 'acr' from deb acr (2.1.2-1)
+  command 'alr' from deb alire (1.2.1-1.1build1.1)
+Try: sudo apt install <deb name>
+-bash: syntax error near unexpected token `newline'
+-bash: syntax error near unexpected token `('
+Command 'abr' not found, did you mean:
+  command 'abe' from deb abe (1.1+dfsg-5)
+  command 'alr' from deb alire (1.2.1-1.1build1.1)
+  command 'abx' from deb abx (0.0~b1-1build1)
+  command 'ar' from deb binutils (2.42-4ubuntu2.10)
+  command 'bar' from deb bar (1.11.1-4)
+  command 'acr' from deb acr (2.1.2-1)
+  command 'br' from deb bottlerocket (0.05b3-18)
+  command 'amr' from deb acr (2.1.2-1)
+  command 'arb' from deb arb (6.0.6-7)
+  command 'adr' from deb adr-tools (3.0.0-2)
+  command 'pbr' from deb python3-pbr (5.11.1-0ubuntu1)
+  command 'ab' from deb apache2-utils (2.4.58-1ubuntu8.11)
+Try: sudo apt install <deb name>
+Command 'abr' not found, did you mean:
+  command 'arb' from deb arb (6.0.6-7)
+  command 'bar' from deb bar (1.11.1-4)
+  command 'ab' from deb apache2-utils (2.4.58-1ubuntu8.11)
+  command 'adr' from deb adr-tools (3.0.0-2)
+  command 'abx' from deb abx (0.0~b1-1build1)
+  command 'pbr' from deb python3-pbr (5.11.1-0ubuntu1)
+  command 'acr' from deb acr (2.1.2-1)
+  command 'alr' from deb alire (1.2.1-1.1build1.1)
+  command 'amr' from deb acr (2.1.2-1)
+  command 'ar' from deb binutils (2.42-4ubuntu2.10)
+  command 'br' from deb bottlerocket (0.05b3-18)
+  command 'abe' from deb abe (1.1+dfsg-5)
+Try: sudo apt install <deb name>
+Command 'abr' not found, did you mean:
+  command 'ab' from deb apache2-utils (2.4.58-1ubuntu8.11)
+  command 'amr' from deb acr (2.1.2-1)
+  command 'ar' from deb binutils (2.42-4ubuntu2.10)
+  command 'arb' from deb arb (6.0.6-7)
+  command 'br' from deb bottlerocket (0.05b3-18)
+  command 'abe' from deb abe (1.1+dfsg-5)
+  command 'abx' from deb abx (0.0~b1-1build1)
+  command 'pbr' from deb python3-pbr (5.11.1-0ubuntu1)
+  command 'acr' from deb acr (2.1.2-1)
+  command 'bar' from deb bar (1.11.1-4)
+  command 'adr' from deb adr-tools (3.0.0-2)
+  command 'alr' from deb alire (1.2.1-1.1build1.1)
+Try: sudo apt install <deb name>
+Command 'abr' not found, did you mean:
+  command 'ab' from deb apache2-utils (2.4.58-1ubuntu8.11)
+  command 'acr' from deb acr (2.1.2-1)
+  command 'bar' from deb bar (1.11.1-4)
+  command 'adr' from deb adr-tools (3.0.0-2)
+  command 'alr' from deb alire (1.2.1-1.1build1.1)
+  command 'br' from deb bottlerocket (0.05b3-18)
+  command 'ar' from deb binutils (2.42-4ubuntu2.10)
+  command 'abe' from deb abe (1.1+dfsg-5)
+  command 'arb' from deb arb (6.0.6-7)
+  command 'amr' from deb acr (2.1.2-1)
+  command 'pbr' from deb python3-pbr (5.11.1-0ubuntu1)
+  command 'abx' from deb abx (0.0~b1-1build1)
+Try: sudo apt install <deb name>
+-bash: syntax error near unexpected token `leonardo@agile-ai-experts-server:~$'
+Command 'abr' not found, did you mean:
+  command 'bar' from deb bar (1.11.1-4)
+  command 'br' from deb bottlerocket (0.05b3-18)
+  command 'abe' from deb abe (1.1+dfsg-5)
+  command 'arb' from deb arb (6.0.6-7)
+  command 'ab' from deb apache2-utils (2.4.58-1ubuntu8.11)
+  command 'adr' from deb adr-tools (3.0.0-2)
+  command 'abx' from deb abx (0.0~b1-1build1)
+  command 'pbr' from deb python3-pbr (5.11.1-0ubuntu1)
+  command 'ar' from deb binutils (2.42-4ubuntu2.10)
+  command 'amr' from deb acr (2.1.2-1)
+  command 'alr' from deb alire (1.2.1-1.1build1.1)
+  command 'acr' from deb acr (2.1.2-1)
+Try: sudo apt install <deb name>
+-bash: syntax error near unexpected token `('
+Command 'abr' not found, did you mean:
+  command 'br' from deb bottlerocket (0.05b3-18)
+  command 'adr' from deb adr-tools (3.0.0-2)
+  command 'abx' from deb abx (0.0~b1-1build1)
+  command 'ab' from deb apache2-utils (2.4.58-1ubuntu8.11)
+  command 'amr' from deb acr (2.1.2-1)
+  command 'pbr' from deb python3-pbr (5.11.1-0ubuntu1)
+  command 'abe' from deb abe (1.1+dfsg-5)
+  command 'ar' from deb binutils (2.42-4ubuntu2.10)
+  command 'bar' from deb bar (1.11.1-4)
+  command 'acr' from deb acr (2.1.2-1)
+  command 'arb' from deb arb (6.0.6-7)
+  command 'alr' from deb alire (1.2.1-1.1build1.1)
+Try: sudo apt install <deb name>
+Command 'abr' not found, did you mean:
+  command 'acr' from deb acr (2.1.2-1)
+  command 'amr' from deb acr (2.1.2-1)
+  command 'abx' from deb abx (0.0~b1-1build1)
+  command 'abe' from deb abe (1.1+dfsg-5)
+  command 'br' from deb bottlerocket (0.05b3-18)
+  command 'arb' from deb arb (6.0.6-7)
+  command 'ab' from deb apache2-utils (2.4.58-1ubuntu8.11)
+  command 'alr' from deb alire (1.2.1-1.1build1.1)
+  command 'pbr' from deb python3-pbr (5.11.1-0ubuntu1)
+  command 'adr' from deb adr-tools (3.0.0-2)
+  command 'bar' from deb bar (1.11.1-4)
+  command 'ar' from deb binutils (2.42-4ubuntu2.10)
+Try: sudo apt install <deb name>
+-bash: syntax error near unexpected token `('
+Command 'abr' not found, did you mean:
+  command 'acr' from deb acr (2.1.2-1)
+  command 'adr' from deb adr-tools (3.0.0-2)
+  command 'arb' from deb arb (6.0.6-7)
+  command 'abx' from deb abx (0.0~b1-1build1)
+  command 'amr' from deb acr (2.1.2-1)
+  command 'alr' from deb alire (1.2.1-1.1build1.1)
+  command 'br' from deb bottlerocket (0.05b3-18)
+  command 'abe' from deb abe (1.1+dfsg-5)
+  command 'pbr' from deb python3-pbr (5.11.1-0ubuntu1)
+  command 'ab' from deb apache2-utils (2.4.58-1ubuntu8.11)
+  command 'ar' from deb binutils (2.42-4ubuntu2.10)
+  command 'bar' from deb bar (1.11.1-4)
+Try: sudo apt install <deb name>
+Command 'abr' not found, did you mean:
+  command 'amr' from deb acr (2.1.2-1)
+  command 'bar' from deb bar (1.11.1-4)
+  command 'ar' from deb binutils (2.42-4ubuntu2.10)
+  command 'br' from deb bottlerocket (0.05b3-18)
+  command 'adr' from deb adr-tools (3.0.0-2)
+  command 'abx' from deb abx (0.0~b1-1build1)
+  command 'pbr' from deb python3-pbr (5.11.1-0ubuntu1)
+  command 'ab' from deb apache2-utils (2.4.58-1ubuntu8.11)
+  command 'acr' from deb acr (2.1.2-1)
+  command 'arb' from deb arb (6.0.6-7)
+  command 'abe' from deb abe (1.1+dfsg-5)
+  command 'alr' from deb alire (1.2.1-1.1build1.1)
+Try: sudo apt install <deb name>
+Command 'abr' not found, did you mean:
+  command 'br' from deb bottlerocket (0.05b3-18)
+  command 'adr' from deb adr-tools (3.0.0-2)
+  command 'abe' from deb abe (1.1+dfsg-5)
+  command 'bar' from deb bar (1.11.1-4)
+  command 'alr' from deb alire (1.2.1-1.1build1.1)
+  command 'ar' from deb binutils (2.42-4ubuntu2.10)
+  command 'amr' from deb acr (2.1.2-1)
+  command 'pbr' from deb python3-pbr (5.11.1-0ubuntu1)
+  command 'ab' from deb apache2-utils (2.4.58-1ubuntu8.11)
+  command 'acr' from deb acr (2.1.2-1)
+  command 'arb' from deb arb (6.0.6-7)
+  command 'abx' from deb abx (0.0~b1-1build1)
+Try: sudo apt install <deb name>
+Command 'abr' not found, did you mean:
+  command 'br' from deb bottlerocket (0.05b3-18)
+  command 'alr' from deb alire (1.2.1-1.1build1.1)
+  command 'acr' from deb acr (2.1.2-1)
+  command 'arb' from deb arb (6.0.6-7)
+  command 'ar' from deb binutils (2.42-4ubuntu2.10)
+  command 'bar' from deb bar (1.11.1-4)
+  command 'adr' from deb adr-tools (3.0.0-2)
+  command 'abe' from deb abe (1.1+dfsg-5)
+  command 'ab' from deb apache2-utils (2.4.58-1ubuntu8.11)
+  command 'abx' from deb abx (0.0~b1-1build1)
+  command 'pbr' from deb python3-pbr (5.11.1-0ubuntu1)
+  command 'amr' from deb acr (2.1.2-1)
+Try: sudo apt install <deb name>
+Command 'abr' not found, did you mean:
+  command 'ar' from deb binutils (2.42-4ubuntu2.10)
+  command 'ab' from deb apache2-utils (2.4.58-1ubuntu8.11)
+  command 'br' from deb bottlerocket (0.05b3-18)
+  command 'pbr' from deb python3-pbr (5.11.1-0ubuntu1)
+  command 'abx' from deb abx (0.0~b1-1build1)
+  command 'arb' from deb arb (6.0.6-7)
+  command 'amr' from deb acr (2.1.2-1)
+  command 'bar' from deb bar (1.11.1-4)
+  command 'alr' from deb alire (1.2.1-1.1build1.1)
+  command 'adr' from deb adr-tools (3.0.0-2)
+  command 'abe' from deb abe (1.1+dfsg-5)
+  command 'acr' from deb acr (2.1.2-1)
+Try: sudo apt install <deb name>
+Command 'abr' not found, did you mean:
+  command 'arb' from deb arb (6.0.6-7)
+  command 'ab' from deb apache2-utils (2.4.58-1ubuntu8.11)
+  command 'abe' from deb abe (1.1+dfsg-5)
+  command 'alr' from deb alire (1.2.1-1.1build1.1)
+  command 'br' from deb bottlerocket (0.05b3-18)
+  command 'acr' from deb acr (2.1.2-1)
+  command 'abx' from deb abx (0.0~b1-1build1)
+  command 'pbr' from deb python3-pbr (5.11.1-0ubuntu1)
+  command 'bar' from deb bar (1.11.1-4)
+  command 'adr' from deb adr-tools (3.0.0-2)
+  command 'ar' from deb binutils (2.42-4ubuntu2.10)
+  command 'amr' from deb acr (2.1.2-1)
+Try: sudo apt install <deb name>
+Command 'abr' not found, did you mean:
+  command 'bar' from deb bar (1.11.1-4)
+  command 'ar' from deb binutils (2.42-4ubuntu2.10)
+  command 'br' from deb bottlerocket (0.05b3-18)
+  command 'acr' from deb acr (2.1.2-1)
+  command 'abe' from deb abe (1.1+dfsg-5)
+  command 'alr' from deb alire (1.2.1-1.1build1.1)
+  command 'pbr' from deb python3-pbr (5.11.1-0ubuntu1)
+  command 'adr' from deb adr-tools (3.0.0-2)
+  command 'ab' from deb apache2-utils (2.4.58-1ubuntu8.11)
+  command 'abx' from deb abx (0.0~b1-1build1)
+  command 'amr' from deb acr (2.1.2-1)
+  command 'arb' from deb arb (6.0.6-7)
+Try: sudo apt install <deb name>
+-bash: syntax error near unexpected token `newline'
+-bash: syntax error near unexpected token `('
+Command 'abr' not found, did you mean:
+  command 'abx' from deb abx (0.0~b1-1build1)
+  command 'ar' from deb binutils (2.42-4ubuntu2.10)
+  command 'pbr' from deb python3-pbr (5.11.1-0ubuntu1)
+  command 'arb' from deb arb (6.0.6-7)
+  command 'acr' from deb acr (2.1.2-1)
+  command 'bar' from deb bar (1.11.1-4)
+  command 'abe' from deb abe (1.1+dfsg-5)
+  command 'br' from deb bottlerocket (0.05b3-18)
+  command 'adr' from deb adr-tools (3.0.0-2)
+  command 'amr' from deb acr (2.1.2-1)
+  command 'ab' from deb apache2-utils (2.4.58-1ubuntu8.11)
+  command 'alr' from deb alire (1.2.1-1.1build1.1)
+Try: sudo apt install <deb name>
+Command 'abr' not found, did you mean:
+  command 'adr' from deb adr-tools (3.0.0-2)
+  command 'alr' from deb alire (1.2.1-1.1build1.1)
+  command 'br' from deb bottlerocket (0.05b3-18)
+  command 'pbr' from deb python3-pbr (5.11.1-0ubuntu1)
+  command 'bar' from deb bar (1.11.1-4)
+  command 'arb' from deb arb (6.0.6-7)
+  command 'acr' from deb acr (2.1.2-1)
+  command 'amr' from deb acr (2.1.2-1)
+  command 'abx' from deb abx (0.0~b1-1build1)
+  command 'ar' from deb binutils (2.42-4ubuntu2.10)
+  command 'abe' from deb abe (1.1+dfsg-5)
+  command 'ab' from deb apache2-utils (2.4.58-1ubuntu8.11)
+Try: sudo apt install <deb name>
+Command 'abr' not found, did you mean:
+  command 'bar' from deb bar (1.11.1-4)
+  command 'br' from deb bottlerocket (0.05b3-18)
+  command 'abe' from deb abe (1.1+dfsg-5)
+  command 'pbr' from deb python3-pbr (5.11.1-0ubuntu1)
+  command 'arb' from deb arb (6.0.6-7)
+  command 'alr' from deb alire (1.2.1-1.1build1.1)
+  command 'adr' from deb adr-tools (3.0.0-2)
+  command 'amr' from deb acr (2.1.2-1)
+  command 'abx' from deb abx (0.0~b1-1build1)
+  command 'ar' from deb binutils (2.42-4ubuntu2.10)
+  command 'acr' from deb acr (2.1.2-1)
+  command 'ab' from deb apache2-utils (2.4.58-1ubuntu8.11)
+Try: sudo apt install <deb name>
+Command 'abr' not found, did you mean:
+  command 'amr' from deb acr (2.1.2-1)
+  command 'pbr' from deb python3-pbr (5.11.1-0ubuntu1)
+  command 'acr' from deb acr (2.1.2-1)
+  command 'alr' from deb alire (1.2.1-1.1build1.1)
+  command 'arb' from deb arb (6.0.6-7)
+  command 'ab' from deb apache2-utils (2.4.58-1ubuntu8.11)
+  command 'br' from deb bottlerocket (0.05b3-18)
+  command 'abx' from deb abx (0.0~b1-1build1)
+  command 'adr' from deb adr-tools (3.0.0-2)
+  command 'ar' from deb binutils (2.42-4ubuntu2.10)
+  command 'abe' from deb abe (1.1+dfsg-5)
+  command 'bar' from deb bar (1.11.1-4)
+Try: sudo apt install <deb name>
+Command 'abr' not found, did you mean:
+  command 'br' from deb bottlerocket (0.05b3-18)
+  command 'bar' from deb bar (1.11.1-4)
+  command 'amr' from deb acr (2.1.2-1)
+  command 'acr' from deb acr (2.1.2-1)
+  command 'pbr' from deb python3-pbr (5.11.1-0ubuntu1)
+  command 'abx' from deb abx (0.0~b1-1build1)
+  command 'ar' from deb binutils (2.42-4ubuntu2.10)
+  command 'arb' from deb arb (6.0.6-7)
+  command 'adr' from deb adr-tools (3.0.0-2)
+  command 'ab' from deb apache2-utils (2.4.58-1ubuntu8.11)
+  command 'abe' from deb abe (1.1+dfsg-5)
+  command 'alr' from deb alire (1.2.1-1.1build1.1)
+Try: sudo apt install <deb name>
+Command 'abr' not found, did you mean:
+  command 'ar' from deb binutils (2.42-4ubuntu2.10)
+  command 'acr' from deb acr (2.1.2-1)
+  command 'ab' from deb apache2-utils (2.4.58-1ubuntu8.11)
+  command 'bar' from deb bar (1.11.1-4)
+  command 'abx' from deb abx (0.0~b1-1build1)
+  command 'amr' from deb acr (2.1.2-1)
+  command 'alr' from deb alire (1.2.1-1.1build1.1)
+  command 'arb' from deb arb (6.0.6-7)
+  command 'br' from deb bottlerocket (0.05b3-18)
+  command 'pbr' from deb python3-pbr (5.11.1-0ubuntu1)
+  command 'adr' from deb adr-tools (3.0.0-2)
+  command 'abe' from deb abe (1.1+dfsg-5)
+Try: sudo apt install <deb name>
+-bash: syntax error near unexpected token `leonardo@agile-ai-experts-server:~$'
+-bash: syntax error near unexpected token `('
+Command 'abr' not found, did you mean:
+  command 'abx' from deb abx (0.0~b1-1build1)
+  command 'pbr' from deb python3-pbr (5.11.1-0ubuntu1)
+  command 'bar' from deb bar (1.11.1-4)
+  command 'arb' from deb arb (6.0.6-7)
+  command 'br' from deb bottlerocket (0.05b3-18)
+  command 'ab' from deb apache2-utils (2.4.58-1ubuntu8.11)
+  command 'abe' from deb abe (1.1+dfsg-5)
+  command 'alr' from deb alire (1.2.1-1.1build1.1)
+  command 'adr' from deb adr-tools (3.0.0-2)
+  command 'ar' from deb binutils (2.42-4ubuntu2.10)
+  command 'acr' from deb acr (2.1.2-1)
+  command 'amr' from deb acr (2.1.2-1)
+Try: sudo apt install <deb name>
+Command 'abr' not found, did you mean:
+  command 'br' from deb bottlerocket (0.05b3-18)
+  command 'amr' from deb acr (2.1.2-1)
+  command 'adr' from deb adr-tools (3.0.0-2)
+  command 'abx' from deb abx (0.0~b1-1build1)
+  command 'abe' from deb abe (1.1+dfsg-5)
+  command 'acr' from deb acr (2.1.2-1)
+  command 'ar' from deb binutils (2.42-4ubuntu2.10)
+  command 'arb' from deb arb (6.0.6-7)
+  command 'pbr' from deb python3-pbr (5.11.1-0ubuntu1)
+  command 'alr' from deb alire (1.2.1-1.1build1.1)
+  command 'ab' from deb apache2-utils (2.4.58-1ubuntu8.11)
+  command 'bar' from deb bar (1.11.1-4)
+Try: sudo apt install <deb name>
+-bash: syntax error near unexpected token `('
+Command 'abr' not found, did you mean:
+  command 'arb' from deb arb (6.0.6-7)
+  command 'bar' from deb bar (1.11.1-4)
+  command 'acr' from deb acr (2.1.2-1)
+  command 'amr' from deb acr (2.1.2-1)
+  command 'ab' from deb apache2-utils (2.4.58-1ubuntu8.11)
+  command 'br' from deb bottlerocket (0.05b3-18)
+  command 'adr' from deb adr-tools (3.0.0-2)
+  command 'abe' from deb abe (1.1+dfsg-5)
+  command 'abx' from deb abx (0.0~b1-1build1)
+  command 'alr' from deb alire (1.2.1-1.1build1.1)
+  command 'pbr' from deb python3-pbr (5.11.1-0ubuntu1)
+  command 'ar' from deb binutils (2.42-4ubuntu2.10)
+Try: sudo apt install <deb name>
+Command 'abr' not found, did you mean:
+  command 'alr' from deb alire (1.2.1-1.1build1.1)
+  command 'pbr' from deb python3-pbr (5.11.1-0ubuntu1)
+  command 'arb' from deb arb (6.0.6-7)
+  command 'acr' from deb acr (2.1.2-1)
+  command 'ar' from deb binutils (2.42-4ubuntu2.10)
+  command 'abx' from deb abx (0.0~b1-1build1)
+  command 'abe' from deb abe (1.1+dfsg-5)
+  command 'br' from deb bottlerocket (0.05b3-18)
+  command 'ab' from deb apache2-utils (2.4.58-1ubuntu8.11)
+  command 'bar' from deb bar (1.11.1-4)
+  command 'amr' from deb acr (2.1.2-1)
+  command 'adr' from deb adr-tools (3.0.0-2)
+Try: sudo apt install <deb name>
+-bash: syntax error near unexpected token `('
+Command 'abr' not found, did you mean:
+  command 'alr' from deb alire (1.2.1-1.1build1.1)
+  command 'ar' from deb binutils (2.42-4ubuntu2.10)
+  command 'bar' from deb bar (1.11.1-4)
+  command 'abe' from deb abe (1.1+dfsg-5)
+  command 'adr' from deb adr-tools (3.0.0-2)
+  command 'br' from deb bottlerocket (0.05b3-18)
+  command 'acr' from deb acr (2.1.2-1)
+  command 'ab' from deb apache2-utils (2.4.58-1ubuntu8.11)
+  command 'arb' from deb arb (6.0.6-7)
+  command 'amr' from deb acr (2.1.2-1)
+  command 'pbr' from deb python3-pbr (5.11.1-0ubuntu1)
+  command 'abx' from deb abx (0.0~b1-1build1)
+Try: sudo apt install <deb name>
+Command 'abr' not found, did you mean:
+  command 'abx' from deb abx (0.0~b1-1build1)
+  command 'adr' from deb adr-tools (3.0.0-2)
+  command 'abe' from deb abe (1.1+dfsg-5)
+  command 'pbr' from deb python3-pbr (5.11.1-0ubuntu1)
+  command 'alr' from deb alire (1.2.1-1.1build1.1)
+  command 'arb' from deb arb (6.0.6-7)
+  command 'ar' from deb binutils (2.42-4ubuntu2.10)
+  command 'bar' from deb bar (1.11.1-4)
+  command 'amr' from deb acr (2.1.2-1)
+  command 'acr' from deb acr (2.1.2-1)
+  command 'ab' from deb apache2-utils (2.4.58-1ubuntu8.11)
+  command 'br' from deb bottlerocket (0.05b3-18)
+Try: sudo apt install <deb name>
+Command 'abr' not found, did you mean:
+  command 'abx' from deb abx (0.0~b1-1build1)
+  command 'amr' from deb acr (2.1.2-1)
+  command 'bar' from deb bar (1.11.1-4)
+  command 'br' from deb bottlerocket (0.05b3-18)
+  command 'adr' from deb adr-tools (3.0.0-2)
+  command 'abe' from deb abe (1.1+dfsg-5)
+  command 'acr' from deb acr (2.1.2-1)
+  command 'pbr' from deb python3-pbr (5.11.1-0ubuntu1)
+  command 'ab' from deb apache2-utils (2.4.58-1ubuntu8.11)
+  command 'arb' from deb arb (6.0.6-7)
+  command 'ar' from deb binutils (2.42-4ubuntu2.10)
+  command 'alr' from deb alire (1.2.1-1.1build1.1)
+Try: sudo apt install <deb name>
+Command 'abr' not found, did you mean:
+  command 'alr' from deb alire (1.2.1-1.1build1.1)
+  command 'ab' from deb apache2-utils (2.4.58-1ubuntu8.11)
+  command 'abe' from deb abe (1.1+dfsg-5)
+  command 'ar' from deb binutils (2.42-4ubuntu2.10)
+  command 'amr' from deb acr (2.1.2-1)
+  command 'arb' from deb arb (6.0.6-7)
+  command 'bar' from deb bar (1.11.1-4)
+  command 'adr' from deb adr-tools (3.0.0-2)
+  command 'br' from deb bottlerocket (0.05b3-18)
+  command 'abx' from deb abx (0.0~b1-1build1)
+  command 'acr' from deb acr (2.1.2-1)
+  command 'pbr' from deb python3-pbr (5.11.1-0ubuntu1)
+Try: sudo apt install <deb name>
+Command 'abr' not found, did you mean:
+  command 'adr' from deb adr-tools (3.0.0-2)
+  command 'amr' from deb acr (2.1.2-1)
+  command 'abe' from deb abe (1.1+dfsg-5)
+  command 'pbr' from deb python3-pbr (5.11.1-0ubuntu1)
+  command 'abx' from deb abx (0.0~b1-1build1)
+  command 'bar' from deb bar (1.11.1-4)
+  command 'arb' from deb arb (6.0.6-7)
+  command 'acr' from deb acr (2.1.2-1)
+  command 'ar' from deb binutils (2.42-4ubuntu2.10)
+  command 'ab' from deb apache2-utils (2.4.58-1ubuntu8.11)
+  command 'alr' from deb alire (1.2.1-1.1build1.1)
+  command 'br' from deb bottlerocket (0.05b3-18)
+Try: sudo apt install <deb name>
+Command 'abr' not found, did you mean:
+  command 'amr' from deb acr (2.1.2-1)
+  command 'abe' from deb abe (1.1+dfsg-5)
+  command 'pbr' from deb python3-pbr (5.11.1-0ubuntu1)
+  command 'br' from deb bottlerocket (0.05b3-18)
+  command 'ar' from deb binutils (2.42-4ubuntu2.10)
+  command 'acr' from deb acr (2.1.2-1)
+  command 'abx' from deb abx (0.0~b1-1build1)
+  command 'ab' from deb apache2-utils (2.4.58-1ubuntu8.11)
+  command 'arb' from deb arb (6.0.6-7)
+  command 'alr' from deb alire (1.2.1-1.1build1.1)
+  command 'bar' from deb bar (1.11.1-4)
+  command 'adr' from deb adr-tools (3.0.0-2)
+Try: sudo apt install <deb name>
+Command 'abr' not found, did you mean:
+  command 'pbr' from deb python3-pbr (5.11.1-0ubuntu1)
+  command 'ar' from deb binutils (2.42-4ubuntu2.10)
+  command 'br' from deb bottlerocket (0.05b3-18)
+  command 'bar' from deb bar (1.11.1-4)
+  command 'arb' from deb arb (6.0.6-7)
+  command 'abx' from deb abx (0.0~b1-1build1)
+  command 'adr' from deb adr-tools (3.0.0-2)
+  command 'alr' from deb alire (1.2.1-1.1build1.1)
+  command 'abe' from deb abe (1.1+dfsg-5)
+  command 'amr' from deb acr (2.1.2-1)
+  command 'acr' from deb acr (2.1.2-1)
+  command 'ab' from deb apache2-utils (2.4.58-1ubuntu8.11)
+Try: sudo apt install <deb name>
+-bash: syntax error near unexpected token `newline'
+-bash: syntax error near unexpected token `('
+Command 'abr' not found, did you mean:
+  command 'ar' from deb binutils (2.42-4ubuntu2.10)
+  command 'abe' from deb abe (1.1+dfsg-5)
+  command 'pbr' from deb python3-pbr (5.11.1-0ubuntu1)
+  command 'abx' from deb abx (0.0~b1-1build1)
+  command 'br' from deb bottlerocket (0.05b3-18)
+  command 'adr' from deb adr-tools (3.0.0-2)
+  command 'ab' from deb apache2-utils (2.4.58-1ubuntu8.11)
+  command 'alr' from deb alire (1.2.1-1.1build1.1)
+  command 'arb' from deb arb (6.0.6-7)
+  command 'bar' from deb bar (1.11.1-4)
+  command 'amr' from deb acr (2.1.2-1)
+  command 'acr' from deb acr (2.1.2-1)
+Try: sudo apt install <deb name>
+Command 'abr' not found, did you mean:
+  command 'br' from deb bottlerocket (0.05b3-18)
+  command 'bar' from deb bar (1.11.1-4)
+  command 'ar' from deb binutils (2.42-4ubuntu2.10)
+  command 'ab' from deb apache2-utils (2.4.58-1ubuntu8.11)
+  command 'abe' from deb abe (1.1+dfsg-5)
+  command 'amr' from deb acr (2.1.2-1)
+  command 'pbr' from deb python3-pbr (5.11.1-0ubuntu1)
+  command 'arb' from deb arb (6.0.6-7)
+  command 'alr' from deb alire (1.2.1-1.1build1.1)
+  command 'acr' from deb acr (2.1.2-1)
+  command 'abx' from deb abx (0.0~b1-1build1)
+  command 'adr' from deb adr-tools (3.0.0-2)
+Try: sudo apt install <deb name>
+Command 'abr' not found, did you mean:
+  command 'pbr' from deb python3-pbr (5.11.1-0ubuntu1)
+  command 'acr' from deb acr (2.1.2-1)
+  command 'amr' from deb acr (2.1.2-1)
+  command 'adr' from deb adr-tools (3.0.0-2)
+  command 'ar' from deb binutils (2.42-4ubuntu2.10)
+  command 'abe' from deb abe (1.1+dfsg-5)
+  command 'abx' from deb abx (0.0~b1-1build1)
+  command 'br' from deb bottlerocket (0.05b3-18)
+  command 'ab' from deb apache2-utils (2.4.58-1ubuntu8.11)
+  command 'arb' from deb arb (6.0.6-7)
+  command 'alr' from deb alire (1.2.1-1.1build1.1)
+  command 'bar' from deb bar (1.11.1-4)
+Try: sudo apt install <deb name>
+Command 'abr' not found, did you mean:
+  command 'bar' from deb bar (1.11.1-4)
+  command 'amr' from deb acr (2.1.2-1)
+  command 'ab' from deb apache2-utils (2.4.58-1ubuntu8.11)
+  command 'arb' from deb arb (6.0.6-7)
+  command 'abx' from deb abx (0.0~b1-1build1)
+  command 'adr' from deb adr-tools (3.0.0-2)
+  command 'br' from deb bottlerocket (0.05b3-18)
+  command 'ar' from deb binutils (2.42-4ubuntu2.10)
+  command 'abe' from deb abe (1.1+dfsg-5)
+  command 'alr' from deb alire (1.2.1-1.1build1.1)
+  command 'pbr' from deb python3-pbr (5.11.1-0ubuntu1)
+  command 'acr' from deb acr (2.1.2-1)
+Try: sudo apt install <deb name>
+-bash: syntax error near unexpected token `leonardo@agile-ai-experts-server:~$'
+activating
+activating: command not found
+-bash: syntax error near unexpected token `leonardo@agile-ai-experts-server:~$'
+-H: command not found
+-bash: syntax error near unexpected token `lexbridge'
+(lexbridge) leonardo@agile-ai-experts-server:~$
