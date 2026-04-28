@@ -1,48 +1,98 @@
 import { useState, useRef } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
-import { ArrowLeft, Database, Upload, FileText, CheckCircle2, Trash2 } from 'lucide-react';
+import { ArrowLeft, Database, Upload, FileText, CheckCircle2, Trash2, Loader2, AlertCircle } from 'lucide-react';
 import { Link } from 'wouter';
 import { Button } from '@/components/ui/button';
-import { useListDocuments, getListDocumentsQueryKey, useUploadDocument, useDeleteDocument } from '@workspace/api-client-react';
+import { useListDocuments, getListDocumentsQueryKey, useDeleteDocument } from '@workspace/api-client-react';
 import { useQueryClient } from '@tanstack/react-query';
-import { usePdf } from '@/hooks/use-pdf';
+import { useToast } from '@/hooks/use-toast';
+
+const apiBase = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/+$/, '') ?? '';
+
+async function uploadFilesToServer(
+  files: File[],
+  module: 'rural' | 'executio',
+  authToken: string | null
+): Promise<{ ok: boolean; errors: string[] }> {
+  const errors: string[] = [];
+  for (const file of files) {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('module', module);
+
+    const headers: Record<string, string> = {};
+    if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
+
+    try {
+      const res = await fetch(`${apiBase}/api/documents/upload`, {
+        method: 'POST',
+        headers,
+        body: formData,
+        credentials: 'include',
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+        errors.push(`${file.name}: ${body.error ?? res.statusText}`);
+      }
+    } catch (e: any) {
+      errors.push(`${file.name}: ${e?.message ?? 'Erro de rede'}`);
+    }
+  }
+  return { ok: errors.length === 0, errors };
+}
 
 export default function Documents({ module }: { module: 'rural' | 'executio' }) {
   const qc = useQueryClient();
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
-  const { extractText } = usePdf();
+  const { toast } = useToast();
+
+  const hasIndexing = (docs: any[]) => docs.some((d: any) => d.status === 'indexing');
 
   const { data: docs = [], isLoading } = useListDocuments({
-    query: { queryKey: getListDocumentsQueryKey() }
+    query: {
+      queryKey: getListDocumentsQueryKey(),
+      refetchInterval: (query) => {
+        const data = query.state.data as any[] | undefined;
+        return data && hasIndexing(data.filter((d: any) => d.module === module)) ? 5000 : false;
+      },
+    },
   });
 
-  const moduleDocs = docs.filter(d => d.module === module);
+  const moduleDocs = docs.filter((d: any) => d.module === module);
 
-  const upload = useUploadDocument();
   const del = useDeleteDocument();
 
   const handleFiles = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
-    setUploading(true);
-    for (const file of Array.from(files)) {
-      if (file.type !== 'application/pdf') continue;
-      try {
-        const content = await extractText(file);
-        await upload.mutateAsync({
-          data: { filename: file.name, content, module }
-        });
-      } catch (e) {
-        console.error('Erro ao processar PDF:', e);
-      }
+    const pdfs = Array.from(files).filter(
+      (f) => f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf')
+    );
+    if (pdfs.length === 0) {
+      toast({ title: 'Formato inválido', description: 'Selecione arquivos PDF.', variant: 'destructive' });
+      return;
     }
+    setUploading(true);
+    const { ok, errors } = await uploadFilesToServer(pdfs, module, null);
     await qc.invalidateQueries({ queryKey: getListDocumentsQueryKey() });
     setUploading(false);
+
+    if (ok) {
+      toast({ title: 'Upload concluído', description: 'Indexação em andamento...' });
+    } else {
+      for (const err of errors) {
+        toast({ title: 'Erro no upload', description: err, variant: 'destructive' });
+      }
+    }
   };
 
   const handleDelete = async (id: number) => {
-    await del.mutateAsync({ id });
-    await qc.invalidateQueries({ queryKey: getListDocumentsQueryKey() });
+    try {
+      await del.mutateAsync({ id });
+      await qc.invalidateQueries({ queryKey: getListDocumentsQueryKey() });
+    } catch (e: any) {
+      toast({ title: 'Erro ao excluir', description: e?.message ?? 'Tente novamente.', variant: 'destructive' });
+    }
   };
 
   return (
@@ -73,13 +123,13 @@ export default function Documents({ module }: { module: 'rural' | 'executio' }) 
             disabled={uploading}
             data-testid="btn-upload-doc"
           >
-            <Upload className="w-4 h-4" />
-            {uploading ? 'Processando...' : 'Carregar PDF'}
+            {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+            {uploading ? 'Enviando...' : 'Carregar PDF'}
           </Button>
           <input
             ref={fileRef}
             type="file"
-            accept="application/pdf"
+            accept="application/pdf,.pdf"
             multiple
             className="hidden"
             onChange={(e) => handleFiles(e.target.files)}
@@ -101,7 +151,7 @@ export default function Documents({ module }: { module: 'rural' | 'executio' }) 
           <Card className="bg-card border-border">
             <CardContent className="p-0">
               <div className="divide-y divide-border">
-                {moduleDocs.map((doc) => (
+                {moduleDocs.map((doc: any) => (
                   <div key={doc.id} className="p-4 flex items-center justify-between hover:bg-muted/30 transition-colors">
                     <div className="flex items-center gap-4 overflow-hidden">
                       <div className="h-10 w-10 rounded bg-muted flex items-center justify-center text-muted-foreground shrink-0">
@@ -116,9 +166,21 @@ export default function Documents({ module }: { module: 'rural' | 'executio' }) 
                       </div>
                     </div>
                     <div className="flex items-center gap-3 shrink-0">
-                      <span className="flex items-center gap-1.5 text-sm text-primary">
-                        <CheckCircle2 className="w-4 h-4" /> Indexado
-                      </span>
+                      {doc.status === 'ready' && (
+                        <span className="flex items-center gap-1.5 text-sm text-primary">
+                          <CheckCircle2 className="w-4 h-4" /> Indexado
+                        </span>
+                      )}
+                      {doc.status === 'indexing' && (
+                        <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                          <Loader2 className="w-4 h-4 animate-spin" /> Indexando...
+                        </span>
+                      )}
+                      {doc.status === 'error' && (
+                        <span className="flex items-center gap-1.5 text-sm text-destructive">
+                          <AlertCircle className="w-4 h-4" /> Erro na indexação
+                        </span>
+                      )}
                       <Button
                         variant="ghost"
                         size="icon"

@@ -1,6 +1,7 @@
 import app from "./app";
 import { logger } from "./lib/logger";
 import { seedDatabase } from "./lib/seed";
+import { getOllamaBaseUrl, warmupOllama } from "./lib/ollama";
 
 const rawPort = process.env["PORT"];
 
@@ -27,4 +28,14 @@ app.listen(port, async (err) => {
   seedDatabase().catch((err) => {
     logger.error({ err }, "Seed falhou — servidor continua no ar");
   });
+
+  const ollamaBaseUrl = getOllamaBaseUrl();
+  if (ollamaBaseUrl) {
+    logger.info("Iniciando warm-up dos modelos Ollama em background...");
+    warmupOllama(ollamaBaseUrl).then(() => {
+      logger.info("Warm-up dos modelos Ollama concluído");
+    }).catch((err) => {
+      logger.warn({ err }, "Warm-up Ollama falhou — servidor continua no ar");
+    });
+  }
 });

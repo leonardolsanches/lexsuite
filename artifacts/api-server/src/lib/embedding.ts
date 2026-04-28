@@ -16,8 +16,8 @@ export async function generateEmbedding(text: string): Promise<number[]> {
   const response = await fetch(`${baseUrl}/api/embeddings`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ model, prompt: text }),
-    signal: AbortSignal.timeout(30_000),
+    body: JSON.stringify({ model, prompt: text, keep_alive: "30m" }),
+    signal: AbortSignal.timeout(120_000),
   });
 
   if (!response.ok) {
@@ -59,7 +59,7 @@ export async function dbBridgeInsertChunk(payload: ChunkInsertPayload): Promise<
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
-    signal: AbortSignal.timeout(15_000),
+    signal: AbortSignal.timeout(30_000),
   });
 
   if (!response.ok) {

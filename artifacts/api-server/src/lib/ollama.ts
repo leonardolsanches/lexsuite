@@ -26,7 +26,7 @@ export async function* streamOllama(
   const response = await fetch(`${baseUrl}/api/generate`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ model, prompt, stream: true }),
+    body: JSON.stringify({ model, prompt, stream: true, keep_alive: "30m" }),
   });
 
   if (!response.ok) {
@@ -78,6 +78,31 @@ export async function pingOllama(baseUrl: string): Promise<boolean> {
     return resp.ok;
   } catch {
     return false;
+  }
+}
+
+/**
+ * Pre-loads Ollama models into GPU/RAM so the first real request doesn't time out.
+ * Sends a minimal generation request with keep_alive to prime the model cache.
+ */
+export async function warmupOllama(baseUrl: string): Promise<void> {
+  const models = [
+    process.env.OLLAMA_MODEL_PARECER ?? OLLAMA_DEFAULT_MODEL_PARECER,
+    process.env.OLLAMA_MODEL_EXTRACAO ?? OLLAMA_DEFAULT_MODEL_EXTRACTION,
+    process.env.OLLAMA_MODEL_EMBEDDING ?? OLLAMA_DEFAULT_MODEL_EMBEDDING,
+  ];
+
+  for (const model of models) {
+    try {
+      await fetch(`${baseUrl}/api/generate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ model, prompt: ".", stream: false, keep_alive: "30m", num_predict: 1 }),
+        signal: AbortSignal.timeout(180_000),
+      });
+    } catch {
+      // warm-up is best-effort; do not crash the server
+    }
   }
 }
 
