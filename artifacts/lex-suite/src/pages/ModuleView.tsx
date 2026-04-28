@@ -101,18 +101,20 @@ export default function ModuleView({ module }: ModuleViewProps) {
   useEffect(() => { tabsRef.current = tabs; }, [tabs]);
 
   // ── LLM connectivity status ───────────────────────────────────────────────
-  type LlmStatus = 'checking' | 'online' | 'offline' | 'unconfigured';
+  // 'degraded' = configured but ping timed out (CF tunnel latency) — analysis still works
+  // 'offline'  = OLLAMA_BASE_URL not configured at all
+  type LlmStatus = 'checking' | 'online' | 'degraded' | 'offline' | 'unconfigured';
   const [llmStatus, setLlmStatus] = useState<LlmStatus>('checking');
   const checkLlm = useCallback(async () => {
     setLlmStatus('checking');
     try {
       const res = await fetch('/api/llm-status');
-      if (!res.ok) { setLlmStatus('offline'); return; }
+      if (!res.ok) { setLlmStatus('degraded'); return; }
       const data = await res.json() as { configured: boolean; online: boolean };
       if (!data.configured) setLlmStatus('unconfigured');
       else if (data.online) setLlmStatus('online');
-      else setLlmStatus('offline');
-    } catch { setLlmStatus('offline'); }
+      else setLlmStatus('degraded'); // configured but ping failed — likely CF tunnel latency
+    } catch { setLlmStatus('degraded'); }
   }, []);
   // Wait for Clerk to be fully loaded before first check
   useEffect(() => { if (authLoaded) checkLlm(); }, [authLoaded, checkLlm]);
@@ -535,16 +537,23 @@ export default function ModuleView({ module }: ModuleViewProps) {
           {/* LLM status indicator */}
           <button
             onClick={checkLlm}
-            title={llmStatus === 'online' ? 'Motor de IA online — clique para verificar' : 'Motor de IA offline — clique para verificar'}
+            title={
+              llmStatus === 'online' ? 'Motor de IA online — clique para verificar' :
+              llmStatus === 'degraded' ? 'IA configurada — ping lento, análise pode funcionar' :
+              'Motor de IA offline — clique para verificar'
+            }
             className={`flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border transition-all ${
               llmStatus === 'online'
                 ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-500'
                 : llmStatus === 'checking'
                 ? 'border-muted-foreground/20 bg-muted/30 text-muted-foreground'
+                : llmStatus === 'degraded'
+                ? 'border-amber-500/30 bg-amber-500/10 text-amber-500'
                 : 'border-destructive/30 bg-destructive/10 text-destructive'
             }`}
           >
             {llmStatus === 'online' && <><Wifi className="w-3 h-3" /> IA online</>}
+            {llmStatus === 'degraded' && <><Wifi className="w-3 h-3" /> IA configurada</>}
             {llmStatus === 'offline' && <><WifiOff className="w-3 h-3" /> IA offline</>}
             {llmStatus === 'unconfigured' && <><WifiOff className="w-3 h-3" /> IA não configurada</>}
             {llmStatus === 'checking' && <><Loader2 className="w-3 h-3 animate-spin" /> Verificando...</>}
@@ -561,16 +570,25 @@ export default function ModuleView({ module }: ModuleViewProps) {
         </div>
       </header>
 
-      {/* Offline warning banner */}
-      {(llmStatus === 'offline' || llmStatus === 'unconfigured') && (
+      {/* Offline / degraded warning banner */}
+      {llmStatus === 'unconfigured' && (
         <div className="shrink-0 bg-destructive/10 border-b border-destructive/20 px-4 py-2 flex items-center gap-3">
           <WifiOff className="w-4 h-4 text-destructive shrink-0" />
           <div className="flex-1 text-sm text-destructive">
-            {llmStatus === 'offline'
-              ? 'Motor de IA offline — o Mini PC está desligado ou o túnel Cloudflare está inativo. As análises não serão processadas até que o servidor esteja acessível.'
-              : 'OLLAMA_BASE_URL não configurado — adicione a URL do túnel nas configurações do servidor.'}
+            OLLAMA_BASE_URL não configurado — adicione a URL do túnel nas configurações do servidor.
           </div>
           <button onClick={checkLlm} className="text-xs text-destructive/70 hover:text-destructive underline shrink-0">
+            Verificar novamente
+          </button>
+        </div>
+      )}
+      {llmStatus === 'degraded' && (
+        <div className="shrink-0 bg-amber-500/10 border-b border-amber-500/20 px-4 py-2 flex items-center gap-3">
+          <Wifi className="w-4 h-4 text-amber-500 shrink-0" />
+          <div className="flex-1 text-sm text-amber-600 dark:text-amber-400">
+            Conexão com o Mini PC lenta ou instável — o túnel pode estar retomando. Análises ainda podem funcionar, clique em Analisar para tentar.
+          </div>
+          <button onClick={checkLlm} className="text-xs text-amber-500/70 hover:text-amber-500 underline shrink-0">
             Verificar novamente
           </button>
         </div>

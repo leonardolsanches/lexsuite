@@ -186,7 +186,7 @@ export async function* streamOllama(
 
 export async function pingOllama(baseUrl: string): Promise<boolean> {
   try {
-    const resp = await fetch(`${baseUrl}/api/tags`, { signal: AbortSignal.timeout(5000) });
+    const resp = await fetch(`${baseUrl}/api/tags`, { signal: AbortSignal.timeout(15_000) });
     return resp.ok;
   } catch {
     return false;

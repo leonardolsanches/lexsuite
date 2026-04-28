@@ -78,16 +78,10 @@ router.post("/analyze", requireAuth, async (req, res): Promise<void> => {
   const ollamaUrl = getOllamaBaseUrl()!;
   const ollamaOnline = await pingOllama(ollamaUrl);
   if (!ollamaOnline) {
-    sendError(
-      "🔌 Motor de IA offline\n\n" +
-      "O servidor Ollama não está respondendo no endereço configurado.\n\n" +
-      "Para usar o sistema:\n" +
-      "1. Ligue o Mini PC\n" +
-      "2. Aguarde o túnel Cloudflare reconectar\n" +
-      "3. Tente novamente\n\n" +
-      `URL configurada: ${ollamaUrl.replace(/https?:\/\//, '').split('/')[0]}`
-    );
-    return;
+    // Fail-open: Cloudflare free tunnels can be slow to respond to pings but
+    // still serve requests. Log the warning and allow the analysis to proceed —
+    // if the model truly is offline the streaming call will fail with a clear error.
+    logger.warn({ ollamaUrl }, "Ping do Ollama falhou — tentando análise mesmo assim (fail-open)");
   }
 
   // ── 2. Module access check (fail-open when bridge offline) ────────────────
