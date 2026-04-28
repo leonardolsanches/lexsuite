@@ -59,11 +59,12 @@ export async function ensureModelLoaded(
   const loaded = await getLoadedModels(baseUrl);
   if (loaded.some((n) => modelNamesMatch(n, model))) {
     logger.info({ model }, "Modelo já está na memória");
+    onStatus?.(`Modelo na memória ✓`);
     return;
   }
 
   logger.info({ model }, "Modelo frio — iniciando carregamento via trigger");
-  onStatus?.(`Carregando modelo ${model} na memória (aguarde até 15 minutos na 1ª carga)...`);
+  onStatus?.(`Modelo em espera (dormindo) — iniciando carregamento...`);
 
   // Fire-and-forget load trigger. Cloudflare kills it after 100 s but
   // Ollama continues loading in the background. We do NOT await this.
