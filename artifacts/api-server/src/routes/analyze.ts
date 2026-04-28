@@ -213,6 +213,14 @@ router.post("/analyze", requireAuth, async (req, res): Promise<void> => {
     }
   };
 
+  // Keep-alive heartbeat: prevents proxies/browsers from cutting idle SSE connections
+  // (deepseek-r1 can be silent for 30-60s during its chain-of-thought reasoning phase)
+  const heartbeatInterval = setInterval(() => {
+    if (!res.writableEnded) {
+      res.write(`data: ${JSON.stringify({ type: "ping" })}\n\n`);
+    }
+  }, 15_000);
+
   try {
     await streamAnalysis(
       fullPrompt,
@@ -222,6 +230,7 @@ router.post("/analyze", requireAuth, async (req, res): Promise<void> => {
       onModelStatus
     );
 
+    clearInterval(heartbeatInterval);
     res.write(`data: ${JSON.stringify({ type: "done" })}\n\n`);
     res.end();
 
@@ -234,6 +243,7 @@ router.post("/analyze", requireAuth, async (req, res): Promise<void> => {
       } catch { /* bridge offline, skip */ }
     }
   } catch (err: any) {
+    clearInterval(heartbeatInterval);
     logger.error({ err }, "Erro durante streaming de análise");
     if (sessionRecord) {
       try {
