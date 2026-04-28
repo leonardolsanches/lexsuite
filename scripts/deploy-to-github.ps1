@@ -44,9 +44,20 @@ try {
     Fail "Falha ao extrair ZIP: $_"
 }
 
-$innerDirs = Get-ChildItem -Path $extractDir -Directory
-$sourceRoot = if ($innerDirs.Count -eq 1) { $innerDirs[0].FullName } else { $extractDir }
+# Detectar raiz do projeto: se houver exatamente uma subpasta, usa ela
+$innerDirs  = Get-ChildItem -Path $extractDir -Directory -Force
+$innerFiles = Get-ChildItem -Path $extractDir -File -Force
+$sourceRoot = if ($innerDirs.Count -eq 1 -and $innerFiles.Count -eq 0) {
+    $innerDirs[0].FullName
+} else {
+    $extractDir
+}
+
+$totalSource = (Get-ChildItem -Path $sourceRoot -Recurse -Force).Count
 Write-Host "  Raiz do projeto: $sourceRoot" -ForegroundColor Green
+Write-Host "  Itens no ZIP: $totalSource" -ForegroundColor Green
+
+if ($totalSource -eq 0) { Fail "ZIP parece estar vazio apos extracao." }
 
 # ── 3. Clonar repositorio ────────────────────────────────────────────────────
 Write-Host ""
@@ -60,19 +71,26 @@ if ($LASTEXITCODE -ne 0) { Fail "git clone falhou: $cloneOutput" }
 
 Write-Host "  Repositorio clonado." -ForegroundColor Green
 
-# ── 4. Substituir arquivos ────────────────────────────────────────────────────
+# ── 4. Substituir arquivos com robocopy ───────────────────────────────────────
 Write-Host ""
 Write-Host "[4/5] Sincronizando arquivos..." -ForegroundColor Cyan
 
+# Remover tudo exceto .git
 Get-ChildItem -Path $repoDir -Force |
     Where-Object { $_.Name -ne ".git" } |
     Remove-Item -Recurse -Force
 
-Copy-Item -Path "$sourceRoot\*" -Destination $repoDir -Recurse -Force
+# robocopy copia tudo incluindo arquivos ocultos e subdiretorios
+# /E = subdiretorios incluindo vazios | /NFL /NDL /NJH /NJS = silencioso
+$roboOut = robocopy $sourceRoot $repoDir /E /NFL /NDL /NJH /NJS /NC /NS /NP 2>&1
+# robocopy retorna 0-7 em sucesso (bit flags), apenas >= 8 e erro real
+if ($LASTEXITCODE -ge 8) { Fail "Copia de arquivos falhou (robocopy exit $LASTEXITCODE): $roboOut" }
 
-$fileCount = (Get-ChildItem -Path $repoDir -Recurse -File |
+$fileCount = (Get-ChildItem -Path $repoDir -Recurse -Force -File |
               Where-Object { $_.FullName -notlike "*\.git\*" }).Count
 Write-Host "  $fileCount arquivos copiados." -ForegroundColor Green
+
+if ($fileCount -eq 0) { Fail "Nenhum arquivo foi copiado para o repositorio." }
 
 # ── 5. Commit e Push ──────────────────────────────────────────────────────────
 Write-Host ""
@@ -91,11 +109,15 @@ if (-not $status) {
     exit 0
 }
 
+Write-Host "  Arquivos alterados: $(($status | Measure-Object).Count)" -ForegroundColor Green
+
 $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm"
 $commitMsg = "deploy: Replit export $timestamp (ZIP: $($zip.Name))"
 
 $commitOut = git commit -m $commitMsg 2>&1
 if ($LASTEXITCODE -ne 0) { Fail "git commit falhou: $commitOut" }
+
+Write-Host "  Commit criado." -ForegroundColor Green
 
 $pushOut = git push origin $Branch 2>&1
 if ($LASTEXITCODE -ne 0) { Fail "git push falhou (verifique suas credenciais): $pushOut" }
