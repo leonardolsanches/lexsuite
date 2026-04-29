@@ -215,6 +215,24 @@ router.post("/analyze", requireAuth, async (req, res): Promise<void> => {
     }
   }, 15_000);
 
+  // Checkpoint save: persist partial output every 60 s so a browser refresh
+  // can recover content generated so far (only useful once text starts flowing,
+  // not during the silent <think> phase)
+  let lastCheckpointLen = 0;
+  const checkpointInterval = sessionRecord
+    ? setInterval(async () => {
+        if (fullOutput.length > lastCheckpointLen) {
+          lastCheckpointLen = fullOutput.length;
+          try {
+            await bridgeExecute(
+              "UPDATE sessions SET output_html = $2, updated_at = NOW() WHERE id = $1",
+              [sessionRecord!.id, fullOutput]
+            );
+          } catch { /* bridge offline — skip checkpoint */ }
+        }
+      }, 60_000)
+    : null;
+
   try {
     await streamAnalysis(
       fullPrompt,
@@ -225,6 +243,7 @@ router.post("/analyze", requireAuth, async (req, res): Promise<void> => {
     );
 
     clearInterval(heartbeatInterval);
+    if (checkpointInterval) clearInterval(checkpointInterval);
     res.write(`data: ${JSON.stringify({ type: "done" })}\n\n`);
     res.end();
 
@@ -238,6 +257,7 @@ router.post("/analyze", requireAuth, async (req, res): Promise<void> => {
     }
   } catch (err: any) {
     clearInterval(heartbeatInterval);
+    if (checkpointInterval) clearInterval(checkpointInterval);
     logger.error({ err }, "Erro durante streaming de análise");
     if (sessionRecord) {
       try {

@@ -98,7 +98,7 @@ export default function ModuleView({ module }: ModuleViewProps) {
     { module: module as any, limit: 15 },
     { query: { refetchOnWindowFocus: false } }
   );
-  const doneSessions = recentSessions.filter(s => s.status === 'done' && s.outputHtml);
+  const doneSessions = recentSessions.filter(s => s.outputHtml && (s.status === 'done' || s.status === 'running'));
   
   const { isStreaming, startStream, cancelStream } = useStreaming();
   const { isLoaded: pdfLoaded, extractText } = usePdf();
@@ -125,6 +125,19 @@ export default function ModuleView({ module }: ModuleViewProps) {
   }, []);
   // Wait for Clerk to be fully loaded before first check
   useEffect(() => { if (authLoaded) checkLlm(); }, [authLoaded, checkLlm]);
+
+  // Warn before tab close/refresh when an analysis is running
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (isStreaming) {
+        e.preventDefault();
+        e.returnValue = 'Uma análise está em andamento. Sair agora vai perder o progresso. Tem certeza?';
+        return e.returnValue;
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [isStreaming]);
 
   // Tick every second while any tab is running (drives the live elapsed timer)
   const [, setTick] = useState(0);
@@ -708,7 +721,12 @@ export default function ModuleView({ module }: ModuleViewProps) {
                     onClick={() => openSessionTab(s)}
                     className="w-full text-left p-2 rounded-md transition-colors border border-transparent hover:bg-muted/50 text-muted-foreground hover:text-foreground"
                   >
-                    <div className="text-xs font-medium text-foreground truncate">{s.label}</div>
+                    <div className="flex items-start gap-1.5">
+                      <div className="text-xs font-medium text-foreground truncate flex-1">{s.label}</div>
+                      {s.status === 'running' && (
+                        <span className="text-[9px] font-medium text-amber-500 bg-amber-500/10 px-1 rounded shrink-0 mt-0.5">parcial</span>
+                      )}
+                    </div>
                     <div className="text-[10px] opacity-60 mt-0.5">
                       {new Date(s.updatedAt).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
                     </div>
