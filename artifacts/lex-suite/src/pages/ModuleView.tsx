@@ -6,7 +6,8 @@ import {
   useCreateSession,
   useListSessions,
   getListSessionsQueryKey,
-  useDeleteSession
+  useDeleteSession,
+  type Session
 } from '@workspace/api-client-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -92,6 +93,12 @@ export default function ModuleView({ module }: ModuleViewProps) {
   const moduleWorkflows = workflows.filter(w => w.module === module).sort((a, b) => a.sortOrder - b.sortOrder);
   
   const createSession = useCreateSession();
+
+  const { data: recentSessions = [] } = useListSessions(
+    { module: module as any, limit: 15 },
+    { query: { refetchOnWindowFocus: false } }
+  );
+  const doneSessions = recentSessions.filter(s => s.status === 'done' && s.outputHtml);
   
   const { isStreaming, startStream, cancelStream } = useStreaming();
   const { isLoaded: pdfLoaded, extractText } = usePdf();
@@ -216,6 +223,26 @@ export default function ModuleView({ module }: ModuleViewProps) {
       handleNewProcess();
     }
   };
+
+  const openSessionTab = useCallback((session: Session) => {
+    const newId = crypto.randomUUID();
+    const newTab: ProcessTab = {
+      id: newId,
+      workflowKey: session.workflowKey,
+      label: session.label,
+      status: 'done',
+      execSteps: [],
+      mode: 'form',
+      formData: {},
+      pasteText: '',
+      outputHtml: session.outputHtml ?? '',
+      pdfs: [],
+      sessionId: session.id,
+      endedAt: new Date(session.updatedAt).getTime(),
+    };
+    setTabs(prev => [...prev, newTab]);
+    setActiveTabId(newId);
+  }, []);
 
   const handleSelectWorkflow = (workflowKey: string) => {
     if (!activeTab) return;
@@ -668,6 +695,27 @@ export default function ModuleView({ module }: ModuleViewProps) {
                 </div>
               ))}
             </div>
+
+            {/* Session history — quick-reopen past completed analyses */}
+            {doneSessions.length > 0 && (
+              <div className="space-y-1 pt-2">
+                <div className="px-2 py-1 text-xs font-medium text-muted-foreground/70 uppercase tracking-wider flex items-center gap-1.5">
+                  <Clock className="w-3 h-3" /> Histórico
+                </div>
+                {doneSessions.map(s => (
+                  <button
+                    key={s.id}
+                    onClick={() => openSessionTab(s)}
+                    className="w-full text-left p-2 rounded-md transition-colors border border-transparent hover:bg-muted/50 text-muted-foreground hover:text-foreground"
+                  >
+                    <div className="text-xs font-medium text-foreground truncate">{s.label}</div>
+                    <div className="text-[10px] opacity-60 mt-0.5">
+                      {new Date(s.updatedAt).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
           </ScrollArea>
         </div>
 
