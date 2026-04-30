@@ -2,6 +2,7 @@ import app from "./app";
 import { logger } from "./lib/logger";
 import { seedDatabase } from "./lib/seed";
 import { getOllamaBaseUrl, warmupOllama } from "./lib/ollama";
+import { loadConfigFromDb } from "./lib/runtime-config";
 
 const rawPort = process.env["PORT"];
 
@@ -24,6 +25,11 @@ app.listen(port, async (err) => {
   }
 
   logger.info({ port }, "Server listening");
+
+  // Load operator config (API keys, model overrides) from DB before anything else
+  loadConfigFromDb().catch((err) => {
+    logger.warn({ err }, "loadConfigFromDb falhou — usando apenas variáveis de ambiente");
+  });
 
   seedDatabase().catch((err) => {
     logger.error({ err }, "Seed falhou — servidor continua no ar");

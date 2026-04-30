@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, lazy, Suspense } from 'react';
+const LLMSettingsModal = lazy(() => import('@/components/LLMSettingsModal'));
 import { useLocation, Link } from 'wouter';
 import { 
   useListWorkflows, 
@@ -106,6 +107,8 @@ export default function ModuleView({ module }: ModuleViewProps) {
   // Keep a ref to always-fresh tabs for use inside async callbacks
   const tabsRef = useRef<ProcessTab[]>([]);
   useEffect(() => { tabsRef.current = tabs; }, [tabs]);
+
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   // ── LLM connectivity status ───────────────────────────────────────────────
   type LlmStatus = 'checking' | 'online' | 'degraded' | 'offline' | 'unconfigured';
@@ -663,6 +666,15 @@ ${bodyHtml}
 
   return (
     <div className="flex flex-col h-screen bg-background text-foreground overflow-hidden">
+      {/* LLM settings modal */}
+      <Suspense fallback={null}>
+        <LLMSettingsModal
+          open={settingsOpen}
+          onClose={() => setSettingsOpen(false)}
+          onSaved={() => { setSettingsOpen(false); checkLlm(); }}
+        />
+      </Suspense>
+
       {/* Header */}
       <header className="h-[60px] shrink-0 border-b border-border bg-card px-4 flex items-center justify-between z-10">
         <div className="flex items-center gap-4">
@@ -680,22 +692,18 @@ ${bodyHtml}
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {/* LLM status indicator */}
+          {/* LLM status indicator — click to open settings */}
           <button
-            onClick={checkLlm}
-            title={
-              llmStatus === 'online' ? 'Motor de IA online — clique para verificar' :
-              llmStatus === 'degraded' ? 'IA configurada — ping lento, análise pode funcionar' :
-              'Motor de IA offline — clique para verificar'
-            }
+            onClick={() => setSettingsOpen(true)}
+            title="Configurar motor de IA"
             className={`flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border transition-all ${
               llmStatus === 'online'
-                ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-500'
+                ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20'
                 : llmStatus === 'checking'
                 ? 'border-muted-foreground/20 bg-muted/30 text-muted-foreground'
                 : llmStatus === 'degraded'
-                ? 'border-amber-500/30 bg-amber-500/10 text-amber-500'
-                : 'border-destructive/30 bg-destructive/10 text-destructive'
+                ? 'border-amber-500/30 bg-amber-500/10 text-amber-500 hover:bg-amber-500/20'
+                : 'border-destructive/30 bg-destructive/10 text-destructive hover:bg-destructive/20'
             }`}
           >
             {llmStatus === 'online' && <><Wifi className="w-3 h-3" /> IA online</>}

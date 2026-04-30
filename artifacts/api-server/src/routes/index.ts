@@ -5,6 +5,7 @@ import workflowsRouter from "./workflows";
 import sessionsRouter from "./sessions";
 import analyzeRouter from "./analyze";
 import documentsRouter from "./documents";
+import adminRouter from "./admin";
 
 const router: IRouter = Router();
 
@@ -14,5 +15,6 @@ router.use(workflowsRouter);
 router.use(sessionsRouter);
 router.use(analyzeRouter);
 router.use(documentsRouter);
+router.use("/admin", adminRouter);
 
 export default router;
