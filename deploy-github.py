@@ -56,6 +56,7 @@ def git_live(*args):
 # ── Token ────────────────────────────────────────────────────────────────────
 
 PLACEHOLDER = "ghp_SeuTokenAqui"
+DEFAULT_REPO_URL = "https://github.com/leonardolsanches/lexsuite"
 
 
 def load_token(script_dir: Path):
@@ -323,23 +324,19 @@ def main():
     step("Configurando repositório remoto...")
     rc, existing_remote, _ = git("remote", "get-url", "origin")
     clean_existing = re.sub(r"https?://[^@]+@", "https://", existing_remote) if rc == 0 else ""
-    repo_url = clean_existing
 
-    if repo_url:
-        ok(f"Remote já configurado: {repo_url}")
-        trocar = input("    Deseja usar outra URL? (s/N): ").strip().lower()
-        if trocar == "s":
-            repo_url = ""
+    # Usa o remote existente; se não existir, usa o padrão hardcoded
+    repo_url = clean_existing if clean_existing else DEFAULT_REPO_URL
 
-    if not repo_url:
+    ok(f"Repositório: {repo_url}")
+    trocar = input("    Usar outro repositório? (s/N): ").strip().lower()
+    if trocar == "s":
         print()
-        print(gray("    Crie um repositório VAZIO no GitHub (sem README) e cole a URL abaixo."))
-        print(gray("    Exemplo: https://github.com/seu-usuario/lex-suite.git"))
+        print(gray(f"    Padrão: {DEFAULT_REPO_URL}"))
         print()
-        repo_url = input("    URL do repositório GitHub: ").strip()
-        if not repo_url:
-            err("URL não fornecida. Abortando.")
-            pause_exit()
+        nova_url = input("    Nova URL (Enter para manter o padrão): ").strip()
+        if nova_url:
+            repo_url = nova_url
 
     # 5. Init git se necessário
     step("Verificando repositório Git local...")
