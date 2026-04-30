@@ -108,19 +108,20 @@ export default function ModuleView({ module }: ModuleViewProps) {
   useEffect(() => { tabsRef.current = tabs; }, [tabs]);
 
   // ── LLM connectivity status ───────────────────────────────────────────────
-  // 'degraded' = configured but ping timed out (CF tunnel latency) — analysis still works
-  // 'offline'  = OLLAMA_BASE_URL not configured at all
   type LlmStatus = 'checking' | 'online' | 'degraded' | 'offline' | 'unconfigured';
   const [llmStatus, setLlmStatus] = useState<LlmStatus>('checking');
+  const [llmProvider, setLlmProvider] = useState<'anthropic' | 'ollama' | 'none'>('none');
   const checkLlm = useCallback(async () => {
     setLlmStatus('checking');
     try {
       const res = await fetch('/api/llm-status');
       if (!res.ok) { setLlmStatus('degraded'); return; }
-      const data = await res.json() as { configured: boolean; online: boolean };
+      const data = await res.json() as { configured: boolean; online: boolean; provider?: string };
+      const prov = (data.provider === 'anthropic' ? 'anthropic' : data.provider === 'ollama' ? 'ollama' : 'none') as 'anthropic' | 'ollama' | 'none';
+      setLlmProvider(prov);
       if (!data.configured) setLlmStatus('unconfigured');
       else if (data.online) setLlmStatus('online');
-      else setLlmStatus('degraded'); // configured but ping failed — likely CF tunnel latency
+      else setLlmStatus('degraded');
     } catch { setLlmStatus('degraded'); }
   }, []);
   // Wait for Clerk to be fully loaded before first check
@@ -727,7 +728,7 @@ ${bodyHtml}
           </button>
         </div>
       )}
-      {llmStatus === 'degraded' && (
+      {llmStatus === 'degraded' && llmProvider !== 'anthropic' && (
         <div className="shrink-0 bg-amber-500/10 border-b border-amber-500/20 px-4 py-2 flex items-center gap-3">
           <Wifi className="w-4 h-4 text-amber-500 shrink-0" />
           <div className="flex-1 text-sm text-amber-600 dark:text-amber-400">

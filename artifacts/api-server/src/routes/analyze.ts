@@ -1,7 +1,8 @@
 import { Router, type IRouter } from "express";
 import { requireAuth } from "../lib/auth";
-import { isAnyLlmConfigured, getLlmStatusMessage, streamAnalysis } from "../lib/llm";
+import { isAnyLlmConfigured, getLlmStatusMessage, streamAnalysis, getActiveProvider } from "../lib/llm";
 import { isOllamaConfigured, getOllamaBaseUrl, listOllamaModels, pingOllama, getOllamaModelParecer, getOllamaModelExtraction } from "../lib/ollama";
+import { isAnthropicConfigured, getAnthropicModel, pingAnthropic } from "../lib/anthropic";
 import { isDbBridgeConfigured, dbBridgeSearchChunks } from "../lib/embedding";
 import { pingDbBridge, getDbBridgeUrl, bridgeQuery, bridgeQueryOne, bridgeExecute } from "../lib/bridge";
 import { searchRelevantChunks, buildRagContext } from "../lib/rag";
@@ -11,28 +12,44 @@ import { logger } from "../lib/logger";
 const router: IRouter = Router();
 
 router.get("/llm-status", async (_req, res): Promise<void> => {
+  const activeProvider = getActiveProvider();
+
+  // Anthropic status
+  const anthropicConfigured = isAnthropicConfigured();
+  const anthropicOnline = anthropicConfigured ? await pingAnthropic() : false;
+
+  // Ollama status
   const ollamaUrl = getOllamaBaseUrl();
   let ollamaOnline = false;
   let ollamaModels: string[] = [];
-
   if (ollamaUrl) {
     ollamaOnline = await pingOllama(ollamaUrl);
-    if (ollamaOnline) {
-      ollamaModels = await listOllamaModels(ollamaUrl);
-    }
+    if (ollamaOnline) ollamaModels = await listOllamaModels(ollamaUrl);
   }
 
+  // RAG / DB Bridge status
   const dbBridgeConfigured = isDbBridgeConfigured();
   const dbBridgeOnline = dbBridgeConfigured ? await pingDbBridge() : false;
 
+  const configured = activeProvider !== null;
+  const online = activeProvider === "anthropic" ? anthropicOnline : ollamaOnline;
+
   res.json({
-    provider: "ollama",
-    configured: isOllamaConfigured(),
-    online: ollamaOnline,
+    provider: activeProvider ?? "none",
+    configured,
+    online,
+    // Anthropic
+    anthropic: {
+      configured: anthropicConfigured,
+      online: anthropicOnline,
+      model: anthropicConfigured ? getAnthropicModel() : null,
+    },
+    // Ollama
     url: ollamaUrl ? "configured" : null,
     models: ollamaModels,
     modelParecer: getOllamaModelParecer(),
     modelExtracao: getOllamaModelExtraction(),
+    // RAG
     rag: {
       configured: dbBridgeConfigured,
       online: dbBridgeOnline,
@@ -69,19 +86,20 @@ router.post("/analyze", requireAuth, async (req, res): Promise<void> => {
     res.end();
   };
 
-  // ── 1. Check LLM availability — actually ping Ollama ─────────────────────
+  // ── 1. Check LLM availability ─────────────────────────────────────────────
   sendStep("llm", "Verificando motor de linguagem...", "cpu");
-  if (!isAnyLlmConfigured()) {
-    sendError("⚙️ Motor de IA não configurado. Adicione a URL do Ollama em OLLAMA_BASE_URL.");
+  const activeProvider = getActiveProvider();
+  if (!activeProvider) {
+    sendError("⚙️ Motor de IA não configurado. Adicione ANTHROPIC_API_KEY (Claude) ou OLLAMA_BASE_URL (local).");
     return;
   }
-  const ollamaUrl = getOllamaBaseUrl()!;
-  const ollamaOnline = await pingOllama(ollamaUrl);
-  if (!ollamaOnline) {
-    // Fail-open: Cloudflare free tunnels can be slow to respond to pings but
-    // still serve requests. Log the warning and allow the analysis to proceed —
-    // if the model truly is offline the streaming call will fail with a clear error.
-    logger.warn({ ollamaUrl }, "Ping do Ollama falhou — tentando análise mesmo assim (fail-open)");
+  // For Ollama: fail-open on ping (CF tunnel may be slow but still serve requests)
+  if (activeProvider === "ollama") {
+    const ollamaUrl = getOllamaBaseUrl()!;
+    const ollamaOnline = await pingOllama(ollamaUrl);
+    if (!ollamaOnline) {
+      logger.warn({ ollamaUrl }, "Ping do Ollama falhou — tentando análise mesmo assim (fail-open)");
+    }
   }
 
   // ── 2. Module access check (fail-open when bridge offline) ────────────────
@@ -197,7 +215,10 @@ router.post("/analyze", requireAuth, async (req, res): Promise<void> => {
   }
 
   // ── 7. Stream from LLM ────────────────────────────────────────────────────
-  sendStep("model", "Verificando se modelo está na memória...", "brain");
+  const modelLabel = activeProvider === "anthropic"
+    ? "Conectando ao Claude (Anthropic)..."
+    : "Verificando se modelo está na memória...";
+  sendStep("model", modelLabel, "brain");
 
   let fullOutput = "";
 

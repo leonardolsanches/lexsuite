@@ -6,16 +6,29 @@ import {
   isOllamaConfigured,
   streamOllama,
 } from "./ollama";
+import {
+  isAnthropicConfigured,
+  streamAnthropic,
+} from "./anthropic";
 import { getDbBridgeUrl } from "./bridge";
 import { logger } from "./logger";
 
+export type LlmProvider = "anthropic" | "ollama";
+
+/** Claude takes priority when ANTHROPIC_API_KEY is set; otherwise Ollama. */
+export function getActiveProvider(): LlmProvider | null {
+  if (isAnthropicConfigured()) return "anthropic";
+  if (isOllamaConfigured()) return "ollama";
+  return null;
+}
+
 export function isAnyLlmConfigured(): boolean {
-  return isOllamaConfigured();
+  return getActiveProvider() !== null;
 }
 
 export function getLlmStatusMessage(): string {
-  if (!isOllamaConfigured()) {
-    return "Motor local não configurado. Adicione a URL do túnel Cloudflare em OLLAMA_BASE_URL para ativar o processamento.";
+  if (!isAnyLlmConfigured()) {
+    return "Nenhum motor de IA configurado. Adicione ANTHROPIC_API_KEY (Claude) ou OLLAMA_BASE_URL (local).";
   }
   return "";
 }
@@ -27,20 +40,32 @@ export async function streamAnalysis(
   continueFrom?: string,
   onStatus?: (msg: string) => void
 ): Promise<void> {
-  if (!isOllamaConfigured()) {
-    throw new Error("OLLAMA_BASE_URL não configurado.");
+  const provider = getActiveProvider();
+
+  if (!provider) {
+    throw new Error("Nenhum motor de IA configurado (ANTHROPIC_API_KEY ou OLLAMA_BASE_URL).");
   }
 
+  // ── Claude ────────────────────────────────────────────────────────────────
+  if (provider === "anthropic") {
+    logger.info("Streaming via Claude (Anthropic)");
+    onStatus?.("Conectando ao Claude...");
+
+    for await (const text of streamAnthropic(prompt, continueFrom)) {
+      onChunk(text);
+      res.write(`data: ${JSON.stringify({ type: "text", text })}\n\n`);
+    }
+    return;
+  }
+
+  // ── Ollama (local) ────────────────────────────────────────────────────────
   const baseUrl = getOllamaBaseUrl()!;
   const model = getOllamaModelParecer();
 
   logger.info({ model, baseUrl }, "Streaming via Ollama local");
 
-  // Ensure model is in memory before streaming (handles cold-start gracefully)
   await ensureModelLoaded(baseUrl, model, onStatus);
 
-  // Prepend language instruction to every prompt.
-  // deepseek-r1 tends to respond in English without an explicit directive.
   const langPrefix =
     "INSTRUÇÃO OBRIGATÓRIA DE IDIOMA: Responda EXCLUSIVAMENTE em português brasileiro (pt-BR). " +
     "Não escreva nenhuma palavra em inglês. Toda a sua resposta deve ser em português, sem exceção.\n\n";
@@ -50,8 +75,7 @@ export async function streamAnalysis(
     fullPrompt += `\n\n[RESPOSTA ANTERIOR]:\n${continueFrom}\n\nContinue a análise do ponto onde parou.`;
   }
 
-  // deepseek-r1 prefixes its response with a <think>...</think> reasoning block
-  // (often in English). Strip it entirely — only forward content after </think>.
+  // Strip deepseek-r1 <think>...</think> reasoning block
   let thinkPhase: "checking" | "stripping" | "passthrough" = "checking";
   let thinkBuffer = "";
 
@@ -69,7 +93,6 @@ export async function streamAnalysis(
       if (trimmed.startsWith("<think>")) {
         thinkPhase = "stripping";
       } else if (trimmed.length > 40 || !trimmed.startsWith("<")) {
-        // No think block — flush buffer and pass through
         thinkPhase = "passthrough";
         onChunk(thinkBuffer);
         res.write(`data: ${JSON.stringify({ type: "text", text: thinkBuffer })}\n\n`);

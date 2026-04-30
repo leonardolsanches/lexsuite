@@ -18,6 +18,10 @@ services:
         sync: false
       - key: CLERK_SECRET_KEY
         sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: ANTHROPIC_MODEL
+        value: claude-opus-4-5
 
   # ── Frontend (React/Vite — static site) ───────────────────────────────────
   - type: web
