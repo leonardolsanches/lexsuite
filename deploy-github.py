@@ -451,73 +451,91 @@ def main():
         git_live("branch", "-M", "main")
     ok("Branch: main")
 
-    # 11. Push — tenta normal → force → orphan (se histórico contém arquivos grandes)
-    def do_push() -> tuple[bool, str]:
-        """Executa push mostrando progresso e retorna (sucesso, stderr_completo)."""
+    # 11. Push
+    LARGE_EXTS = {".exe", ".zip", ".pptx", ".mp4", ".ogg", ".mp3", ".opus", ".pdf"}
+
+    def _has_large_history() -> bool:
+        """Retorna True se qualquer commit anterior adicionou arquivos com extensão grande."""
+        _, log_files, _ = git("log", "--name-only", "--format=", "--diff-filter=A")
+        for f in log_files.splitlines():
+            p = Path(f)
+            if p.suffix.lower() in LARGE_EXTS or f.endswith(".done"):
+                return True
+        return False
+
+    def _push_capture(*extra_args) -> tuple[bool, str]:
+        """Executa git push, mostra saída em tempo real e retorna (ok, stderr)."""
         proc = subprocess.Popen(
-            ["git", "push", "-u", "origin", "main"],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
+            ["git", "push", "-u", "origin", "main"] + list(extra_args),
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
         )
-        # git envia progresso para stderr — mostra em tempo real e captura
-        stderr_lines = []
+        lines = []
         for line in proc.stderr:
             print(line, end="", flush=True)
-            stderr_lines.append(line)
+            lines.append(line)
         proc.wait()
-        return proc.returncode == 0, "".join(stderr_lines)
+        return proc.returncode == 0, "".join(lines)
 
-    def push_orphan(commit_msg: str) -> bool:
-        """Reescreve histórico completo via branch órfão e faz force push."""
-        warn("Reescrevendo histórico git para remover arquivos grandes do passado...")
-        steps = [
+    def _push_orphan() -> bool:
+        """Descarta histórico inteiro, cria commit único e faz force push."""
+        warn("Reescrevendo histórico git (orphan branch)...")
+        ts = datetime.now().strftime("%Y-%m-%d %H:%M")
+        msg = f"chore: deploy Lex Suite {ts} (histórico limpo)"
+        for cmd in [
             ["git", "checkout", "--orphan", "_deploy_clean"],
             ["git", "add", "--all"],
-            ["git", "commit", "-m", commit_msg],
+            ["git", "commit", "-m", msg],
             ["git", "branch", "-D", "main"],
             ["git", "branch", "-m", "main"],
-        ]
-        for cmd in steps:
+        ]:
             r = subprocess.run(cmd, capture_output=True, text=True)
             if r.returncode != 0:
-                err(f"Falha em: {' '.join(cmd)}")
+                err(f"Falha: {' '.join(cmd)}")
                 err(r.stderr.strip())
                 return False
-        ok("Histórico reescrito — agora fazendo force push...")
+        ok("Histórico reescrito — enviando...")
         print()
-        return git_live("push", "-u", "--force", "origin", "main")
+        ok_push, _ = _push_capture("--force")
+        return ok_push
+
+    def _is_large_err(stderr: str) -> bool:
+        return any(x in stderr for x in ["GH001", "exceeds GitHub", "larger than GitHub"])
 
     step("Enviando para GitHub...")
-    print()
-    success, push_stderr = do_push()
-    print()
 
-    if not success:
-        large_file_error = "GH001" in push_stderr or "exceeds GitHub" in push_stderr or "larger than GitHub" in push_stderr
-        if large_file_error:
+    # Detecta antecipadamente histórico com arquivos grandes
+    if _has_large_history():
+        print()
+        warn("Detectado: histórico git contém arquivos grandes de commits anteriores.")
+        warn("É necessário reescrever o histórico (orphan branch) para o push funcionar.")
+        warn("TODO o histórico antigo será descartado — ficará apenas um commit limpo.")
+        print()
+        if input("    Confirmar? (s/N): ").strip().lower() != "s":
+            err("Abortado.")
+            pause_exit()
+        print()
+        success = _push_orphan()
+        print()
+    else:
+        # Tenta push normal
+        print()
+        success, stderr1 = _push_capture()
+        print()
+
+        if not success:
+            if _is_large_err(stderr1):
+                warn("Push rejeitado: arquivos grandes no histórico.")
+            else:
+                warn("Push falhou (repositório remoto tem commits diferentes).")
+
+            warn("O Replit é a fonte da verdade — histórico será reescrito e reenviado.")
             print()
-            warn("O histórico git contém arquivos grandes de envios anteriores.")
-            warn("O script vai reescrever o histórico (orphan branch) e fazer force push.")
-            warn("TODO o histórico antigo será descartado — só fica um commit limpo.")
-            print()
-            confirmar = input("    Confirmar? (s/N): ").strip().lower()
-            if confirmar == "s":
-                ts = datetime.now().strftime("%Y-%m-%d %H:%M")
-                success = push_orphan(f"chore: deploy Lex Suite {ts} (histórico limpo)")
+            if input("    Confirmar orphan + force push? (s/N): ").strip().lower() == "s":
+                print()
+                success = _push_orphan()
                 print()
             else:
-                err("Abortado pelo usuário.")
-        else:
-            warn("Push normal falhou. O conteúdo do GitHub será substituído pelo Replit.")
-            print()
-            confirmar = input("    Confirmar force push? (s/N): ").strip().lower()
-            if confirmar == "s":
-                print()
-                success = git_live("push", "-u", "--force", "origin", "main")
-                print()
-            else:
-                err("Abortado pelo usuário.")
+                err("Abortado.")
 
     if success:
         print(green("  SUCESSO! Projeto enviado para o GitHub."))
@@ -525,10 +543,8 @@ def main():
         if m:
             print(cyan(f"  Acesse: https://github.com/{m.group(1)}"))
     else:
-        err("Falha no push. Verifique:")
-        warn("1. O token tem permissão de escrita (scope: repo)")
-        warn("2. O token não está expirado")
-        warn("3. O nome do repositório está correto")
+        err("Falha no push.")
+        warn("Verifique: token com scope 'repo', repositório correto, token não expirado.")
 
     print()
     print(gray("Pressione Enter para fechar..."))
