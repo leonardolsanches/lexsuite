@@ -108,33 +108,39 @@ def zip_contains_marker(zf: zipfile.ZipFile) -> bool:
 
 def extract_zip(zip_path: Path, dest: Path) -> Path:
     """
-    Extrai o ZIP em dest/.
-    Se todos os arquivos estiverem dentro de uma única pasta-raiz (ex: workspace-main/),
-    move o conteúdo para dest diretamente.
+    Extrai o ZIP em dest/ com barra de progresso.
     Retorna o caminho da raiz do projeto.
     """
-    with zipfile.ZipFile(zip_path, "r") as zf:
-        # Descobre se há uma pasta-raiz única no ZIP
-        top_dirs = {name.split("/")[0] for name in zf.namelist() if name.strip("/")}
-        single_root = len(top_dirs) == 1 and not any(
-            n == top_dirs.copy().pop() + "/" or not n.startswith(top_dirs.copy().pop())
-            for n in zf.namelist() if n.strip("/")
-        )
+    tmp = dest / f"_zip_extract_{zip_path.stem}"
+    if tmp.exists():
+        shutil.rmtree(tmp)
+    tmp.mkdir(parents=True, exist_ok=True)
 
-        # Extrai tudo para uma pasta temporária
-        tmp = dest / f"_zip_extract_{zip_path.stem}"
-        if tmp.exists():
-            shutil.rmtree(tmp)
-        zf.extractall(tmp)
+    with zipfile.ZipFile(zip_path, "r") as zf:
+        entries = zf.infolist()
+        total = len(entries)
+        bar_width = 40
+
+        print(f"    {'Arquivos':10}  {'Progresso'}")
+        for i, entry in enumerate(entries, 1):
+            zf.extract(entry, tmp)
+
+            # Barra de progresso
+            pct = i / total
+            filled = int(bar_width * pct)
+            bar = "█" * filled + "░" * (bar_width - filled)
+            label = entry.filename[-38:] if len(entry.filename) > 38 else entry.filename
+            print(f"\r    {i:4}/{total:<4}  [{bar}] {pct:5.1%}  {label:<40}", end="", flush=True)
+
+        print()  # nova linha após concluir
 
     # Encontra a raiz do projeto dentro do extraído
     project_root = _find_project_root(tmp)
     if project_root is None:
-        # Fallback: usa a primeira subpasta ou o próprio tmp
         subdirs = [p for p in tmp.iterdir() if p.is_dir()]
         project_root = subdirs[0] if subdirs else tmp
 
-    # Copia os arquivos para dest (sobrescreve)
+    info("Movendo arquivos para a pasta de destino...")
     _merge_into(project_root, dest)
     shutil.rmtree(tmp)
 
