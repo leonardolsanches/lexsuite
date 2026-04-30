@@ -12,6 +12,7 @@ interface LlmConfig {
   ollama: {
     configured: boolean;
     url: string | null;
+    urlSource: "database" | "env" | "none";
     model: string;
   };
 }
@@ -38,6 +39,7 @@ export default function LLMSettingsModal({ open, onClose, onSaved }: Props) {
   const [showKey, setShowKey] = useState(false);
   const [apiKey, setApiKey] = useState("");
   const [model, setModel] = useState("claude-opus-4-5");
+  const [ollamaUrl, setOllamaUrl] = useState("");
   const [saveMsg, setSaveMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
 
   useEffect(() => {
@@ -46,6 +48,7 @@ export default function LLMSettingsModal({ open, onClose, onSaved }: Props) {
     setSaveMsg(null);
     setTestResult(null);
     setApiKey("");
+    setOllamaUrl("");
     fetch("/api/admin/llm-config")
       .then((r) => r.json())
       .then((data: LlmConfig) => {
@@ -58,6 +61,11 @@ export default function LLMSettingsModal({ open, onClose, onSaved }: Props) {
 
   if (!open) return null;
 
+  const hasChanges =
+    apiKey !== "" ||
+    model !== config?.anthropic.model ||
+    ollamaUrl !== "";
+
   async function handleSave() {
     setSaving(true);
     setSaveMsg(null);
@@ -65,6 +73,7 @@ export default function LLMSettingsModal({ open, onClose, onSaved }: Props) {
       const body: Record<string, string> = {};
       if (apiKey !== "") body.anthropicApiKey = apiKey;
       if (model !== config?.anthropic.model) body.anthropicModel = model;
+      if (ollamaUrl !== "") body.ollamaBaseUrl = ollamaUrl;
 
       if (Object.keys(body).length === 0) {
         setSaveMsg({ type: "err", text: "Nenhuma alteração para salvar." });
@@ -92,7 +101,7 @@ export default function LLMSettingsModal({ open, onClose, onSaved }: Props) {
       });
 
       setApiKey("");
-      // Refresh config
+      setOllamaUrl("");
       const refreshed = await fetch("/api/admin/llm-config").then((r) => r.json()) as LlmConfig;
       setConfig(refreshed);
       onSaved();
@@ -140,7 +149,7 @@ export default function LLMSettingsModal({ open, onClose, onSaved }: Props) {
         </div>
 
         {/* Body */}
-        <div className="px-6 py-5 space-y-5">
+        <div className="px-6 py-5 space-y-5 max-h-[80vh] overflow-y-auto">
           {loading ? (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
@@ -207,12 +216,13 @@ export default function LLMSettingsModal({ open, onClose, onSaved }: Props) {
 
               {/* Claude API key section */}
               <div className="space-y-3">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Claude (Anthropic)</p>
                 <div>
                   <label className="text-sm font-medium block mb-1">
-                    Chave da API — Claude (Anthropic)
+                    Chave da API
                   </label>
                   <p className="text-xs text-muted-foreground mb-2">
-                    Obtenha em <a href="https://console.anthropic.com" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground">console.anthropic.com</a>. A chave é salva com segurança no banco de dados do sistema e nunca fica exposta no navegador.
+                    Obtenha em <a href="https://console.anthropic.com" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground">console.anthropic.com</a>. A chave é salva com segurança no banco de dados e nunca fica exposta no navegador.
                   </p>
                   <div className="relative">
                     <input
@@ -249,16 +259,39 @@ export default function LLMSettingsModal({ open, onClose, onSaved }: Props) {
                 </div>
               </div>
 
-              {/* Ollama info (read-only) */}
-              {config?.ollama.configured && (
-                <div className="rounded-lg border border-border/50 bg-muted/20 px-4 py-3">
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">Fallback local (Ollama)</p>
-                  <p className="text-xs text-muted-foreground">
-                    Modelo: <span className="font-mono text-foreground/80">{config.ollama.model}</span>
-                    {" · "}Ativado quando o Claude não está configurado.
+              {/* Ollama section — editable */}
+              <div className="space-y-3 pt-1">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Ollama (Mini PC local)</p>
+                <div>
+                  <label className="text-sm font-medium block mb-1">
+                    URL do túnel
+                  </label>
+                  <p className="text-xs text-muted-foreground mb-2">
+                    URL do Cloudflare ou ngrok que aponta para o Ollama local (ex: <code className="font-mono">https://xxx.trycloudflare.com</code>). Atualize aqui quando o túnel mudar — sem precisar ir ao Render.
                   </p>
+                  <input
+                    type="text"
+                    value={ollamaUrl}
+                    onChange={(e) => setOllamaUrl(e.target.value)}
+                    placeholder={
+                      config?.ollama.url
+                        ? `Atual: ${config.ollama.url}${config.ollama.urlSource === "database" ? " (banco)" : " (env var)"} — cole para substituir`
+                        : "https://seu-tunel.trycloudflare.com"
+                    }
+                    className="w-full px-3 py-2 text-sm bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring font-mono placeholder:font-sans placeholder:text-muted-foreground/60"
+                  />
+                  {ollamaUrl && !ollamaUrl.startsWith("http") && (
+                    <p className="text-xs text-destructive mt-1">A URL deve começar com http:// ou https://</p>
+                  )}
+                  {config?.ollama.configured && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Modelo: <span className="font-mono text-foreground/70">{config.ollama.model}</span>
+                      {config.ollama.urlSource === "database" && <span className="ml-2 text-emerald-500/80">(URL salva no banco)</span>}
+                      {config.ollama.urlSource === "env" && <span className="ml-2 text-muted-foreground/60">(URL da variável de ambiente)</span>}
+                    </p>
+                  )}
                 </div>
-              )}
+              </div>
 
               {/* Save result message */}
               {saveMsg && (
@@ -284,7 +317,7 @@ export default function LLMSettingsModal({ open, onClose, onSaved }: Props) {
           </button>
           <button
             onClick={handleSave}
-            disabled={saving || loading || (!apiKey && model === config?.anthropic.model)}
+            disabled={saving || loading || !hasChanges}
             className="text-sm px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-40 transition-colors flex items-center gap-2"
           >
             {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}

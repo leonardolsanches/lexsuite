@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { requireAuth } from "../lib/auth";
-import { getConfig, setConfig, deleteConfig, isAdminUser } from "../lib/runtime-config";
+import { getConfig, setConfig, deleteConfig, isAdminUser, loadConfigFromDb } from "../lib/runtime-config";
 import { isAnthropicConfigured, getAnthropicModel, pingAnthropic } from "../lib/anthropic";
 import { isOllamaConfigured, getOllamaBaseUrl, getOllamaModelParecer, pingOllama } from "../lib/ollama";
 import { getActiveProvider } from "../lib/llm";
@@ -26,6 +26,10 @@ router.get("/llm-config", requireAuth, async (req, res): Promise<void> => {
     : "none";
 
   const ollamaUrl = getOllamaBaseUrl();
+  // Show partial URL for display (hide sensitive tunnel tokens if any)
+  const ollamaUrlPreview = ollamaUrl
+    ? (ollamaUrl.length > 40 ? ollamaUrl.slice(0, 35) + "..." : ollamaUrl)
+    : null;
 
   res.json({
     provider: getActiveProvider() ?? "none",
@@ -37,7 +41,10 @@ router.get("/llm-config", requireAuth, async (req, res): Promise<void> => {
     },
     ollama: {
       configured: isOllamaConfigured(),
-      url: ollamaUrl ? "configured" : null,
+      url: ollamaUrlPreview,
+      urlSource: ollamaUrl
+        ? (getConfig("ollama_base_url") ? "database" : "env")
+        : "none",
       model: getOllamaModelParecer(),
     },
   });
@@ -51,9 +58,10 @@ router.put("/llm-config", requireAuth, async (req, res): Promise<void> => {
     return;
   }
 
-  const { anthropicApiKey, anthropicModel } = req.body as {
+  const { anthropicApiKey, anthropicModel, ollamaBaseUrl } = req.body as {
     anthropicApiKey?: string;
     anthropicModel?: string;
+    ollamaBaseUrl?: string;
   };
 
   if (anthropicApiKey !== undefined) {
@@ -75,6 +83,20 @@ router.put("/llm-config", requireAuth, async (req, res): Promise<void> => {
     logger.info({ userId, model: anthropicModel }, "admin: ANTHROPIC_MODEL atualizado");
   }
 
+  if (ollamaBaseUrl !== undefined) {
+    if (ollamaBaseUrl === "") {
+      await deleteConfig("ollama_base_url");
+      logger.info({ userId }, "admin: OLLAMA_BASE_URL removida (usa env var)");
+    } else {
+      if (!ollamaBaseUrl.startsWith("http")) {
+        res.status(400).json({ error: "URL inválida — deve começar com http:// ou https://" });
+        return;
+      }
+      await setConfig("ollama_base_url", ollamaBaseUrl.trim().replace(/\/$/, ""));
+      logger.info({ userId }, "admin: OLLAMA_BASE_URL atualizada");
+    }
+  }
+
   // Ping the updated config to confirm it works
   let pingOk: boolean | null = null;
   if (isAnthropicConfigured()) {
@@ -82,6 +104,7 @@ router.put("/llm-config", requireAuth, async (req, res): Promise<void> => {
   }
 
   const rawKey = getConfig("anthropic_api_key", process.env.ANTHROPIC_API_KEY ?? undefined);
+  const newOllamaUrl = getOllamaBaseUrl();
   res.json({
     ok: true,
     provider: getActiveProvider() ?? "none",
@@ -90,6 +113,10 @@ router.put("/llm-config", requireAuth, async (req, res): Promise<void> => {
       ? rawKey.slice(0, 8) + "..." + rawKey.slice(-4)
       : null,
     model: getConfig("anthropic_model", process.env.ANTHROPIC_MODEL ?? undefined) ?? "claude-opus-4-5",
+    ollama: {
+      configured: !!newOllamaUrl,
+      urlSource: newOllamaUrl ? (getConfig("ollama_base_url") ? "database" : "env") : "none",
+    },
   });
 });
 

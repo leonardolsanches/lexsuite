@@ -1,15 +1,18 @@
 import { logger } from "./logger";
+import { getConfig } from "./runtime-config";
 
 export const OLLAMA_DEFAULT_MODEL_EXTRACTION = "qwen2:7b";
 export const OLLAMA_DEFAULT_MODEL_PARECER = "deepseek-r1:32b";
 export const OLLAMA_DEFAULT_MODEL_EMBEDDING = "nomic-embed-text";
 
 export function getOllamaBaseUrl(): string | null {
-  return process.env.OLLAMA_BASE_URL ?? null;
+  // Runtime config (set via admin panel) takes priority over env var so the
+  // URL can be updated without a Render redeploy when the Cloudflare tunnel changes.
+  return getConfig("ollama_base_url", process.env.OLLAMA_BASE_URL ?? undefined) ?? null;
 }
 
 export function isOllamaConfigured(): boolean {
-  return !!process.env.OLLAMA_BASE_URL;
+  return !!getOllamaBaseUrl();
 }
 
 export function getOllamaModelParecer(): string {
