@@ -104,9 +104,24 @@ export function buildRagContext(chunks: ChunkSearchResult[]): string {
   if (chunks.length === 0) return "";
 
   const sections = chunks.map((c, i) => {
-    const label = c.caso_id ? `Caso: ${c.caso_id}` : `Documento #${c.document_id}`;
-    return `[Fonte ${i + 1} — ${label}]\n${c.texto}`;
+    // Chunks saved from previous analyses have caso_id set to the analysis label.
+    // Distinguish them clearly so the model knows the type of source.
+    const isParecer = c.caso_id && !c.caso_id.startsWith("análise-") && isNaN(Number(c.caso_id));
+    const label = isParecer
+      ? `Parecer anterior — ${c.caso_id}`
+      : c.caso_id
+      ? `Caso: ${c.caso_id}`
+      : `Documento #${c.document_id}`;
+
+    const sim = c.similaridade != null ? ` (similaridade: ${(c.similaridade * 100).toFixed(0)}%)` : "";
+    return `[Fonte ${i + 1} — ${label}${sim}]\n${c.texto}`;
   });
 
-  return `CONTEXTO RECUPERADO DA BASE DE CONHECIMENTO (RAG):\n${"─".repeat(60)}\n${sections.join("\n\n")}\n${"─".repeat(60)}\n\n`;
+  return (
+    `CONTEXTO RECUPERADO DA BASE DE CONHECIMENTO (RAG):\n` +
+    `Use este contexto para embasar a análise, citar precedentes e validar teses similares.\n` +
+    `${"─".repeat(60)}\n` +
+    `${sections.join("\n\n")}\n` +
+    `${"─".repeat(60)}\n\n`
+  );
 }

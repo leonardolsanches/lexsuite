@@ -46,7 +46,9 @@ import {
   Zap,
   WifiOff,
   Wifi,
-  FileText as FileTextIcon
+  FileText as FileTextIcon,
+  BookOpen,
+  CheckCheck
 } from 'lucide-react';
 import { useStreaming, type ExecStep } from '@/hooks/use-streaming';
 import { usePdf } from '@/hooks/use-pdf';
@@ -71,6 +73,8 @@ type ProcessTab = {
   pasteText: string;
   outputHtml: string;
   pdfs: File[];
+  savedToKb?: boolean;
+  savingToKb?: boolean;
 };
 
 export default function ModuleView({ module }: ModuleViewProps) {
@@ -657,6 +661,50 @@ ${bodyHtml}
     setTimeout(() => { win.print(); }, 500);
   };
 
+  const handleSaveToKb = async () => {
+    if (!activeTab || !activeTab.outputHtml || activeTab.status !== 'done') return;
+
+    updateActiveTab({ savingToKb: true });
+
+    try {
+      const token = await getToken();
+      const wf = moduleWorkflows.find(w => w.key === activeTab.workflowKey);
+      const label = wf ? `${wf.name} — ${activeTab.label}` : activeTab.label;
+
+      const res = await fetch('/api/knowledge/save-analysis', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          label,
+          workflowKey: activeTab.workflowKey ?? undefined,
+          module,
+          outputText: activeTab.outputHtml,
+          sessionId: activeTab.sessionId ? String(activeTab.sessionId) : undefined,
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: 'Erro desconhecido' }));
+        toast({ title: 'Falha ao salvar', description: err.error ?? 'Tente novamente.', variant: 'destructive' });
+        updateActiveTab({ savingToKb: false });
+        return;
+      }
+
+      const data = await res.json();
+      updateActiveTab({ savingToKb: false, savedToKb: true });
+      toast({
+        title: 'Salvo na base de conhecimento',
+        description: `${data.chunksIndexed} trecho(s) indexado(s). Análises futuras similares vão referenciar este parecer.`,
+      });
+    } catch (err: any) {
+      toast({ title: 'Erro de rede', description: err?.message ?? 'Tente novamente.', variant: 'destructive' });
+      updateActiveTab({ savingToKb: false });
+    }
+  };
+
   const handlePdfUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       const files = Array.from(e.target.files).filter(f => f.type === 'application/pdf');
@@ -1223,6 +1271,28 @@ ${bodyHtml}
                     >
                       <Download className="w-3.5 h-3.5" /> PDF
                     </Button>
+                    {activeTab?.status === 'done' && activeTab?.outputHtml && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleSaveToKb}
+                        disabled={activeTab.savingToKb || activeTab.savedToKb}
+                        className={`h-8 gap-2 ${
+                          activeTab.savedToKb
+                            ? 'text-emerald-500 hover:text-emerald-500'
+                            : 'text-muted-foreground hover:text-primary'
+                        }`}
+                        title={activeTab.savedToKb ? 'Já salvo na base de conhecimento' : 'Salvar parecer na base RAG para enriquecer análises futuras'}
+                      >
+                        {activeTab.savingToKb ? (
+                          <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Indexando...</>
+                        ) : activeTab.savedToKb ? (
+                          <><CheckCheck className="w-3.5 h-3.5" /> Salvo na Base</>
+                        ) : (
+                          <><BookOpen className="w-3.5 h-3.5" /> Salvar na Base</>
+                        )}
+                      </Button>
+                    )}
                   </div>
                 </div>
 
