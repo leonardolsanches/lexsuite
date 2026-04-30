@@ -3,7 +3,7 @@ import { Card, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Link } from 'wouter';
 import { useClerk } from '@clerk/react';
-import { Wheat, Scale, LayoutDashboard, LogOut } from 'lucide-react';
+import { Wheat, Scale, LayoutDashboard, LogOut, Calculator } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 
 const STATUS_PT: Record<string, string> = {
@@ -77,6 +77,23 @@ export default function Dashboard() {
                 <CardContent className="p-0 text-muted-foreground font-sans text-sm">
                   Execuções bancárias, embargos, cálculo de débito, impugnação à penhora e estratégia em hasta pública.
                 </CardContent>
+              </div>
+            </Card>
+          </Link>
+        </div>
+
+        {/* Utility tools row */}
+        <div className="grid md:grid-cols-3 gap-4">
+          <Link href="/app/calculadora" className="block outline-none">
+            <Card className="bg-card border-border hover:border-emerald-500/50 transition-colors cursor-pointer group">
+              <div className="p-4 flex items-center gap-3">
+                <div className="h-9 w-9 rounded bg-emerald-500/10 text-emerald-500 flex items-center justify-center group-hover:scale-110 transition-transform shrink-0">
+                  <Calculator className="w-4 h-4" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-foreground group-hover:text-emerald-400 transition-colors">Calculadora AWS</p>
+                  <p className="text-xs text-muted-foreground">Estimativa de custo Bedrock por volume</p>
+                </div>
               </div>
             </Card>
           </Link>
