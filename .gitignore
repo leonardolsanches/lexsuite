@@ -53,3 +53,6 @@ replit.nix
 
 # Archived unused files
 _archive/
+
+# Deploy local secrets — nunca commitar
+.env.deploy
