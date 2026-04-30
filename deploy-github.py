@@ -453,12 +453,20 @@ def main():
 
     # 11. Push — tenta normal → force → orphan (se histórico contém arquivos grandes)
     def do_push() -> tuple[bool, str]:
-        """Retorna (sucesso, stderr)."""
-        result = subprocess.run(
+        """Executa push mostrando progresso e retorna (sucesso, stderr_completo)."""
+        proc = subprocess.Popen(
             ["git", "push", "-u", "origin", "main"],
-            capture_output=True, text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
         )
-        return result.returncode == 0, result.stderr
+        # git envia progresso para stderr — mostra em tempo real e captura
+        stderr_lines = []
+        for line in proc.stderr:
+            print(line, end="", flush=True)
+            stderr_lines.append(line)
+        proc.wait()
+        return proc.returncode == 0, "".join(stderr_lines)
 
     def push_orphan(commit_msg: str) -> bool:
         """Reescreve histórico completo via branch órfão e faz force push."""
