@@ -56,3 +56,12 @@ _archive/
 
 # Deploy local secrets — nunca commitar
 .env.deploy
+
+# Duplicatas do Windows (download repetido: "arquivo (1).ext")
+* (*).yaml
+* (*).json
+* (*).ts
+* (*).tsx
+* (*).md
+* (*).txt
+* (*).py

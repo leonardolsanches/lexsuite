@@ -427,6 +427,19 @@ def main():
     else:
         ok("Nenhum arquivo local no tracking")
 
+    # 9b. Remove duplicatas do Windows ("arquivo (1).ext") do tracking
+    win_dup_pattern = re.compile(r".+ \(\d+\)\.[^/\\]+$")
+    _, tracked2, _ = git("ls-files")
+    win_dups = [f for f in tracked2.splitlines() if win_dup_pattern.search(Path(f).name)]
+    if win_dups:
+        warn(f"Detectado {len(win_dups)} arquivo(s) duplicado(s) do Windows:")
+        for f in win_dups:
+            warn(f"  {f}")
+            git("rm", "--cached", "-q", "--", f)
+        ok("Duplicatas removidas do tracking git (os arquivos locais não são apagados)")
+    else:
+        ok("Sem duplicatas do Windows")
+
     # 10. Stage e commit
     step("Preparando arquivos para commit...")
     git_live("add", "--all")
