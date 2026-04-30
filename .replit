@@ -26,7 +26,7 @@ VITE_CLERK_PUBLISHABLE_KEY = "pk_test_YXdha2UtbW91c2UtMi5jbGVyay5hY2NvdW50cy5kZX
 LEX_MODO_LLM = "local"
 OLLAMA_MODEL_PARECER = "deepseek-r1:32b"
 OLLAMA_MODEL_EXTRACAO = "qwen2:7b"
-ANTHROPIC_API_KEY = "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"
+ANTHROPIC_API_KEY = "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"
 
 [userenv.development]
 DB_BRIDGE_URL = "https://naval-banners-naturals-fioricet.trycloudflare.com"
