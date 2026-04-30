@@ -112,26 +112,35 @@ def main():
         pause_exit()
     ok(out)
 
-    # 2. Pasta correta? Busca pnpm-workspace.yaml aqui ou em subpastas imediatas
+    # 2. Localizar raiz do projeto
     step("Verificando pasta do projeto...")
     marker = "pnpm-workspace.yaml"
     project_root = None
+
+    # Tenta: pasta atual → subpastas imediatas
     if Path(marker).exists():
         project_root = Path.cwd()
     else:
-        # ZIP do Replit costuma extrair dentro de uma subpasta (ex: workspace-main/)
         for sub in sorted(Path.cwd().iterdir()):
             if sub.is_dir() and (sub / marker).exists():
                 project_root = sub
                 break
-    if project_root is None:
-        err(f"Projeto não encontrado em {os.getcwd()} nem em suas subpastas.")
-        warn("Verifique se extraiu o ZIP corretamente.")
-        pause_exit()
-    if project_root != Path.cwd():
-        warn(f"Projeto encontrado em subpasta: {project_root.name}")
-        os.chdir(project_root)
-    ok(f"Pasta do projeto: {os.getcwd()}")
+
+    if project_root is not None:
+        if project_root != Path.cwd():
+            warn(f"Projeto encontrado em subpasta: {project_root.name}")
+            os.chdir(project_root)
+        ok(f"Pasta do projeto: {os.getcwd()}")
+    else:
+        # Não encontrou o marcador — pede confirmação manual
+        warn(f"pnpm-workspace.yaml não encontrado em {os.getcwd()}")
+        warn("Isso pode acontecer se o ZIP foi extraído em local diferente.")
+        print()
+        confirmar = input("    Continuar mesmo assim a partir desta pasta? (s/N): ").strip().lower()
+        if confirmar != "s":
+            err("Abortado. Extraia o ZIP do Replit nesta pasta e tente novamente.")
+            pause_exit()
+        ok(f"Usando pasta atual: {os.getcwd()}")
 
     # 3. Token
     step("Carregando token de acesso GitHub...")
