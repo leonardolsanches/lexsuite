@@ -109,6 +109,13 @@ export async function ensureModelLoaded(
   );
 }
 
+// System instruction injected into every request to enforce Portuguese output.
+// deepseek-r1 defaults to English when no explicit language is set.
+const SYSTEM_PT_BR =
+  "Você é um assistente jurídico especializado em direito brasileiro. " +
+  "REGRA ABSOLUTA DE IDIOMA: responda EXCLUSIVAMENTE em português brasileiro (pt-BR). " +
+  "Não escreva nenhuma palavra em inglês. Toda a resposta deve ser em português, sem exceção.";
+
 export async function* streamOllama(
   prompt: string,
   model: string,
@@ -126,7 +133,14 @@ export async function* streamOllama(
 
   // num_ctx: 16384 ensures the full prompt (system instructions + data + RAG) is never
   // silently truncated by the model. deepseek-r1 default is 4096 which cuts long prompts.
-  const ollamaPayload = { model, prompt, stream: true, keep_alive: "30m", num_ctx: 16384 };
+  const ollamaPayload = {
+    model,
+    system: SYSTEM_PT_BR,
+    prompt,
+    stream: true,
+    keep_alive: "30m",
+    num_ctx: 16384,
+  };
 
   let response = await fetch(url, {
     method: "POST",

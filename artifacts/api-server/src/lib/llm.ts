@@ -39,7 +39,13 @@ export async function streamAnalysis(
   // Ensure model is in memory before streaming (handles cold-start gracefully)
   await ensureModelLoaded(baseUrl, model, onStatus);
 
-  let fullPrompt = prompt;
+  // Prepend language instruction to every prompt.
+  // deepseek-r1 tends to respond in English without an explicit directive.
+  const langPrefix =
+    "INSTRUÇÃO OBRIGATÓRIA DE IDIOMA: Responda EXCLUSIVAMENTE em português brasileiro (pt-BR). " +
+    "Não escreva nenhuma palavra em inglês. Toda a sua resposta deve ser em português, sem exceção.\n\n";
+
+  let fullPrompt = langPrefix + prompt;
   if (continueFrom) {
     fullPrompt += `\n\n[RESPOSTA ANTERIOR]:\n${continueFrom}\n\nContinue a análise do ponto onde parou.`;
   }
