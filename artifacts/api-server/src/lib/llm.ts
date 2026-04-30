@@ -5,6 +5,7 @@ import {
   getOllamaModelParecer,
   isOllamaConfigured,
   streamOllama,
+  type OllamaThinkMode,
 } from "./ollama";
 import {
   isAnthropicConfigured,
@@ -14,6 +15,7 @@ import { getDbBridgeUrl } from "./bridge";
 import { logger } from "./logger";
 
 export type LlmProvider = "anthropic" | "ollama";
+export type { OllamaThinkMode };
 
 /** Claude takes priority when ANTHROPIC_API_KEY is set; otherwise Ollama. */
 export function getActiveProvider(): LlmProvider | null {
@@ -62,12 +64,18 @@ function buildDateContext(): string {
   );
 }
 
+export interface StreamAnalysisOptions {
+  /** "deep" (default) = full CoT reasoning; "fast" = skip CoT, ~3-5× faster */
+  thinkMode?: OllamaThinkMode;
+}
+
 export async function streamAnalysis(
   prompt: string,
   res: Response,
   onChunk: (text: string) => void,
   continueFrom?: string,
-  onStatus?: (msg: string) => void
+  onStatus?: (msg: string) => void,
+  options: StreamAnalysisOptions = {}
 ): Promise<void> {
   const provider = getActiveProvider();
 
@@ -76,8 +84,7 @@ export async function streamAnalysis(
   }
 
   // Inject today's date so the model can compute prescription / deadlines accurately.
-  const dateCtx = buildDateContext();
-  const promptWithDate = dateCtx + prompt;
+  const promptWithDate = buildDateContext() + prompt;
 
   // ── Claude ────────────────────────────────────────────────────────────────
   if (provider === "anthropic") {
@@ -94,8 +101,9 @@ export async function streamAnalysis(
   // ── Ollama (local) ────────────────────────────────────────────────────────
   const baseUrl = getOllamaBaseUrl()!;
   const model = getOllamaModelParecer();
+  const thinkMode = options.thinkMode ?? "deep";
 
-  logger.info({ model, baseUrl }, "Streaming via Ollama local");
+  logger.info({ model, baseUrl, thinkMode }, "Streaming via Ollama local");
 
   await ensureModelLoaded(baseUrl, model, onStatus);
 
@@ -104,11 +112,35 @@ export async function streamAnalysis(
     fullPrompt += `\n\n[RESPOSTA ANTERIOR]:\n${continueFrom}\n\nContinue a análise do ponto onde parou.`;
   }
 
-  // Strip deepseek-r1 <think>...</think> reasoning block
+  // ── Thinking-phase progress tracker ──────────────────────────────────────
+  // deepseek-r1 can spend 15-20 min in silent CoT before outputting anything.
+  // We track token count from two sources:
+  //  (a) separate "thinking" JSON field (Ollama ≥0.5 with think:true param)
+  //  (b) <think>...</think> tags in the "response" field (older Ollama / fallback)
+  // Progress updates are sent via onStatus so the browser shows live feedback.
+  let thinkCharTotal = 0;
+  let lastStatusAt = 0;
+  const PROGRESS_INTERVAL = 800; // emit status every ~200 tokens (800 chars)
+
+  function emitThinkProgress(addedChars: number) {
+    thinkCharTotal += addedChars;
+    const approxTokens = Math.round(thinkCharTotal / 4);
+    if (thinkCharTotal - lastStatusAt >= PROGRESS_INTERVAL) {
+      lastStatusAt = thinkCharTotal;
+      onStatus?.(
+        `Raciocínio jurídico em andamento... ~${approxTokens.toLocaleString("pt-BR")} tokens`
+      );
+    }
+  }
+
+  // Source (a): Ollama native thinking tokens
+  const onThinkChunk = (chars: number) => emitThinkProgress(chars);
+
+  // Source (b): strip <think>...</think> tags from response stream
   let thinkPhase: "checking" | "stripping" | "passthrough" = "checking";
   let thinkBuffer = "";
 
-  for await (const text of streamOllama(fullPrompt, model, baseUrl, getDbBridgeUrl())) {
+  for await (const text of streamOllama(fullPrompt, model, baseUrl, getDbBridgeUrl(), thinkMode, onThinkChunk)) {
     if (thinkPhase === "passthrough") {
       onChunk(text);
       res.write(`data: ${JSON.stringify({ type: "text", text })}\n\n`);
@@ -130,6 +162,7 @@ export async function streamAnalysis(
     }
 
     if (thinkPhase === "stripping") {
+      emitThinkProgress(text.length); // count chars in tag-embedded thinking
       const closeIdx = thinkBuffer.indexOf("</think>");
       if (closeIdx !== -1) {
         thinkPhase = "passthrough";

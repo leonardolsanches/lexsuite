@@ -139,11 +139,15 @@ REGRAS ABSOLUTAS — VIOLÁ-LAS É FALHA GRAVE:
    - Indique qual a estratégia mais eficiente no caso concreto, não a mais genérica.`;
 
 
+export type OllamaThinkMode = "deep" | "fast";
+
 export async function* streamOllama(
   prompt: string,
   model: string,
   baseUrl: string,
-  bridgeUrl?: string | null
+  bridgeUrl?: string | null,
+  thinkMode: OllamaThinkMode = "deep",
+  onThinkChunk?: (chars: number) => void
 ): AsyncGenerator<string> {
   // Route through DB Bridge proxy when available.
   // The bridge calls Ollama on localhost and sends heartbeat "\n" bytes every 8s,
@@ -154,16 +158,26 @@ export async function* streamOllama(
     ? `${bridgeUrl}/ollama-proxy/stream`
     : `${baseUrl}/api/generate`;
 
-  // num_ctx: 32768 ensures the full prompt (system instructions + data + RAG) is never
-  // silently truncated by the model. deepseek-r1 default is 4096 which cuts long prompts.
-  // 32k fits ~24k tokens of document content + our expanded system instructions.
-  const ollamaPayload = {
+  // Inference parameters tuned for legal analysis:
+  //   num_ctx  16384 — fits ~12k tokens of document + system + RAG; faster than 32k
+  //   temperature 0.1 — deterministic legal reasoning; avoids creative drift
+  //   num_predict 3000 — caps response at ~2200 words; prevents runaway verbosity
+  //   think — deepseek-r1 extended CoT toggle (Ollama ≥0.5.x); "fast" disables the
+  //            silent thinking phase and gives 3-5× speed improvement at the cost of
+  //            lighter reasoning. "deep" (default) keeps full CoT for complex analysis.
+  const ollamaPayload: Record<string, unknown> = {
     model,
     system: SYSTEM_PT_BR,
     prompt,
     stream: true,
     keep_alive: "30m",
-    num_ctx: 32768,
+    options: {
+      num_ctx: 16384,
+      temperature: 0.1,
+      num_predict: 3000,
+    },
+    // think is a deepseek-r1 specific parameter; ignored by other models
+    think: thinkMode !== "fast",
   };
 
   let response = await fetch(url, {
@@ -205,6 +219,10 @@ export async function* streamOllama(
       if (!line.trim()) continue;
       try {
         const data = JSON.parse(line);
+        // Ollama ≥0.5 with think:true emits separate "thinking" tokens — route to callback
+        if (typeof data.thinking === "string" && data.thinking && onThinkChunk) {
+          onThinkChunk(data.thinking.length);
+        }
         if (typeof data.response === "string" && data.response) {
           yield data.response;
         }
@@ -217,6 +235,9 @@ export async function* streamOllama(
   if (buffer.trim()) {
     try {
       const data = JSON.parse(buffer);
+      if (typeof data.thinking === "string" && data.thinking && onThinkChunk) {
+        onThinkChunk(data.thinking.length);
+      }
       if (typeof data.response === "string" && data.response) {
         yield data.response;
       }

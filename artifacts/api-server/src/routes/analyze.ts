@@ -61,7 +61,7 @@ router.get("/llm-status", async (_req, res): Promise<void> => {
 
 router.post("/analyze", requireAuth, async (req, res): Promise<void> => {
   const userId = (req as any).userId as string;
-  const { sessionId, workflowKey, module, formData, pasteText, observations, continueFrom } = req.body;
+  const { sessionId, workflowKey, module, formData, pasteText, observations, continueFrom, thinkMode } = req.body;
 
   if (!workflowKey || !module) {
     res.status(400).json({ error: "Missing workflowKey or module" });
@@ -260,7 +260,8 @@ router.post("/analyze", requireAuth, async (req, res): Promise<void> => {
       res,
       (text) => { fullOutput += text; },
       continueFrom,
-      onModelStatus
+      onModelStatus,
+      { thinkMode: thinkMode === "fast" ? "fast" : "deep" }
     );
 
     clearInterval(heartbeatInterval);

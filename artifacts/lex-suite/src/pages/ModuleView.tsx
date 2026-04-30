@@ -109,6 +109,7 @@ export default function ModuleView({ module }: ModuleViewProps) {
   useEffect(() => { tabsRef.current = tabs; }, [tabs]);
 
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [thinkMode, setThinkMode] = useState<'deep' | 'fast'>('deep');
 
   // ── LLM connectivity status ───────────────────────────────────────────────
   type LlmStatus = 'checking' | 'online' | 'degraded' | 'offline' | 'unconfigured';
@@ -303,6 +304,7 @@ export default function ModuleView({ module }: ModuleViewProps) {
       workflowKey: tab.workflowKey,
       module,
       mode: tab.mode,
+      thinkMode,
       formData: tab.mode === 'form' ? payloadFormData : undefined,
       pasteText: tab.mode === 'paste'
         ? tab.pasteText
@@ -908,6 +910,25 @@ ${bodyHtml}
               )}
               Executar Todos
             </Button>
+            {/* Think mode toggle — only relevant for local deepseek */}
+            {llmProvider !== 'anthropic' && (
+              <div className="flex items-center h-8 rounded-md border border-border overflow-hidden shrink-0 ml-1">
+                <button
+                  onClick={() => setThinkMode('fast')}
+                  title="Rápido: desativa o raciocínio estendido. 3-5× mais veloz, resultado direto."
+                  className={`px-2.5 h-full text-xs transition-colors ${thinkMode === 'fast' ? 'bg-amber-500 text-white font-medium' : 'text-muted-foreground hover:bg-muted'}`}
+                >
+                  ⚡ Rápido
+                </button>
+                <button
+                  onClick={() => setThinkMode('deep')}
+                  title="Profundo: raciocínio estendido ativo. Máxima profundidade, mais lento."
+                  className={`px-2.5 h-full text-xs transition-colors border-l border-border ${thinkMode === 'deep' ? 'bg-primary text-primary-foreground font-medium' : 'text-muted-foreground hover:bg-muted'}`}
+                >
+                  🧠 Profundo
+                </button>
+              </div>
+            )}
             <Button 
               variant="default" 
               size="sm"
