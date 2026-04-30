@@ -372,6 +372,20 @@ def main():
     success = git_live("push", "-u", "origin", "main")
     print()
 
+    if not success:
+        # Repositório remoto já tem conteúdo sem histórico em comum → force push
+        warn("Push normal falhou (repositório remoto não está vazio).")
+        warn("O Replit é a fonte da verdade — será feito force push.")
+        warn("O conteúdo atual do GitHub será SUBSTITUÍDO pelo projeto do Replit.")
+        print()
+        confirmar = input("    Confirmar? (s/N): ").strip().lower()
+        if confirmar == "s":
+            print()
+            success = git_live("push", "-u", "--force", "origin", "main")
+            print()
+        else:
+            err("Abortado pelo usuário.")
+
     if success:
         print(green("  SUCESSO! Projeto enviado para o GitHub."))
         m = re.search(r"github\.com[/:](.+?)(?:\.git)?$", repo_url)
@@ -379,9 +393,9 @@ def main():
             print(cyan(f"  Acesse: https://github.com/{m.group(1)}"))
     else:
         err("Falha no push. Verifique:")
-        warn("1. O repositório no GitHub existe e está vazio (sem commits)")
-        warn("2. O token tem permissão de escrita (scope: repo)")
-        warn("3. O token não está expirado")
+        warn("1. O token tem permissão de escrita (scope: repo)")
+        warn("2. O token não está expirado")
+        warn("3. O nome do repositório está correto")
 
     print()
     print(gray("Pressione Enter para fechar..."))
