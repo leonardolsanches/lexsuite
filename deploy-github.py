@@ -3,9 +3,15 @@
 deploy-github.py — Envia o projeto Lex Suite para o GitHub
 Uso: python deploy-github.py
 
+Fluxo:
+  1. Detecta o ZIP baixado do Replit na pasta atual (ou pede o caminho)
+  2. Extrai o ZIP automaticamente
+  3. Faz commit e push para o GitHub
+
 O token é lido de (em ordem de prioridade):
   1. Variável de ambiente GITHUB_PERSONAL_ACCESS_TOKEN
-  2. Arquivo .env.deploy na mesma pasta (formato: GITHUB_PERSONAL_ACCESS_TOKEN=ghp_...)
+  2. Arquivo .env.deploy na mesma pasta que este script
+     (formato: GITHUB_PERSONAL_ACCESS_TOKEN=ghp_...)
 
 O arquivo .env.deploy está no .gitignore e nunca é commitado.
 """
@@ -14,6 +20,8 @@ import subprocess
 import sys
 import os
 import re
+import zipfile
+import shutil
 from datetime import datetime
 from pathlib import Path
 
@@ -26,66 +34,213 @@ def yellow(s):  return f"\033[93m{s}\033[0m"
 def red(s):     return f"\033[91m{s}\033[0m"
 def magenta(s): return f"\033[95m{s}\033[0m"
 def gray(s):    return f"\033[90m{s}\033[0m"
+def bold(s):    return f"\033[1m{s}\033[0m"
 
 def step(msg):  print(f"\n{cyan('==>')} {msg}")
 def ok(msg):    print(f"    {green('OK')}  {msg}")
 def warn(msg):  print(f"    {yellow('AV')}  {msg}")
 def err(msg):   print(f"    {red('ERR')} {msg}")
+def info(msg):  print(f"    {gray('...')} {msg}")
 
 
 # ── Helpers git ──────────────────────────────────────────────────────────────
 
-def git(*args, capture=True):
-    result = subprocess.run(["git"] + list(args), capture_output=capture, text=True)
+def git(*args):
+    result = subprocess.run(["git"] + list(args), capture_output=True, text=True)
     return result.returncode, result.stdout.strip(), result.stderr.strip()
 
 def git_live(*args):
-    """Executa git com saída em tempo real. Retorna True se sucesso."""
     return subprocess.run(["git"] + list(args)).returncode == 0
 
 
-# ── Carregar token ───────────────────────────────────────────────────────────
+# ── Token ────────────────────────────────────────────────────────────────────
 
-def load_token():
-    """Busca GITHUB_PERSONAL_ACCESS_TOKEN: env var → .env.deploy → None."""
-    # 1. Variável de ambiente
+def load_token(script_dir: Path):
     token = os.environ.get("GITHUB_PERSONAL_ACCESS_TOKEN", "").strip()
     if token:
         return token
-
-    # 2. Arquivo .env.deploy
-    env_file = Path(__file__).parent / ".env.deploy"
-    if env_file.exists():
-        for line in env_file.read_text(encoding="utf-8").splitlines():
-            line = line.strip()
-            if line.startswith("GITHUB_PERSONAL_ACCESS_TOKEN="):
-                token = line.split("=", 1)[1].strip().strip('"').strip("'")
-                if token:
-                    return token
-
+    for base in [script_dir, Path.cwd()]:
+        env_file = base / ".env.deploy"
+        if env_file.exists():
+            for line in env_file.read_text(encoding="utf-8").splitlines():
+                line = line.strip()
+                if line.startswith("GITHUB_PERSONAL_ACCESS_TOKEN="):
+                    t = line.split("=", 1)[1].strip().strip('"').strip("'")
+                    if t:
+                        return t
     return None
 
 
-def create_env_deploy_template():
-    """Cria .env.deploy vazio com instruções se não existir."""
-    env_file = Path(__file__).parent / ".env.deploy"
+def create_env_deploy_template(script_dir: Path):
+    env_file = script_dir / ".env.deploy"
     if not env_file.exists():
         env_file.write_text(
             "# Token de acesso pessoal do GitHub (nunca commitar este arquivo)\n"
-            "# Gere em: GitHub → Settings → Developer settings → Personal access tokens → Classic\n"
+            "# Gere em: GitHub > Settings > Developer settings > Personal access tokens > Classic\n"
             "# Scope necessário: repo\n"
             "GITHUB_PERSONAL_ACCESS_TOKEN=\n",
             encoding="utf-8",
         )
-        return True
-    return False
+        return env_file
+    return env_file
 
 
-def inject_token_in_url(url: str, token: str, username: str = "oauth2") -> str:
-    """Insere o token na URL: https://TOKEN@github.com/..."""
-    url = re.sub(r"https?://(?:[^@]+@)?", "", url)  # remove credencial antiga
-    return f"https://{username}:{token}@{url}"
+def inject_token_in_url(url: str, token: str) -> str:
+    url = re.sub(r"https?://(?:[^@]+@)?", "", url)
+    return f"https://oauth2:{token}@{url}"
 
+
+# ── ZIP ───────────────────────────────────────────────────────────────────────
+
+MARKER = "pnpm-workspace.yaml"
+
+
+def find_zips(folder: Path) -> list[Path]:
+    """Retorna ZIPs na pasta, mais recente primeiro."""
+    zips = sorted(folder.glob("*.zip"), key=lambda p: p.stat().st_mtime, reverse=True)
+    return zips
+
+
+def zip_contains_marker(zf: zipfile.ZipFile) -> bool:
+    """Verifica se o ZIP contém pnpm-workspace.yaml (em qualquer nível)."""
+    return any(MARKER in name for name in zf.namelist())
+
+
+def extract_zip(zip_path: Path, dest: Path) -> Path:
+    """
+    Extrai o ZIP em dest/.
+    Se todos os arquivos estiverem dentro de uma única pasta-raiz (ex: workspace-main/),
+    move o conteúdo para dest diretamente.
+    Retorna o caminho da raiz do projeto.
+    """
+    with zipfile.ZipFile(zip_path, "r") as zf:
+        # Descobre se há uma pasta-raiz única no ZIP
+        top_dirs = {name.split("/")[0] for name in zf.namelist() if name.strip("/")}
+        single_root = len(top_dirs) == 1 and not any(
+            n == top_dirs.copy().pop() + "/" or not n.startswith(top_dirs.copy().pop())
+            for n in zf.namelist() if n.strip("/")
+        )
+
+        # Extrai tudo para uma pasta temporária
+        tmp = dest / f"_zip_extract_{zip_path.stem}"
+        if tmp.exists():
+            shutil.rmtree(tmp)
+        zf.extractall(tmp)
+
+    # Encontra a raiz do projeto dentro do extraído
+    project_root = _find_project_root(tmp)
+    if project_root is None:
+        # Fallback: usa a primeira subpasta ou o próprio tmp
+        subdirs = [p for p in tmp.iterdir() if p.is_dir()]
+        project_root = subdirs[0] if subdirs else tmp
+
+    # Copia os arquivos para dest (sobrescreve)
+    _merge_into(project_root, dest)
+    shutil.rmtree(tmp)
+
+    return dest
+
+
+def _find_project_root(base: Path) -> Path | None:
+    """Procura recursivamente por pnpm-workspace.yaml."""
+    if (base / MARKER).exists():
+        return base
+    for child in sorted(base.iterdir()):
+        if child.is_dir():
+            found = _find_project_root(child)
+            if found:
+                return found
+    return None
+
+
+def _merge_into(src: Path, dst: Path):
+    """Copia src/* → dst/, sobrescrevendo arquivos existentes."""
+    dst.mkdir(parents=True, exist_ok=True)
+    for item in src.iterdir():
+        dest_item = dst / item.name
+        if item.is_dir():
+            if dest_item.exists():
+                shutil.rmtree(dest_item)
+            shutil.copytree(item, dest_item)
+        else:
+            shutil.copy2(item, dest_item)
+
+
+def locate_project(script_dir: Path) -> Path:
+    """
+    Encontra ou extrai a raiz do projeto. Retorna o Path da raiz.
+    Estratégia:
+      1. Já existe pnpm-workspace.yaml aqui? → usa direto
+      2. Existe em subpasta? → usa subpasta
+      3. Existe ZIP do Replit aqui? → extrai e usa
+      4. Pede ao usuário o caminho do ZIP
+    """
+    cwd = Path.cwd()
+
+    # 1. Raiz na pasta atual
+    if (cwd / MARKER).exists():
+        return cwd
+
+    # 2. Raiz em subpasta imediata
+    for sub in sorted(cwd.iterdir()):
+        if sub.is_dir() and (sub / MARKER).exists():
+            return sub
+
+    # 3. Busca ZIP na pasta atual
+    step("Projeto não encontrado. Procurando ZIP do Replit...")
+    zips = find_zips(cwd)
+    # Filtra ZIPs que parecem ser do Replit (contêm o marker)
+    replit_zips = []
+    for z in zips:
+        try:
+            with zipfile.ZipFile(z) as zf:
+                if zip_contains_marker(zf):
+                    replit_zips.append(z)
+        except Exception:
+            pass
+
+    if not replit_zips and zips:
+        # Tem ZIPs mas nenhum tem o marker — oferece o mais recente
+        replit_zips = [zips[0]]
+
+    zip_path = None
+    if replit_zips:
+        zip_path = replit_zips[0]
+        info(f"ZIP encontrado: {zip_path.name}")
+        usar = input(f"    Extrair este arquivo? (S/n): ").strip().lower()
+        if usar == "n":
+            zip_path = None
+
+    if zip_path is None:
+        print()
+        print(gray("    Baixe o ZIP do Replit: menu ⋯ → Download as ZIP"))
+        print(gray(f"    Depois coloque o ZIP em: {cwd}"))
+        print()
+        caminho = input("    Ou cole o caminho completo do ZIP: ").strip().strip('"')
+        if not caminho:
+            return cwd  # fallback: usa pasta atual e deixa git reclamar
+        zip_path = Path(caminho)
+        if not zip_path.exists():
+            err(f"Arquivo não encontrado: {zip_path}")
+            return cwd
+
+    # Extrai
+    info(f"Extraindo {zip_path.name} → {cwd} ...")
+    project_root = extract_zip(zip_path, cwd)
+    ok(f"ZIP extraído com sucesso")
+
+    # Renomeia o ZIP para não reprocessar da próxima vez
+    done_path = zip_path.with_suffix(".zip.done")
+    try:
+        zip_path.rename(done_path)
+        info(f"ZIP renomeado para: {done_path.name}  (não será reprocessado)")
+    except Exception:
+        pass
+
+    return project_root
+
+
+# ── Pause / exit ─────────────────────────────────────────────────────────────
 
 def pause_exit():
     print(gray("\nPressione Enter para fechar..."))
@@ -98,6 +253,8 @@ def pause_exit():
 def main():
     if sys.platform == "win32":
         os.system("")   # ativa ANSI no terminal Windows
+
+    script_dir = Path(__file__).parent.resolve()
 
     print()
     print(magenta("  LEX SUITE — Deploy para GitHub"))
@@ -112,59 +269,31 @@ def main():
         pause_exit()
     ok(out)
 
-    # 2. Localizar raiz do projeto
-    step("Verificando pasta do projeto...")
-    marker = "pnpm-workspace.yaml"
-    project_root = None
-
-    # Tenta: pasta atual → subpastas imediatas
-    if Path(marker).exists():
-        project_root = Path.cwd()
-    else:
-        for sub in sorted(Path.cwd().iterdir()):
-            if sub.is_dir() and (sub / marker).exists():
-                project_root = sub
-                break
-
-    if project_root is not None:
-        if project_root != Path.cwd():
-            warn(f"Projeto encontrado em subpasta: {project_root.name}")
-            os.chdir(project_root)
-        ok(f"Pasta do projeto: {os.getcwd()}")
-    else:
-        # Não encontrou o marcador — pede confirmação manual
-        warn(f"pnpm-workspace.yaml não encontrado em {os.getcwd()}")
-        warn("Isso pode acontecer se o ZIP foi extraído em local diferente.")
-        print()
-        confirmar = input("    Continuar mesmo assim a partir desta pasta? (s/N): ").strip().lower()
-        if confirmar != "s":
-            err("Abortado. Extraia o ZIP do Replit nesta pasta e tente novamente.")
-            pause_exit()
-        ok(f"Usando pasta atual: {os.getcwd()}")
+    # 2. Localizar / extrair projeto
+    step("Localizando projeto...")
+    project_root = locate_project(script_dir)
+    os.chdir(project_root)
+    ok(f"Pasta do projeto: {project_root}")
 
     # 3. Token
     step("Carregando token de acesso GitHub...")
-    token = load_token()
+    token = load_token(script_dir)
     if token:
         masked = token[:6] + "..." + token[-4:] if len(token) > 10 else "***"
         ok(f"Token encontrado: {masked}")
     else:
-        created = create_env_deploy_template()
-        env_path = Path(__file__).parent / ".env.deploy"
+        env_file = create_env_deploy_template(script_dir)
         warn("Token não encontrado.")
-        if created:
-            warn(f"Arquivo criado: {env_path}")
-        warn("Preencha GITHUB_PERSONAL_ACCESS_TOKEN no arquivo .env.deploy e execute novamente.")
-        warn("Ou defina a variável de ambiente GITHUB_PERSONAL_ACCESS_TOKEN antes de rodar.")
+        warn(f"Preencha GITHUB_PERSONAL_ACCESS_TOKEN em: {env_file}")
+        warn("Ou defina a variável de ambiente GITHUB_PERSONAL_ACCESS_TOKEN.")
         print()
-        warn("Gere um token em: GitHub → Settings → Developer settings")
+        warn("Gere o token em: GitHub → Settings → Developer settings")
         warn("                 → Personal access tokens → Classic → scope: repo")
         pause_exit()
 
     # 4. URL do repositório
     step("Configurando repositório remoto...")
     rc, existing_remote, _ = git("remote", "get-url", "origin")
-    # Remove token antigo da URL para comparar
     clean_existing = re.sub(r"https?://[^@]+@", "https://", existing_remote) if rc == 0 else ""
     repo_url = clean_existing
 
@@ -225,7 +354,7 @@ def main():
     else:
         ts = datetime.now().strftime("%Y-%m-%d %H:%M")
         commit_msg = f"chore: deploy Lex Suite {ts}"
-        print(gray(f"    Mensagem: {commit_msg}"))
+        info(f"Mensagem: {commit_msg}")
         git_live("commit", "-m", commit_msg)
         ok("Commit criado")
 
