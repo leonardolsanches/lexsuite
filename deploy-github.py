@@ -451,25 +451,65 @@ def main():
         git_live("branch", "-M", "main")
     ok("Branch: main")
 
-    # 10. Push
+    # 11. Push — tenta normal → force → orphan (se histórico contém arquivos grandes)
+    def do_push() -> tuple[bool, str]:
+        """Retorna (sucesso, stderr)."""
+        result = subprocess.run(
+            ["git", "push", "-u", "origin", "main"],
+            capture_output=True, text=True,
+        )
+        return result.returncode == 0, result.stderr
+
+    def push_orphan(commit_msg: str) -> bool:
+        """Reescreve histórico completo via branch órfão e faz force push."""
+        warn("Reescrevendo histórico git para remover arquivos grandes do passado...")
+        steps = [
+            ["git", "checkout", "--orphan", "_deploy_clean"],
+            ["git", "add", "--all"],
+            ["git", "commit", "-m", commit_msg],
+            ["git", "branch", "-D", "main"],
+            ["git", "branch", "-m", "main"],
+        ]
+        for cmd in steps:
+            r = subprocess.run(cmd, capture_output=True, text=True)
+            if r.returncode != 0:
+                err(f"Falha em: {' '.join(cmd)}")
+                err(r.stderr.strip())
+                return False
+        ok("Histórico reescrito — agora fazendo force push...")
+        print()
+        return git_live("push", "-u", "--force", "origin", "main")
+
     step("Enviando para GitHub...")
     print()
-    success = git_live("push", "-u", "origin", "main")
+    success, push_stderr = do_push()
     print()
 
     if not success:
-        # Repositório remoto já tem conteúdo sem histórico em comum → force push
-        warn("Push normal falhou (repositório remoto não está vazio).")
-        warn("O Replit é a fonte da verdade — será feito force push.")
-        warn("O conteúdo atual do GitHub será SUBSTITUÍDO pelo projeto do Replit.")
-        print()
-        confirmar = input("    Confirmar? (s/N): ").strip().lower()
-        if confirmar == "s":
+        large_file_error = "GH001" in push_stderr or "exceeds GitHub" in push_stderr or "larger than GitHub" in push_stderr
+        if large_file_error:
             print()
-            success = git_live("push", "-u", "--force", "origin", "main")
+            warn("O histórico git contém arquivos grandes de envios anteriores.")
+            warn("O script vai reescrever o histórico (orphan branch) e fazer force push.")
+            warn("TODO o histórico antigo será descartado — só fica um commit limpo.")
             print()
+            confirmar = input("    Confirmar? (s/N): ").strip().lower()
+            if confirmar == "s":
+                ts = datetime.now().strftime("%Y-%m-%d %H:%M")
+                success = push_orphan(f"chore: deploy Lex Suite {ts} (histórico limpo)")
+                print()
+            else:
+                err("Abortado pelo usuário.")
         else:
-            err("Abortado pelo usuário.")
+            warn("Push normal falhou. O conteúdo do GitHub será substituído pelo Replit.")
+            print()
+            confirmar = input("    Confirmar force push? (s/N): ").strip().lower()
+            if confirmar == "s":
+                print()
+                success = git_live("push", "-u", "--force", "origin", "main")
+                print()
+            else:
+                err("Abortado pelo usuário.")
 
     if success:
         print(green("  SUCESSO! Projeto enviado para o GitHub."))
