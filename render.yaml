@@ -1,4 +1,25 @@
 services:
+  # ── API Server (Node/Express) ──────────────────────────────────────────────
+  - type: web
+    name: lex-api
+    env: node
+    region: oregon
+    plan: free
+    buildCommand: pnpm install && pnpm --filter @workspace/api-server run build
+    startCommand: pnpm --filter @workspace/api-server run start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DB_BRIDGE_URL
+        sync: false
+      - key: OLLAMA_BASE_URL
+        sync: false
+      - key: SESSION_SECRET
+        sync: false
+      - key: CLERK_SECRET_KEY
+        sync: false
+
+  # ── Frontend (React/Vite — static site) ───────────────────────────────────
   - type: web
     name: lexsuite
     env: static
@@ -13,3 +34,7 @@ services:
         value: production
       - key: BASE_PATH
         value: /
+      - key: VITE_API_URL
+        value: https://lex-api.onrender.com
+      - key: VITE_CLERK_PUBLISHABLE_KEY
+        sync: false
