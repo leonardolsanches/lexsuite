@@ -373,7 +373,64 @@ def main():
         git("remote", "add", "origin", auth_url)
     ok(f"Remote configurado: {repo_url}  (token injetado na URL)")
 
-    # 8. Stage e commit
+    # 8. Exclusões locais (.git/info/exclude — nunca commitado)
+    step("Configurando exclusões locais...")
+    exclude_path = Path(".git") / "info" / "exclude"
+    exclude_path.parent.mkdir(parents=True, exist_ok=True)
+    local_excludes = [
+        "# Arquivos locais — gerado por deploy-github.py",
+        "*.exe",           # instaladores
+        "*.zip",           # ZIPs do Replit
+        "*.zip.done",      # ZIPs já processados
+        "*.pptx",          # apresentações locais
+        "*.ogg",           # áudios
+        "*.mp3",
+        "*.mp4",           # vídeos
+        "*.opus",
+        "*.pdf",           # PDFs locais (fora de artifacts/)
+        "Troubleshooting/",
+        "*.html",          # HTMLs locais avulsos
+        "*.env",           # arquivos de env locais
+        ".env.deploy",
+        "deploy-to-github.ps1",
+        "cli_*.zip",
+    ]
+    existing = exclude_path.read_text(encoding="utf-8") if exclude_path.exists() else ""
+    marker = "# Arquivos locais — gerado por deploy-github.py"
+    if marker not in existing:
+        with exclude_path.open("a", encoding="utf-8") as f:
+            f.write("\n" + "\n".join(local_excludes) + "\n")
+        ok("Exclusões locais configuradas (.git/info/exclude)")
+    else:
+        ok("Exclusões locais já configuradas")
+
+    # 9. Remove do tracking arquivos locais que não devem ir ao GitHub
+    step("Removendo arquivos locais do tracking git...")
+    SKIP_EXTS = {".exe", ".zip", ".pptx", ".ogg", ".mp3", ".mp4", ".opus", ".pdf", ".env", ".ps1"}
+    SKIP_SUFFIXES = (".zip.done", ".done")
+    SKIP_DIRS = {"Troubleshooting"}
+    SKIP_NAMES = {".env.deploy", "deploy-to-github.ps1"}
+
+    _, tracked_raw, _ = git("ls-files")
+    to_untrack = []
+    for fpath in tracked_raw.splitlines():
+        p = Path(fpath)
+        if (
+            p.suffix.lower() in SKIP_EXTS
+            or any(fpath.endswith(s) for s in SKIP_SUFFIXES)
+            or p.name in SKIP_NAMES
+            or any(part in SKIP_DIRS for part in p.parts)
+        ):
+            to_untrack.append(fpath)
+
+    if to_untrack:
+        for fpath in to_untrack:
+            git("rm", "--cached", "-q", "--", fpath)
+        ok(f"{len(to_untrack)} arquivo(s) local(is) removido(s) do tracking")
+    else:
+        ok("Nenhum arquivo local no tracking")
+
+    # 10. Stage e commit
     step("Preparando arquivos para commit...")
     git_live("add", "--all")
     _, status, _ = git("status", "--short")
