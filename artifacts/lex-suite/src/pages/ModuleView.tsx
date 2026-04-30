@@ -53,6 +53,8 @@ import {
 import { useStreaming, type ExecStep } from '@/hooks/use-streaming';
 import { usePdf } from '@/hooks/use-pdf';
 
+const apiBase = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/+$/, '') ?? '';
+
 type ModuleViewProps = {
   module: 'rural' | 'executio';
 };
@@ -122,7 +124,7 @@ export default function ModuleView({ module }: ModuleViewProps) {
   const checkLlm = useCallback(async () => {
     setLlmStatus('checking');
     try {
-      const res = await fetch('/api/llm-status');
+      const res = await fetch(`${apiBase}/api/llm-status`);
       if (!res.ok) { setLlmStatus('degraded'); return; }
       const data = await res.json() as { configured: boolean; online: boolean; provider?: string };
       const prov = (data.provider === 'anthropic' ? 'anthropic' : data.provider === 'ollama' ? 'ollama' : 'none') as 'anthropic' | 'ollama' | 'none';
@@ -671,7 +673,7 @@ ${bodyHtml}
       const wf = moduleWorkflows.find(w => w.key === activeTab.workflowKey);
       const label = wf ? `${wf.name} — ${activeTab.label}` : activeTab.label;
 
-      const res = await fetch('/api/knowledge/save-analysis', {
+      const res = await fetch(`${apiBase}/api/knowledge/save-analysis`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

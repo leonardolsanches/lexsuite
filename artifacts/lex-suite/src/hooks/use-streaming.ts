@@ -1,6 +1,8 @@
 import { useState, useCallback, useRef } from 'react';
 import { useAuth } from '@clerk/react';
 
+const apiBase = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/+$/, '') ?? '';
+
 export type ExecStep = {
   id: string;
   label: string;
@@ -64,7 +66,7 @@ export function useStreaming() {
     try {
       const token = await getToken();
 
-      const response = await fetch('/api/analyze', {
+      const response = await fetch(`${apiBase}/api/analyze`, {
         method: 'POST',
         signal: controller.signal,
         headers: {
