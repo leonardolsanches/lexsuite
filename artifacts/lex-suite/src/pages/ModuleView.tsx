@@ -581,6 +581,76 @@ export default function ModuleView({ module }: ModuleViewProps) {
     );
   };
 
+  const handleCopyResult = async () => {
+    if (!activeTab?.outputHtml) return;
+    // Strip any HTML tags, decode entities, get plain text
+    const tmp = document.createElement('div');
+    tmp.innerHTML = activeTab.outputHtml.replace(/\n/g, '\n');
+    const plainText = tmp.innerText || tmp.textContent || activeTab.outputHtml;
+    try {
+      await navigator.clipboard.writeText(plainText);
+      toast({ title: 'Copiado para a área de transferência' });
+    } catch {
+      toast({ title: 'Falha ao copiar', variant: 'destructive' });
+    }
+  };
+
+  const handleExportPdf = () => {
+    if (!activeTab?.outputHtml) return;
+    const wf = moduleWorkflows.find(w => w.key === activeTab.workflowKey);
+    const title = wf?.name || activeTab.label || 'Análise';
+    const date = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
+
+    // Convert plain text with newlines to HTML paragraphs
+    const bodyHtml = activeTab.outputHtml
+      .split('\n')
+      .map(line => {
+        const t = line.trim();
+        if (!t) return '<br/>';
+        // Bold markers **text**
+        const formatted = t.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+        // Section headers like "SEÇÃO 1 —" or "1." at start
+        if (/^(SEÇÃO|FASE|ETAPA|#{1,3})\s/i.test(t) || /^\d+\.\s+[A-ZÁÉÍÓÚÀÃÕÇ]/.test(t)) {
+          return `<p class="section">${formatted}</p>`;
+        }
+        return `<p>${formatted}</p>`;
+      })
+      .join('');
+
+    const html = `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>${title}</title>
+<style>
+  @page { margin: 2.5cm 2cm; }
+  body { font-family: 'Georgia', serif; font-size: 12pt; line-height: 1.7; color: #111; }
+  h1 { font-size: 16pt; margin-bottom: 4pt; }
+  .meta { font-size: 10pt; color: #555; margin-bottom: 24pt; border-bottom: 1px solid #ccc; padding-bottom: 8pt; }
+  p { margin: 0 0 6pt 0; text-align: justify; }
+  p.section { font-weight: bold; margin-top: 14pt; margin-bottom: 4pt; }
+  strong { font-weight: bold; }
+  br { display: block; margin: 4pt 0; }
+</style>
+</head>
+<body>
+<h1>${title}</h1>
+<div class="meta">Gerado em ${date} — Lex Suite</div>
+${bodyHtml}
+</body>
+</html>`;
+
+    const win = window.open('', '_blank');
+    if (!win) {
+      toast({ title: 'Permita pop-ups para exportar o PDF', variant: 'destructive' });
+      return;
+    }
+    win.document.write(html);
+    win.document.close();
+    win.focus();
+    setTimeout(() => { win.print(); }, 500);
+  };
+
   const handlePdfUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       const files = Array.from(e.target.files).filter(f => f.type === 'application/pdf');
@@ -1105,10 +1175,22 @@ export default function ModuleView({ module }: ModuleViewProps) {
                         <RefreshCw className="w-3 h-3" /> Reiniciar
                       </Button>
                     )}
-                    <Button variant="ghost" size="sm" className="h-8 gap-2 text-muted-foreground hover:text-foreground">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 gap-2 text-muted-foreground hover:text-foreground"
+                      onClick={handleCopyResult}
+                      disabled={!activeTab?.outputHtml}
+                    >
                       <Copy className="w-3.5 h-3.5" /> Copiar
                     </Button>
-                    <Button variant="ghost" size="sm" className="h-8 gap-2 text-muted-foreground hover:text-foreground">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 gap-2 text-muted-foreground hover:text-foreground"
+                      onClick={handleExportPdf}
+                      disabled={!activeTab?.outputHtml}
+                    >
                       <Download className="w-3.5 h-3.5" /> PDF
                     </Button>
                   </div>
@@ -1225,7 +1307,11 @@ export default function ModuleView({ module }: ModuleViewProps) {
                     {activeTab.outputHtml && (
                       <div
                         className="prose prose-sm dark:prose-invert max-w-none font-serif leading-relaxed text-[15px]"
-                        dangerouslySetInnerHTML={{ __html: activeTab.outputHtml.replace(/\n/g, '<br/>') }}
+                        dangerouslySetInnerHTML={{ __html: activeTab.outputHtml
+                          .replace(/\*\*\*(.*?)\*\*\*/g, '<strong><em>$1</em></strong>')
+                          .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                          .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                          .replace(/\n/g, '<br/>') }}
                       />
                     )}
 
