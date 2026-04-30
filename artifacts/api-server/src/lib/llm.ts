@@ -33,6 +33,35 @@ export function getLlmStatusMessage(): string {
   return "";
 }
 
+/**
+ * Builds a date/time context header injected at the top of every LLM prompt.
+ * Gives the model the information it needs to calculate prescription periods,
+ * deadlines, and any date arithmetic from the actual documents.
+ */
+function buildDateContext(): string {
+  const now = new Date();
+
+  const dateStr = now.toLocaleDateString("pt-BR", {
+    weekday: "long",
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+    timeZone: "America/Sao_Paulo",
+  });
+
+  const year = now.toLocaleDateString("pt-BR", { year: "numeric", timeZone: "America/Sao_Paulo" });
+
+  return (
+    `[CONTEXTO TEMPORAL — USE PARA TODOS OS CÁLCULOS DE PRAZO]\n` +
+    `Data de hoje: ${dateStr} (fuso horário: Brasília/BRT).\n` +
+    `Ano corrente: ${year}.\n` +
+    `Use esta data como referência para calcular prescrição intercorrente (art. 40 LEF), ` +
+    `prazos processuais, decadência e qualquer outro prazo mencionado nos documentos abaixo.\n` +
+    `Exemplo: se a CDA foi inscrita em 15/03/2018 e hoje é ${dateStr}, ` +
+    `transcorreram ${now.getFullYear() - 2018} anos desde a inscrição.\n\n`
+  );
+}
+
 export async function streamAnalysis(
   prompt: string,
   res: Response,
@@ -46,12 +75,16 @@ export async function streamAnalysis(
     throw new Error("Nenhum motor de IA configurado (ANTHROPIC_API_KEY ou OLLAMA_BASE_URL).");
   }
 
+  // Inject today's date so the model can compute prescription / deadlines accurately.
+  const dateCtx = buildDateContext();
+  const promptWithDate = dateCtx + prompt;
+
   // ── Claude ────────────────────────────────────────────────────────────────
   if (provider === "anthropic") {
     logger.info("Streaming via Claude (Anthropic)");
     onStatus?.("Conectando ao Claude...");
 
-    for await (const text of streamAnthropic(prompt, continueFrom)) {
+    for await (const text of streamAnthropic(promptWithDate, continueFrom)) {
       onChunk(text);
       res.write(`data: ${JSON.stringify({ type: "text", text })}\n\n`);
     }
@@ -66,11 +99,7 @@ export async function streamAnalysis(
 
   await ensureModelLoaded(baseUrl, model, onStatus);
 
-  const langPrefix =
-    "INSTRUÇÃO OBRIGATÓRIA DE IDIOMA: Responda EXCLUSIVAMENTE em português brasileiro (pt-BR). " +
-    "Não escreva nenhuma palavra em inglês. Toda a sua resposta deve ser em português, sem exceção.\n\n";
-
-  let fullPrompt = langPrefix + prompt;
+  let fullPrompt = promptWithDate;
   if (continueFrom) {
     fullPrompt += `\n\n[RESPOSTA ANTERIOR]:\n${continueFrom}\n\nContinue a análise do ponto onde parou.`;
   }
