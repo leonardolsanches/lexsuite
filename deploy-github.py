@@ -55,19 +55,30 @@ def git_live(*args):
 
 # ── Token ────────────────────────────────────────────────────────────────────
 
+PLACEHOLDER = "ghp_SeuTokenAqui"
+
+
 def load_token(script_dir: Path):
+    # 1. Variável de ambiente
     token = os.environ.get("GITHUB_PERSONAL_ACCESS_TOKEN", "").strip()
-    if token:
+    if token and token != PLACEHOLDER:
         return token
+
+    # 2. Arquivo .env.deploy — lê com utf-8-sig para ignorar BOM do PowerShell/Notepad
     for base in [script_dir, Path.cwd()]:
         env_file = base / ".env.deploy"
         if env_file.exists():
-            for line in env_file.read_text(encoding="utf-8").splitlines():
+            try:
+                text = env_file.read_text(encoding="utf-8-sig")
+            except Exception:
+                text = env_file.read_text(encoding="utf-8", errors="replace")
+            for line in text.splitlines():
                 line = line.strip()
                 if line.startswith("GITHUB_PERSONAL_ACCESS_TOKEN="):
                     t = line.split("=", 1)[1].strip().strip('"').strip("'")
-                    if t:
+                    if t and t != PLACEHOLDER:
                         return t
+
     return None
 
 
@@ -289,13 +300,24 @@ def main():
         ok(f"Token encontrado: {masked}")
     else:
         env_file = create_env_deploy_template(script_dir)
-        warn("Token não encontrado.")
-        warn(f"Preencha GITHUB_PERSONAL_ACCESS_TOKEN em: {env_file}")
-        warn("Ou defina a variável de ambiente GITHUB_PERSONAL_ACCESS_TOKEN.")
+        warn("Token não encontrado no .env.deploy nem na variável de ambiente.")
         print()
-        warn("Gere o token em: GitHub → Settings → Developer settings")
-        warn("                 → Personal access tokens → Classic → scope: repo")
-        pause_exit()
+        print(gray("    Como gerar o token:"))
+        print(gray("    GitHub → Settings → Developer settings"))
+        print(gray("    → Personal access tokens → Classic → New token → scope: repo"))
+        print()
+        token = input("    Cole seu token GitHub agora (ghp_...): ").strip()
+        if not token or token == PLACEHOLDER or not token.startswith("ghp_"):
+            err("Token inválido. Abortando.")
+            pause_exit()
+        # Salva no .env.deploy para próximas execuções
+        env_file.write_text(
+            f"GITHUB_PERSONAL_ACCESS_TOKEN={token}\n",
+            encoding="utf-8",
+        )
+        ok(f"Token salvo em: {env_file}")
+        masked = token[:6] + "..." + token[-4:]
+        ok(f"Token: {masked}")
 
     # 4. URL do repositório
     step("Configurando repositório remoto...")
