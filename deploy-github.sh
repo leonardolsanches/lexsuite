@@ -35,6 +35,15 @@ echo "  Enviando para GitHub..."
 git --no-optional-locks push --force \
   "https://${GH_DEPLOY_TOKEN}@github.com/leonardolsanches/lexsuite.git" \
   "${BRANCH}:${BRANCH}" 2>&1 | sed "s/ghp_[A-Za-z0-9]*/REDACTED/g"
+PUSH_EXIT="${PIPESTATUS[0]}"
+
+if [ "$PUSH_EXIT" -ne 0 ]; then
+  echo ""
+  echo "  ERRO: Push rejeitado pelo GitHub (código $PUSH_EXIT)."
+  echo "  Veja a mensagem acima para detalhes."
+  echo ""
+  exit 1
+fi
 
 echo ""
 echo "  SUCESSO! Código atualizado em:"

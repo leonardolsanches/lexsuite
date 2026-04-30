@@ -1,5 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { X, Loader2, CheckCircle2, XCircle, Eye, EyeOff, Cpu, Cloud, Wifi } from "lucide-react";
+import { useAuth } from "@clerk/react";
+
+const apiBase = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/+$/, "") ?? "";
 
 interface LlmConfig {
   provider: "anthropic" | "ollama" | "none";
@@ -31,6 +34,7 @@ interface Props {
 }
 
 export default function LLMSettingsModal({ open, onClose, onSaved }: Props) {
+  const { getToken } = useAuth();
   const [config, setConfig] = useState<LlmConfig | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -42,6 +46,18 @@ export default function LLMSettingsModal({ open, onClose, onSaved }: Props) {
   const [ollamaUrl, setOllamaUrl] = useState("");
   const [saveMsg, setSaveMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
 
+  /** Fetch wrapper that injects the Clerk JWT — needed for cross-origin calls (Render). */
+  const authFetch = useCallback(async (url: string, init?: RequestInit): Promise<Response> => {
+    const token = await getToken();
+    return fetch(url, {
+      ...init,
+      headers: {
+        ...(init?.headers ?? {}),
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    });
+  }, [getToken]);
+
   useEffect(() => {
     if (!open) return;
     setLoading(true);
@@ -49,7 +65,7 @@ export default function LLMSettingsModal({ open, onClose, onSaved }: Props) {
     setTestResult(null);
     setApiKey("");
     setOllamaUrl("");
-    fetch("/api/admin/llm-config")
+    authFetch(`${apiBase}/api/admin/llm-config`)
       .then((r) => r.json())
       .then((data: LlmConfig) => {
         setConfig(data);
@@ -57,7 +73,7 @@ export default function LLMSettingsModal({ open, onClose, onSaved }: Props) {
       })
       .catch(() => setConfig(null))
       .finally(() => setLoading(false));
-  }, [open]);
+  }, [open, authFetch]);
 
   if (!open) return null;
 
@@ -80,7 +96,7 @@ export default function LLMSettingsModal({ open, onClose, onSaved }: Props) {
         return;
       }
 
-      const res = await fetch("/api/admin/llm-config", {
+      const res = await authFetch(`${apiBase}/api/admin/llm-config`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
@@ -102,7 +118,7 @@ export default function LLMSettingsModal({ open, onClose, onSaved }: Props) {
 
       setApiKey("");
       setOllamaUrl("");
-      const refreshed = await fetch("/api/admin/llm-config").then((r) => r.json()) as LlmConfig;
+      const refreshed = await authFetch(`${apiBase}/api/admin/llm-config`).then((r) => r.json()) as LlmConfig;
       setConfig(refreshed);
       onSaved();
     } catch {
@@ -116,7 +132,7 @@ export default function LLMSettingsModal({ open, onClose, onSaved }: Props) {
     setTesting(true);
     setTestResult(null);
     try {
-      const res = await fetch("/api/admin/llm-ping", { method: "POST" });
+      const res = await authFetch(`${apiBase}/api/admin/llm-ping`, { method: "POST" });
       const data = await res.json() as { online: boolean };
       setTestResult(data.online ? "ok" : "fail");
     } catch {
