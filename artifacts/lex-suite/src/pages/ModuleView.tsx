@@ -1296,6 +1296,22 @@ ${bodyHtml}
                   </div>
                 </div>
 
+                {/* Slow analysis warning — appears after 5 minutes */}
+                {activeTab.status === 'running' && activeTab.startedAt && (Date.now() - activeTab.startedAt) > 300_000 && (
+                  <div className="mx-4 mt-2 flex items-start gap-3 px-4 py-3 rounded-lg border border-amber-500/30 bg-amber-500/5 text-amber-400 text-xs shrink-0">
+                    <AlertCircle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                    <div className="space-y-1">
+                      <p className="font-medium">Análise demorada detectada ({formatElapsed(activeTab)})</p>
+                      <p className="text-amber-400/70">
+                        {thinkMode === 'deep'
+                          ? 'O Modo Profundo com documentos longos pode levar 5–15 min no deepseek-r1. Se preferir mais velocidade, cancele e use o Modo Rápido (⚡) ou configure Claude como provider.'
+                          : 'A análise está demorando mais do esperado. Verifique se o Ollama está respondendo e considere cancelar e tentar novamente.'
+                        }
+                      </p>
+                    </div>
+                  </div>
+                )}
+
                 {/* Live indeterminate progress bar when running */}
                 {activeTab.status === 'running' && (
                   <div className="h-0.5 w-full bg-border overflow-hidden shrink-0 relative">
