@@ -35,6 +35,8 @@ services:
       - key: BASE_PATH
         value: /
       - key: VITE_API_URL
-        value: https://lex-api.onrender.com
+        value: https://lex-api-ievu.onrender.com
+      - key: VITE_CLERK_PROXY_URL
+        value: https://lex-api-ievu.onrender.com/api/__clerk
       - key: VITE_CLERK_PUBLISHABLE_KEY
         sync: false
