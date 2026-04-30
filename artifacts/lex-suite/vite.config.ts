@@ -2,6 +2,7 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import path from "path";
+import fs from "fs";
 
 const isProduction = process.env.NODE_ENV === "production";
 const isReplit = !!process.env.REPL_ID;
@@ -46,6 +47,17 @@ export default defineConfig({
     react(),
     tailwindcss(),
     spaFallback,
+    // After build: copy index.html → 404.html so Render static hosting serves
+    // the SPA shell for unknown paths (works even without rewrite rules).
+    {
+      name: "spa-404-fallback",
+      closeBundle() {
+        const dist = path.resolve(import.meta.dirname, "dist/public");
+        const src = path.join(dist, "index.html");
+        const dst = path.join(dist, "404.html");
+        if (fs.existsSync(src)) fs.copyFileSync(src, dst);
+      },
+    },
     ...(!isProduction && isReplit
       ? [
           (await import("@replit/vite-plugin-runtime-error-modal")).default(),
