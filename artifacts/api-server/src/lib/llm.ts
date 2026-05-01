@@ -17,11 +17,16 @@ import { logger } from "./logger";
 export type LlmProvider = "anthropic" | "ollama";
 export type { OllamaThinkMode };
 
-/** Claude takes priority when ANTHROPIC_API_KEY is set; otherwise Ollama. */
+/** Ollama is primary; Anthropic is the silent fallback. */
 export function getActiveProvider(): LlmProvider | null {
-  if (isAnthropicConfigured()) return "anthropic";
   if (isOllamaConfigured()) return "ollama";
+  if (isAnthropicConfigured()) return "anthropic";
   return null;
+}
+
+/** True if Anthropic is available to use as a fallback when Ollama is down. */
+export function isAnthropicFallbackAvailable(): boolean {
+  return isOllamaConfigured() && isAnthropicConfigured();
 }
 
 export function isAnyLlmConfigured(): boolean {
@@ -86,11 +91,10 @@ export async function streamAnalysis(
   // Inject today's date so the model can compute prescription / deadlines accurately.
   const promptWithDate = buildDateContext() + prompt;
 
-  // ── Claude ────────────────────────────────────────────────────────────────
+  // ── Anthropic-only path (Ollama not configured) ──────────────────────────
   if (provider === "anthropic") {
-    logger.info("Streaming via Claude (Anthropic)");
+    logger.info("Streaming via Claude (Anthropic) — Ollama não configurado");
     onStatus?.("Conectando ao Claude...");
-
     for await (const text of streamAnthropic(promptWithDate, continueFrom)) {
       onChunk(text);
       res.write(`data: ${JSON.stringify({ type: "text", text })}\n\n`);
@@ -98,81 +102,87 @@ export async function streamAnalysis(
     return;
   }
 
-  // ── Ollama (local) ────────────────────────────────────────────────────────
+  // ── Ollama (primário) com fallback para Claude ────────────────────────────
   const baseUrl = getOllamaBaseUrl()!;
   const model = getOllamaModelParecer();
   const thinkMode = options.thinkMode ?? "deep";
 
   logger.info({ model, baseUrl, thinkMode }, "Streaming via Ollama local");
 
-  await ensureModelLoaded(baseUrl, model, onStatus);
+  try {
+    await ensureModelLoaded(baseUrl, model, onStatus);
 
-  let fullPrompt = promptWithDate;
-  if (continueFrom) {
-    fullPrompt += `\n\n[RESPOSTA ANTERIOR]:\n${continueFrom}\n\nContinue a análise do ponto onde parou.`;
-  }
-
-  // ── Thinking-phase progress tracker ──────────────────────────────────────
-  // deepseek-r1 can spend 15-20 min in silent CoT before outputting anything.
-  // We track token count from two sources:
-  //  (a) separate "thinking" JSON field (Ollama ≥0.5 with think:true param)
-  //  (b) <think>...</think> tags in the "response" field (older Ollama / fallback)
-  // Progress updates are sent via onStatus so the browser shows live feedback.
-  let thinkCharTotal = 0;
-  let lastStatusAt = 0;
-  const PROGRESS_INTERVAL = 800; // emit status every ~200 tokens (800 chars)
-
-  function emitThinkProgress(addedChars: number) {
-    thinkCharTotal += addedChars;
-    const approxTokens = Math.round(thinkCharTotal / 4);
-    if (thinkCharTotal - lastStatusAt >= PROGRESS_INTERVAL) {
-      lastStatusAt = thinkCharTotal;
-      onStatus?.(
-        `Raciocínio jurídico em andamento... ~${approxTokens.toLocaleString("pt-BR")} tokens`
-      );
-    }
-  }
-
-  // Source (a): Ollama native thinking tokens
-  const onThinkChunk = (chars: number) => emitThinkProgress(chars);
-
-  // Source (b): strip <think>...</think> tags from response stream
-  let thinkPhase: "checking" | "stripping" | "passthrough" = "checking";
-  let thinkBuffer = "";
-
-  for await (const text of streamOllama(fullPrompt, model, baseUrl, getDbBridgeUrl(), thinkMode, onThinkChunk)) {
-    if (thinkPhase === "passthrough") {
-      onChunk(text);
-      res.write(`data: ${JSON.stringify({ type: "text", text })}\n\n`);
-      continue;
+    let fullPrompt = promptWithDate;
+    if (continueFrom) {
+      fullPrompt += `\n\n[RESPOSTA ANTERIOR]:\n${continueFrom}\n\nContinue a análise do ponto onde parou.`;
     }
 
-    thinkBuffer += text;
+    // ── Thinking-phase progress tracker ────────────────────────────────────
+    let thinkCharTotal = 0;
+    let lastStatusAt = 0;
+    const PROGRESS_INTERVAL = 800;
 
-    if (thinkPhase === "checking") {
-      const trimmed = thinkBuffer.trimStart();
-      if (trimmed.startsWith("<think>")) {
-        thinkPhase = "stripping";
-      } else if (trimmed.length > 40 || !trimmed.startsWith("<")) {
-        thinkPhase = "passthrough";
-        onChunk(thinkBuffer);
-        res.write(`data: ${JSON.stringify({ type: "text", text: thinkBuffer })}\n\n`);
-        thinkBuffer = "";
+    function emitThinkProgress(addedChars: number) {
+      thinkCharTotal += addedChars;
+      const approxTokens = Math.round(thinkCharTotal / 4);
+      if (thinkCharTotal - lastStatusAt >= PROGRESS_INTERVAL) {
+        lastStatusAt = thinkCharTotal;
+        onStatus?.(
+          `Raciocínio jurídico em andamento... ~${approxTokens.toLocaleString("pt-BR")} tokens`
+        );
       }
     }
 
-    if (thinkPhase === "stripping") {
-      emitThinkProgress(text.length); // count chars in tag-embedded thinking
-      const closeIdx = thinkBuffer.indexOf("</think>");
-      if (closeIdx !== -1) {
-        thinkPhase = "passthrough";
-        const afterThink = thinkBuffer.slice(closeIdx + "</think>".length).replace(/^\n+/, "");
-        thinkBuffer = "";
-        if (afterThink) {
-          onChunk(afterThink);
-          res.write(`data: ${JSON.stringify({ type: "text", text: afterThink })}\n\n`);
+    const onThinkChunk = (chars: number) => emitThinkProgress(chars);
+    let thinkPhase: "checking" | "stripping" | "passthrough" = "checking";
+    let thinkBuffer = "";
+
+    for await (const text of streamOllama(fullPrompt, model, baseUrl, getDbBridgeUrl(), thinkMode, onThinkChunk)) {
+      if (thinkPhase === "passthrough") {
+        onChunk(text);
+        res.write(`data: ${JSON.stringify({ type: "text", text })}\n\n`);
+        continue;
+      }
+
+      thinkBuffer += text;
+
+      if (thinkPhase === "checking") {
+        const trimmed = thinkBuffer.trimStart();
+        if (trimmed.startsWith("<think>")) {
+          thinkPhase = "stripping";
+        } else if (trimmed.length > 40 || !trimmed.startsWith("<")) {
+          thinkPhase = "passthrough";
+          onChunk(thinkBuffer);
+          res.write(`data: ${JSON.stringify({ type: "text", text: thinkBuffer })}\n\n`);
+          thinkBuffer = "";
         }
       }
+
+      if (thinkPhase === "stripping") {
+        emitThinkProgress(text.length);
+        const closeIdx = thinkBuffer.indexOf("</think>");
+        if (closeIdx !== -1) {
+          thinkPhase = "passthrough";
+          const afterThink = thinkBuffer.slice(closeIdx + "</think>".length).replace(/^\n+/, "");
+          thinkBuffer = "";
+          if (afterThink) {
+            onChunk(afterThink);
+            res.write(`data: ${JSON.stringify({ type: "text", text: afterThink })}\n\n`);
+          }
+        }
+      }
+    }
+  } catch (ollamaErr) {
+    // ── Fallback para Claude se Ollama falhar ─────────────────────────────
+    if (isAnthropicConfigured()) {
+      logger.warn({ err: ollamaErr }, "Ollama falhou — usando Claude como fallback");
+      onStatus?.("Mini PC indisponível — usando Claude como alternativa...");
+      for await (const text of streamAnthropic(promptWithDate, continueFrom)) {
+        onChunk(text);
+        res.write(`data: ${JSON.stringify({ type: "text", text })}\n\n`);
+      }
+    } else {
+      throw ollamaErr;
     }
   }
 }

@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { requireAuth } from "../lib/auth";
-import { isAnyLlmConfigured, getLlmStatusMessage, streamAnalysis, getActiveProvider } from "../lib/llm";
+import { isAnyLlmConfigured, getLlmStatusMessage, streamAnalysis, getActiveProvider, isAnthropicFallbackAvailable } from "../lib/llm";
 import { isOllamaConfigured, getOllamaBaseUrl, listOllamaModels, pingOllama, getOllamaModelParecer, getOllamaModelExtraction } from "../lib/ollama";
 import { isAnthropicConfigured, getAnthropicModel, pingAnthropic } from "../lib/anthropic";
 import { isDbBridgeConfigured, dbBridgeSearchChunks } from "../lib/embedding";
@@ -32,13 +32,19 @@ router.get("/llm-status", async (_req, res): Promise<void> => {
   const dbBridgeOnline = dbBridgeConfigured ? await pingDbBridge() : false;
 
   const configured = activeProvider !== null;
-  const online = activeProvider === "anthropic" ? anthropicOnline : ollamaOnline;
+  // "online" reflects Ollama (primary). If Ollama is down but Claude fallback
+  // is available the analysis still works — the frontend should not alarm.
+  const online = activeProvider === "ollama" ? ollamaOnline
+    : activeProvider === "anthropic" ? anthropicOnline
+    : false;
+  const hasFallback = isAnthropicFallbackAvailable() && anthropicConfigured;
 
   res.json({
     provider: activeProvider ?? "none",
     configured,
     online,
-    // Anthropic
+    hasFallback,
+    // Anthropic (fallback — hidden from the main status indicator)
     anthropic: {
       configured: anthropicConfigured,
       online: anthropicOnline,

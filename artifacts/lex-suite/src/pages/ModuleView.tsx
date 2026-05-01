@@ -118,7 +118,7 @@ export default function ModuleView({ module }: ModuleViewProps) {
   const [thinkMode, setThinkMode] = useState<'deep' | 'fast'>('deep');
 
   // ── LLM connectivity status ───────────────────────────────────────────────
-  type LlmStatus = 'checking' | 'online' | 'degraded' | 'offline' | 'unconfigured';
+  type LlmStatus = 'checking' | 'online' | 'fallback' | 'degraded' | 'offline' | 'unconfigured';
   const [llmStatus, setLlmStatus] = useState<LlmStatus>('checking');
   const [llmProvider, setLlmProvider] = useState<'anthropic' | 'ollama' | 'none'>('none');
   const checkLlm = useCallback(async () => {
@@ -126,11 +126,15 @@ export default function ModuleView({ module }: ModuleViewProps) {
     try {
       const res = await fetch(`${apiBase}/api/llm-status`);
       if (!res.ok) { setLlmStatus('degraded'); return; }
-      const data = await res.json() as { configured: boolean; online: boolean; provider?: string };
+      const data = await res.json() as {
+        configured: boolean; online: boolean; provider?: string; hasFallback?: boolean;
+      };
       const prov = (data.provider === 'anthropic' ? 'anthropic' : data.provider === 'ollama' ? 'ollama' : 'none') as 'anthropic' | 'ollama' | 'none';
       setLlmProvider(prov);
       if (!data.configured) setLlmStatus('unconfigured');
       else if (data.online) setLlmStatus('online');
+      // Ollama down but Claude fallback available → analyses still work silently
+      else if (data.hasFallback) setLlmStatus('fallback');
       else setLlmStatus('degraded');
     } catch { setLlmStatus('degraded'); }
   }, []);
@@ -751,6 +755,8 @@ ${bodyHtml}
             className={`flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border transition-all ${
               llmStatus === 'online'
                 ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20'
+                : llmStatus === 'fallback'
+                ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20'
                 : llmStatus === 'checking'
                 ? 'border-muted-foreground/20 bg-muted/30 text-muted-foreground'
                 : llmStatus === 'degraded'
@@ -759,7 +765,8 @@ ${bodyHtml}
             }`}
           >
             {llmStatus === 'online' && <><Wifi className="w-3 h-3" /> IA online</>}
-            {llmStatus === 'degraded' && <><Wifi className="w-3 h-3" /> IA configurada</>}
+            {llmStatus === 'fallback' && <><Wifi className="w-3 h-3" /> IA ativa</>}
+            {llmStatus === 'degraded' && <><Wifi className="w-3 h-3" /> IA instável</>}
             {llmStatus === 'offline' && <><WifiOff className="w-3 h-3" /> IA offline</>}
             {llmStatus === 'unconfigured' && <><WifiOff className="w-3 h-3" /> IA não configurada</>}
             {llmStatus === 'checking' && <><Loader2 className="w-3 h-3 animate-spin" /> Verificando...</>}
@@ -788,11 +795,13 @@ ${bodyHtml}
           </button>
         </div>
       )}
-      {llmStatus === 'degraded' && llmProvider !== 'anthropic' && (
+      {llmStatus === 'degraded' && (
         <div className="shrink-0 bg-amber-500/10 border-b border-amber-500/20 px-4 py-2 flex items-center gap-3">
           <Wifi className="w-4 h-4 text-amber-500 shrink-0" />
           <div className="flex-1 text-sm text-amber-600 dark:text-amber-400">
-            Conexão com o Mini PC lenta ou instável — o túnel pode estar retomando. Análises ainda podem funcionar, clique em Analisar para tentar.
+            {llmProvider === 'ollama'
+              ? 'Mini PC indisponível e sem alternativa configurada. Verifique o túnel ou configure a chave Claude nas configurações.'
+              : 'Motor de IA instável ou inacessível. Verifique as configurações.'}
           </div>
           <button onClick={checkLlm} className="text-xs text-amber-500/70 hover:text-amber-500 underline shrink-0">
             Verificar novamente
