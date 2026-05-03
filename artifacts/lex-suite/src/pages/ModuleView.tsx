@@ -62,11 +62,14 @@ type ModuleViewProps = {
 type ProcessTab = {
   id: string;
   sessionId?: number;
+  jobId?: string;
   workflowKey: string | null;
   label: string;
   status: 'idle' | 'running' | 'done' | 'error';
   errorMessage?: string;
   phase?: 'extracting' | 'streaming';
+  isQueued?: boolean;
+  queuePosition?: number | null;
   startedAt?: number;
   endedAt?: number;
   execSteps: ExecStep[];
@@ -107,7 +110,7 @@ export default function ModuleView({ module }: ModuleViewProps) {
   );
   const doneSessions = recentSessions.filter(s => s.outputHtml && (s.status === 'done' || s.status === 'running'));
   
-  const { isStreaming, startStream, cancelStream } = useJobQueue();
+  const { isStreaming, isQueued, queuePosition, reconnectToJob, startStream, cancelStream } = useJobQueue();
   const { isLoaded: pdfLoaded, extractText } = usePdf();
 
   // Keep a ref to always-fresh tabs for use inside async callbacks
@@ -162,6 +165,81 @@ export default function ModuleView({ module }: ModuleViewProps) {
     const id = setInterval(() => setTick(n => n + 1), 1000);
     return () => clearInterval(id);
   }, [anyRunning]);
+
+  // Track whether we've already attempted reconnect for this page load
+  const reconnectAttemptedRef = useRef(false);
+
+  // Auto-reconnect: on mount, check for active jobs and reconnect if found
+  useEffect(() => {
+    if (!authLoaded || reconnectAttemptedRef.current || isStreaming) return;
+    reconnectAttemptedRef.current = true;
+
+    (async () => {
+      try {
+        const token = await getToken();
+        const headers: Record<string, string> = {};
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+
+        const res = await fetch(`${apiBase}/api/jobs?status=running,queued&limit=5&module=${module}`, { headers });
+        if (!res.ok) return;
+
+        const jobs = await res.json() as Array<{
+          id: string; workflowKey: string; module: string; status: string;
+          outputHtml?: string | null;
+        }>;
+
+        // Pick the first active job for this module
+        const activeJob = jobs.find(j => j.module === module && (j.status === 'running' || j.status === 'queued'));
+        if (!activeJob) return;
+
+        // Create a recovery tab for the reconnected job
+        const recoveryId = crypto.randomUUID();
+        const recoveryTab: ProcessTab = {
+          id: recoveryId,
+          jobId: activeJob.id,
+          workflowKey: activeJob.workflowKey,
+          label: activeJob.workflowKey,
+          status: 'running',
+          isQueued: activeJob.status === 'queued',
+          queuePosition: null,
+          execSteps: [],
+          mode: 'form',
+          formData: {},
+          pasteText: '',
+          outputHtml: activeJob.outputHtml ?? '',
+          pdfs: [],
+          startedAt: Date.now(),
+        };
+
+        setTabs(prev => {
+          // Don't add if a tab for this job already exists
+          if (prev.some(t => t.jobId === activeJob.id)) return prev;
+          return [...prev, recoveryTab];
+        });
+        setActiveTabId(recoveryId);
+
+        await reconnectToJob(activeJob.id, {
+          onQueued: (position) => {
+            setTabs(prev => prev.map(t => t.id === recoveryId ? { ...t, isQueued: true, queuePosition: position } : t));
+          },
+          onRunning: () => {
+            setTabs(prev => prev.map(t => t.id === recoveryId ? { ...t, isQueued: false, queuePosition: null } : t));
+          },
+          onStep: (step) => {
+            setTabs(prev => prev.map(t => t.id === recoveryId ? { ...t, execSteps: [...t.execSteps, step], isQueued: false, queuePosition: null } : t));
+          },
+          onChunk: (partial) => {
+            setTabs(prev => prev.map(t => t.id === recoveryId ? { ...t, outputHtml: partial, isQueued: false, queuePosition: null } : t));
+          },
+          onComplete: (fullContent) => {
+            setTabs(prev => prev.map(t => t.id === recoveryId ? { ...t, status: 'done', outputHtml: fullContent, endedAt: Date.now(), isQueued: false, queuePosition: null } : t));
+          },
+        });
+      } catch {
+        // silent — reconnect is best-effort
+      }
+    })();
+  }, [authLoaded, module]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Create a new tab
   const handleNewProcess = () => {
@@ -348,18 +426,32 @@ export default function ModuleView({ module }: ModuleViewProps) {
         { ...requestData, sessionId },
         // onComplete — final state, locks in result
         (fullContent) => {
-          updateTab(tabId, { status: 'done', outputHtml: fullContent, endedAt: Date.now() });
+          updateTab(tabId, { status: 'done', outputHtml: fullContent, endedAt: Date.now(), isQueued: false, queuePosition: null });
         },
         // onChunk — live streaming to the correct tab
         (partial) => {
-          updateTab(tabId, { outputHtml: partial, phase: 'streaming' });
+          updateTab(tabId, { outputHtml: partial, phase: 'streaming', isQueued: false, queuePosition: null });
         },
         // onStep — append a new execution step to the activity log
         (step) => {
           setTabs(prev => prev.map(t =>
-            t.id === tabId ? { ...t, execSteps: [...t.execSteps, step] } : t
+            t.id === tabId ? { ...t, execSteps: [...t.execSteps, step], isQueued: false, queuePosition: null } : t
           ));
-        }
+        },
+        // onStatus (unused, reserved)
+        undefined,
+        // onQueued — job is waiting in queue
+        (position) => {
+          updateTab(tabId, { isQueued: true, queuePosition: position });
+        },
+        // onRunning — job started executing
+        () => {
+          updateTab(tabId, { isQueued: false, queuePosition: null });
+        },
+        // onJobCreated — store jobId for possible reconnect
+        (jobId) => {
+          updateTab(tabId, { jobId });
+        },
       );
 
       // Recovery: if stream ended with no visible content, try to load saved session result
@@ -1027,7 +1119,8 @@ ${bodyHtml}
                       }`}
                     >
                       {/* Status icon */}
-                      {tab.status === 'running' && <Loader2 className="w-3 h-3 animate-spin shrink-0" />}
+                      {tab.status === 'running' && !tab.isQueued && <Loader2 className="w-3 h-3 animate-spin shrink-0" />}
+                      {tab.status === 'running' && tab.isQueued && <Clock className="w-3 h-3 shrink-0 text-amber-500" />}
                       {tab.status === 'done' && <CheckCircle2 className="w-3 h-3 shrink-0" />}
                       {tab.status === 'error' && <AlertCircle className="w-3 h-3 shrink-0" />}
                       {tab.status === 'idle' && <Clock className="w-3 h-3 shrink-0 opacity-40" />}
@@ -1221,16 +1314,32 @@ ${bodyHtml}
                       const mm = String(Math.floor(elapsedSec / 60)).padStart(2, '0');
                       const ss = String(elapsedSec % 60).padStart(2, '0');
                       const phase = activeTab.phase;
+                      const tabQueued = activeTab.isQueued;
+                      const tabQueuePos = activeTab.queuePosition;
                       return (
                         <div className="flex items-center gap-2">
-                          <span className="relative flex h-2 w-2">
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
-                            <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
-                          </span>
-                          <span className="text-xs text-primary font-mono font-medium">{mm}:{ss}</span>
-                          <span className="text-xs text-muted-foreground">
-                            {phase === 'extracting' ? '· Extraindo PDFs...' : '· Gerando análise...'}
-                          </span>
+                          {tabQueued ? (
+                            <>
+                              <span className="relative flex h-2 w-2">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-500 opacity-75"></span>
+                                <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+                              </span>
+                              <span className="text-xs text-amber-500 font-medium">
+                                {tabQueuePos != null ? `Na fila (posição ${tabQueuePos})` : 'Na fila...'}
+                              </span>
+                            </>
+                          ) : (
+                            <>
+                              <span className="relative flex h-2 w-2">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+                                <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
+                              </span>
+                              <span className="text-xs text-primary font-mono font-medium">{mm}:{ss}</span>
+                              <span className="text-xs text-muted-foreground">
+                                {phase === 'extracting' ? '· Extraindo PDFs...' : '· Executando...'}
+                              </span>
+                            </>
+                          )}
                         </div>
                       );
                     })()}
@@ -1391,8 +1500,26 @@ ${bodyHtml}
                       </div>
                     )}
 
+                    {/* Queue waiting state — job is in queue, no steps yet */}
+                    {activeTab.status === 'running' && activeTab.isQueued && activeTab.execSteps.length === 0 && (
+                      <div className="flex flex-col items-center gap-4 text-center py-16">
+                        <div className="w-14 h-14 rounded-full border border-amber-500/30 flex items-center justify-center bg-amber-500/5 relative">
+                          <Clock className="w-6 h-6 text-amber-500" />
+                          <span className="absolute inset-0 rounded-full border border-amber-500/20 animate-ping" />
+                        </div>
+                        <p className="text-sm font-medium text-foreground">
+                          {activeTab.queuePosition != null
+                            ? `Na fila — posição ${activeTab.queuePosition}`
+                            : 'Aguardando na fila...'}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          A análise iniciará automaticamente quando for a vez do processo.
+                        </p>
+                      </div>
+                    )}
+
                     {/* PDF extraction phase — no SSE steps yet */}
-                    {activeTab.status === 'running' && activeTab.execSteps.length === 0 && activeTab.phase === 'extracting' && (
+                    {activeTab.status === 'running' && activeTab.execSteps.length === 0 && activeTab.phase === 'extracting' && !activeTab.isQueued && (
                       <div className="flex flex-col items-center gap-4 text-center py-16">
                         <div className="w-14 h-14 rounded-full border border-primary/30 flex items-center justify-center bg-primary/5 relative">
                           <span className="font-serif italic text-2xl text-primary">ℓ</span>

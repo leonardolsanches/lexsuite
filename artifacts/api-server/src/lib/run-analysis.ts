@@ -22,6 +22,7 @@ export type AnalysisEvent =
   | { type: "step"; id: string; label: string; icon: string }
   | { type: "text"; text: string }
   | { type: "ping" }
+  | { type: "running" }
   | { type: "error"; message: string }
   | { type: "done" };
 

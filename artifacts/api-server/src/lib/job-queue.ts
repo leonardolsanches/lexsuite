@@ -90,6 +90,7 @@ class JobQueue {
         this.abortControllers.set(jobId, ctrl);
 
         await setJobRunning(jobId);
+        this.emit(jobId, { type: "running" });
 
         let outputHtml = "";
         let failed = false;

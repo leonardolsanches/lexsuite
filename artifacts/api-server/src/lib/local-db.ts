@@ -220,6 +220,23 @@ export async function getNextQueuedJob(): Promise<AnalysisJob | null> {
   return mapJob(row);
 }
 
+/**
+ * Returns the 1-based position of a queued job in the queue.
+ * Position 1 = next to run. Returns null if job is not queued.
+ */
+export async function getJobQueuePosition(jobId: string): Promise<number | null> {
+  const row = await localQueryOne<{ position: string }>(
+    `SELECT COUNT(*)::int AS position
+     FROM analysis_jobs
+     WHERE status = 'queued'
+       AND queued_at <= (SELECT queued_at FROM analysis_jobs WHERE id = $1)`,
+    [jobId]
+  );
+  if (!row) return null;
+  const pos = Number(row.position);
+  return pos > 0 ? pos : null;
+}
+
 function mapJob(row: Record<string, unknown>): AnalysisJob {
   return {
     id: row.id as string,

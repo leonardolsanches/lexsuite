@@ -4,6 +4,7 @@ import {
   createJob,
   getJob,
   getUserJobs,
+  getJobQueuePosition,
   type AnalysisJob,
 } from "../lib/local-db";
 import { jobQueue } from "../lib/job-queue";
@@ -149,12 +150,36 @@ router.get("/jobs/:id/events", requireAuth, async (req, res): Promise<void> => {
     send(event);
   }
 
-  // Heartbeat to keep connection alive while queued/waiting
-  const heartbeatInterval = setInterval(() => {
-    if (!res.writableEnded) {
-      res.write(`data: ${JSON.stringify({ type: "ping" })}\n\n`);
+  // If currently queued, send initial queue position immediately
+  if (job.status === "queued") {
+    const position = await getJobQueuePosition(jobId).catch(() => null);
+    if (position !== null) {
+      send({ type: "queued", position });
     }
-  }, 15_000);
+  }
+
+  // Heartbeat: keep connection alive and refresh queue position while queued
+  const heartbeatInterval = setInterval(async () => {
+    if (res.writableEnded) return;
+    try {
+      const currentJob = await getJob(jobId, userId).catch(() => null);
+      if (!currentJob) return;
+      if (currentJob.status === "queued") {
+        const position = await getJobQueuePosition(jobId).catch(() => null);
+        if (position !== null) {
+          send({ type: "queued", position });
+        } else {
+          res.write(`data: ${JSON.stringify({ type: "ping" })}\n\n`);
+        }
+      } else if (currentJob.status === "running") {
+        res.write(`data: ${JSON.stringify({ type: "ping" })}\n\n`);
+      }
+    } catch {
+      if (!res.writableEnded) {
+        res.write(`data: ${JSON.stringify({ type: "ping" })}\n\n`);
+      }
+    }
+  }, 10_000);
 
   const unsubscribe = jobQueue.subscribe(jobId, (event) => {
     send(event);
