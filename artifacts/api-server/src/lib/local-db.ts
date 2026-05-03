@@ -91,31 +91,34 @@ export async function ensureJobsTable(): Promise<void> {
     CREATE INDEX IF NOT EXISTS analysis_jobs_status_idx ON analysis_jobs (status)
   `);
 
-  // On restart: jobs with partial output_html are salvaged as 'done'; others become 'error'
-  const salvaged = await localExecute(
+  // On restart: first expire jobs that were stuck running for more than 2 hours
+  // (these were genuinely stuck, not just interrupted by a normal restart)
+  const stuckExpired = await localExecute(
     `UPDATE analysis_jobs
-     SET status = 'done', finished_at = NOW()
+     SET status = 'error',
+         error_message = 'Job travado: análise em execução há mais de 2 horas.',
+         finished_at = NOW()
      WHERE status = 'running'
-       AND output_html IS NOT NULL AND output_html <> ''`
+       AND started_at < NOW() - INTERVAL '2 hours'`
   );
-  if (salvaged.rowCount > 0) {
+  if (stuckExpired.rowCount > 0) {
     logger.warn(
-      { count: salvaged.rowCount },
-      "job-queue: jobs interrompidos com saída parcial — marcados como 'done'"
+      { count: stuckExpired.rowCount },
+      "job-queue: jobs travados há >2h — marcados como 'error'"
     );
   }
 
-  const interrupted = await localExecute(
+  // Reset remaining running jobs (recently started, interrupted by this restart)
+  // back to 'queued' so they are automatically retried by kick()
+  const requeued = await localExecute(
     `UPDATE analysis_jobs
-     SET status = 'error',
-         error_message = 'Servidor reiniciado durante análise. Por favor, tente novamente.',
-         finished_at = NOW()
+     SET status = 'queued', started_at = NULL
      WHERE status = 'running'`
   );
-  if (interrupted.rowCount > 0) {
+  if (requeued.rowCount > 0) {
     logger.warn(
-      { count: interrupted.rowCount },
-      "job-queue: jobs interrompidos sem saída — marcados como 'error'"
+      { count: requeued.rowCount },
+      "job-queue: jobs em 'running' na inicialização — resetados para 'queued'"
     );
   }
 
