@@ -3,6 +3,8 @@ import { logger } from "./lib/logger";
 import { seedDatabase } from "./lib/seed";
 import { getOllamaBaseUrl, warmupOllama } from "./lib/ollama";
 import { loadConfigFromDb } from "./lib/runtime-config";
+import { ensureJobsTable } from "./lib/local-db";
+import { jobQueue } from "./lib/job-queue";
 
 const rawPort = process.env["PORT"];
 
@@ -34,6 +36,16 @@ app.listen(port, async (err) => {
   seedDatabase().catch((err) => {
     logger.error({ err }, "Seed falhou — servidor continua no ar");
   });
+
+  // Initialize job queue table and resume any pending jobs
+  ensureJobsTable()
+    .then(() => {
+      jobQueue.kick();
+      logger.info("job-queue: inicializado e pronto");
+    })
+    .catch((err) => {
+      logger.error({ err }, "job-queue: falha na inicialização — análises via fila indisponíveis");
+    });
 
   const ollamaBaseUrl = getOllamaBaseUrl();
   if (ollamaBaseUrl) {

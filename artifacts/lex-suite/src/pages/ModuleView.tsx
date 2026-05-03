@@ -50,7 +50,7 @@ import {
   BookOpen,
   CheckCheck
 } from 'lucide-react';
-import { useStreaming, type ExecStep } from '@/hooks/use-streaming';
+import { useJobQueue, type ExecStep } from '@/hooks/use-job-queue';
 import { usePdf } from '@/hooks/use-pdf';
 
 const apiBase = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/+$/, '') ?? '';
@@ -103,11 +103,11 @@ export default function ModuleView({ module }: ModuleViewProps) {
 
   const { data: recentSessions = [] } = useListSessions(
     { module: module as any, limit: 15 },
-    { query: { refetchOnWindowFocus: false } }
+    { query: { refetchOnWindowFocus: false } as any }
   );
   const doneSessions = recentSessions.filter(s => s.outputHtml && (s.status === 'done' || s.status === 'running'));
   
-  const { isStreaming, startStream, cancelStream } = useStreaming();
+  const { isStreaming, startStream, cancelStream } = useJobQueue();
   const { isLoaded: pdfLoaded, extractText } = usePdf();
 
   // Keep a ref to always-fresh tabs for use inside async callbacks
@@ -321,9 +321,11 @@ export default function ModuleView({ module }: ModuleViewProps) {
         : (tab.mode === 'pdf' || pdfExtractedText ? pdfExtractedText : undefined),
     };
 
+    // sessionId declared outside try so catch block can access it
+    let sessionId = tab.sessionId;
+
     try {
       // Try to create/reuse session — fail silently if DB Bridge is unavailable
-      let sessionId = tab.sessionId;
       if (!sessionId) {
         try {
           const session = await createSession.mutateAsync({

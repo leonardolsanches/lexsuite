@@ -1,4 +1,3 @@
-import type { Response } from "express";
 import {
   ensureModelLoaded,
   getOllamaBaseUrl,
@@ -40,14 +39,8 @@ export function getLlmStatusMessage(): string {
   return "";
 }
 
-/**
- * Builds a date/time context header injected at the top of every LLM prompt.
- * Gives the model the information it needs to calculate prescription periods,
- * deadlines, and any date arithmetic from the actual documents.
- */
 function buildDateContext(): string {
   const now = new Date();
-
   const dateStr = now.toLocaleDateString("pt-BR", {
     weekday: "long",
     day: "2-digit",
@@ -55,9 +48,7 @@ function buildDateContext(): string {
     year: "numeric",
     timeZone: "America/Sao_Paulo",
   });
-
   const year = now.toLocaleDateString("pt-BR", { year: "numeric", timeZone: "America/Sao_Paulo" });
-
   return (
     `[CONTEXTO TEMPORAL — USE PARA TODOS OS CÁLCULOS DE PRAZO]\n` +
     `Data de hoje: ${dateStr} (fuso horário: Brasília/BRT).\n` +
@@ -70,17 +61,28 @@ function buildDateContext(): string {
 }
 
 export interface StreamAnalysisOptions {
-  /** "deep" (default) = full CoT reasoning; "fast" = skip CoT, ~3-5× faster */
   thinkMode?: OllamaThinkMode;
 }
 
+/**
+ * Streams an LLM analysis.
+ *
+ * @param prompt        Full prompt text
+ * @param writeEvent    Callback receiving raw SSE data strings (e.g. `data: {...}\n\n`)
+ * @param onChunk       Callback receiving plain text chunks (for accumulating output)
+ * @param continueFrom  Optional previous output to continue from
+ * @param onStatus      Optional callback for status messages (shown as "model" step updates)
+ * @param options       { thinkMode }
+ * @param signal        Optional AbortSignal for cancellation
+ */
 export async function streamAnalysis(
   prompt: string,
-  res: Response,
+  writeEvent: (sseData: string) => void,
   onChunk: (text: string) => void,
   continueFrom?: string,
   onStatus?: (msg: string) => void,
-  options: StreamAnalysisOptions = {}
+  options: StreamAnalysisOptions = {},
+  signal?: AbortSignal
 ): Promise<void> {
   const provider = getActiveProvider();
 
@@ -88,16 +90,16 @@ export async function streamAnalysis(
     throw new Error("Nenhum motor de IA configurado (ANTHROPIC_API_KEY ou OLLAMA_BASE_URL).");
   }
 
-  // Inject today's date so the model can compute prescription / deadlines accurately.
   const promptWithDate = buildDateContext() + prompt;
 
-  // ── Anthropic-only path (Ollama not configured) ──────────────────────────
+  // ── Anthropic-only path ───────────────────────────────────────────────────
   if (provider === "anthropic") {
     logger.info("Streaming via Claude (Anthropic) — Ollama não configurado");
     onStatus?.("Conectando ao Claude...");
     for await (const text of streamAnthropic(promptWithDate, continueFrom)) {
+      if (signal?.aborted) return;
       onChunk(text);
-      res.write(`data: ${JSON.stringify({ type: "text", text })}\n\n`);
+      writeEvent(`data: ${JSON.stringify({ type: "text", text })}\n\n`);
     }
     return;
   }
@@ -111,13 +113,13 @@ export async function streamAnalysis(
 
   try {
     await ensureModelLoaded(baseUrl, model, onStatus);
+    if (signal?.aborted) return;
 
     let fullPrompt = promptWithDate;
     if (continueFrom) {
       fullPrompt += `\n\n[RESPOSTA ANTERIOR]:\n${continueFrom}\n\nContinue a análise do ponto onde parou.`;
     }
 
-    // ── Thinking-phase progress tracker ────────────────────────────────────
     let thinkCharTotal = 0;
     let lastStatusAt = 0;
     const PROGRESS_INTERVAL = 800;
@@ -133,14 +135,15 @@ export async function streamAnalysis(
       }
     }
 
-    const onThinkChunk = (chars: number) => emitThinkProgress(chars);
     let thinkPhase: "checking" | "stripping" | "passthrough" = "checking";
     let thinkBuffer = "";
 
-    for await (const text of streamOllama(fullPrompt, model, baseUrl, getDbBridgeUrl(), thinkMode, onThinkChunk)) {
+    for await (const text of streamOllama(fullPrompt, model, baseUrl, getDbBridgeUrl(), thinkMode, (chars) => emitThinkProgress(chars))) {
+      if (signal?.aborted) return;
+
       if (thinkPhase === "passthrough") {
         onChunk(text);
-        res.write(`data: ${JSON.stringify({ type: "text", text })}\n\n`);
+        writeEvent(`data: ${JSON.stringify({ type: "text", text })}\n\n`);
         continue;
       }
 
@@ -153,7 +156,7 @@ export async function streamAnalysis(
         } else if (trimmed.length > 40 || !trimmed.startsWith("<")) {
           thinkPhase = "passthrough";
           onChunk(thinkBuffer);
-          res.write(`data: ${JSON.stringify({ type: "text", text: thinkBuffer })}\n\n`);
+          writeEvent(`data: ${JSON.stringify({ type: "text", text: thinkBuffer })}\n\n`);
           thinkBuffer = "";
         }
       }
@@ -167,19 +170,20 @@ export async function streamAnalysis(
           thinkBuffer = "";
           if (afterThink) {
             onChunk(afterThink);
-            res.write(`data: ${JSON.stringify({ type: "text", text: afterThink })}\n\n`);
+            writeEvent(`data: ${JSON.stringify({ type: "text", text: afterThink })}\n\n`);
           }
         }
       }
     }
   } catch (ollamaErr) {
-    // ── Fallback para Claude se Ollama falhar ─────────────────────────────
+    if (signal?.aborted) return;
     if (isAnthropicConfigured()) {
       logger.warn({ err: ollamaErr }, "Ollama falhou — usando Claude como fallback");
       onStatus?.("Mini PC indisponível — usando Claude como alternativa...");
       for await (const text of streamAnthropic(promptWithDate, continueFrom)) {
+        if (signal?.aborted) return;
         onChunk(text);
-        res.write(`data: ${JSON.stringify({ type: "text", text })}\n\n`);
+        writeEvent(`data: ${JSON.stringify({ type: "text", text })}\n\n`);
       }
     } else {
       throw ollamaErr;

@@ -7,6 +7,7 @@ import analyzeRouter from "./analyze";
 import documentsRouter from "./documents";
 import adminRouter from "./admin";
 import knowledgeRouter from "./knowledge";
+import jobsRouter from "./jobs";
 
 const router: IRouter = Router();
 
@@ -16,6 +17,7 @@ router.use(workflowsRouter);
 router.use(sessionsRouter);
 router.use(analyzeRouter);
 router.use(documentsRouter);
+router.use(jobsRouter);
 router.use("/admin", adminRouter);
 router.use("/knowledge", knowledgeRouter);
 
