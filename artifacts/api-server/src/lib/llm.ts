@@ -6,10 +6,7 @@ import {
   streamOllama,
   type OllamaThinkMode,
 } from "./ollama";
-import {
-  isAnthropicConfigured,
-  streamAnthropic,
-} from "./anthropic";
+import { isAnthropicConfigured, streamAnthropic } from "./anthropic";
 import { getDbBridgeUrl } from "./bridge";
 import { logger } from "./logger";
 
@@ -104,88 +101,116 @@ export async function streamAnalysis(
     return;
   }
 
-  // ── Ollama (primário) com fallback para Claude ────────────────────────────
+  // ── Ollama (primário) ─────────────────────────────────────────────────────
   const baseUrl = getOllamaBaseUrl()!;
   const model = getOllamaModelParecer();
   const thinkMode = options.thinkMode ?? "deep";
 
   logger.info({ model, baseUrl, thinkMode }, "Streaming via Ollama local");
 
-  try {
-    await ensureModelLoaded(baseUrl, model, onStatus);
-    if (signal?.aborted) return;
+  const fullPrompt = continueFrom
+    ? promptWithDate + `\n\n[RESPOSTA ANTERIOR]:\n${continueFrom}\n\nContinue a análise do ponto onde parou.`
+    : promptWithDate;
 
-    let fullPrompt = promptWithDate;
-    if (continueFrom) {
-      fullPrompt += `\n\n[RESPOSTA ANTERIOR]:\n${continueFrom}\n\nContinue a análise do ponto onde parou.`;
-    }
+  // Retry up to MAX_RETRIES times on connection errors (ECONNRESET from the
+  // Cloudflare tunnel), but ONLY while no visible text has been emitted yet.
+  // During deepseek-r1's multi-minute think phase the tunnel occasionally drops;
+  // since nothing is shown to the user yet, a transparent retry is safe.
+  const MAX_RETRIES = 2;
+  let attempt = 0;
 
-    let thinkCharTotal = 0;
-    let lastStatusAt = 0;
-    const PROGRESS_INTERVAL = 800;
+  while (true) {
+    let chunkEmitted = false;
 
-    function emitThinkProgress(addedChars: number) {
-      thinkCharTotal += addedChars;
-      const approxTokens = Math.round(thinkCharTotal / 4);
-      if (thinkCharTotal - lastStatusAt >= PROGRESS_INTERVAL) {
-        lastStatusAt = thinkCharTotal;
-        onStatus?.(
-          `Raciocínio jurídico em andamento... ~${approxTokens.toLocaleString("pt-BR")} tokens`
-        );
-      }
-    }
-
-    let thinkPhase: "checking" | "stripping" | "passthrough" = "checking";
-    let thinkBuffer = "";
-
-    for await (const text of streamOllama(fullPrompt, model, baseUrl, getDbBridgeUrl(), thinkMode, (chars) => emitThinkProgress(chars))) {
+    try {
+      await ensureModelLoaded(baseUrl, model, onStatus);
       if (signal?.aborted) return;
 
-      if (thinkPhase === "passthrough") {
-        onChunk(text);
-        writeEvent(`data: ${JSON.stringify({ type: "text", text })}\n\n`);
-        continue;
-      }
+      let thinkCharTotal = 0;
+      let lastStatusAt = 0;
+      const PROGRESS_INTERVAL = 800;
 
-      thinkBuffer += text;
-
-      if (thinkPhase === "checking") {
-        const trimmed = thinkBuffer.trimStart();
-        if (trimmed.startsWith("<think>")) {
-          thinkPhase = "stripping";
-        } else if (trimmed.length > 40 || !trimmed.startsWith("<")) {
-          thinkPhase = "passthrough";
-          onChunk(thinkBuffer);
-          writeEvent(`data: ${JSON.stringify({ type: "text", text: thinkBuffer })}\n\n`);
-          thinkBuffer = "";
+      function emitThinkProgress(addedChars: number) {
+        thinkCharTotal += addedChars;
+        const approxTokens = Math.round(thinkCharTotal / 4);
+        if (thinkCharTotal - lastStatusAt >= PROGRESS_INTERVAL) {
+          lastStatusAt = thinkCharTotal;
+          onStatus?.(
+            `Raciocínio jurídico em andamento... ~${approxTokens.toLocaleString("pt-BR")} tokens`
+          );
         }
       }
 
-      if (thinkPhase === "stripping") {
-        emitThinkProgress(text.length);
-        const closeIdx = thinkBuffer.indexOf("</think>");
-        if (closeIdx !== -1) {
-          thinkPhase = "passthrough";
-          const afterThink = thinkBuffer.slice(closeIdx + "</think>".length).replace(/^\n+/, "");
-          thinkBuffer = "";
-          if (afterThink) {
-            onChunk(afterThink);
-            writeEvent(`data: ${JSON.stringify({ type: "text", text: afterThink })}\n\n`);
+      let thinkPhase: "checking" | "stripping" | "passthrough" = "checking";
+      let thinkBuffer = "";
+
+      for await (const text of streamOllama(fullPrompt, model, baseUrl, getDbBridgeUrl(), thinkMode, (chars) => emitThinkProgress(chars))) {
+        if (signal?.aborted) return;
+
+        if (thinkPhase === "passthrough") {
+          chunkEmitted = true;
+          onChunk(text);
+          writeEvent(`data: ${JSON.stringify({ type: "text", text })}\n\n`);
+          continue;
+        }
+
+        thinkBuffer += text;
+
+        if (thinkPhase === "checking") {
+          const trimmed = thinkBuffer.trimStart();
+          if (trimmed.startsWith("<think>")) {
+            thinkPhase = "stripping";
+          } else if (trimmed.length > 40 || !trimmed.startsWith("<")) {
+            thinkPhase = "passthrough";
+            chunkEmitted = true;
+            onChunk(thinkBuffer);
+            writeEvent(`data: ${JSON.stringify({ type: "text", text: thinkBuffer })}\n\n`);
+            thinkBuffer = "";
+          }
+        }
+
+        if (thinkPhase === "stripping") {
+          emitThinkProgress(text.length);
+          const closeIdx = thinkBuffer.indexOf("</think>");
+          if (closeIdx !== -1) {
+            thinkPhase = "passthrough";
+            const afterThink = thinkBuffer.slice(closeIdx + "</think>".length).replace(/^\n+/, "");
+            thinkBuffer = "";
+            if (afterThink) {
+              chunkEmitted = true;
+              onChunk(afterThink);
+              writeEvent(`data: ${JSON.stringify({ type: "text", text: afterThink })}\n\n`);
+            }
           }
         }
       }
-    }
-  } catch (ollamaErr) {
-    if (signal?.aborted) return;
-    if (isAnthropicConfigured()) {
-      logger.warn({ err: ollamaErr }, "Ollama falhou — usando Claude como fallback");
-      onStatus?.("Mini PC indisponível — usando Claude como alternativa...");
-      for await (const text of streamAnthropic(promptWithDate, continueFrom)) {
+
+      // Streaming finished successfully
+      return;
+
+    } catch (ollamaErr) {
+      if (signal?.aborted) return;
+
+      const isConnErr = ollamaErr instanceof Error &&
+        /ECONNRESET|terminated|ECONNREFUSED|ETIMEDOUT|socket hang up/i.test(ollamaErr.message);
+
+      // Only retry connection errors that happened before any text was emitted
+      if (isConnErr && !chunkEmitted && attempt < MAX_RETRIES) {
+        attempt++;
+        const delaySec = attempt * 4; // 4 s, 8 s
+        logger.warn(
+          { err: ollamaErr, attempt, maxRetries: MAX_RETRIES },
+          `Ollama: conexão perdida antes do output — aguardando ${delaySec}s e tentando novamente`
+        );
+        onStatus?.(
+          `Conexão com o Mini PC interrompida — reconectando (tentativa ${attempt}/${MAX_RETRIES})...`
+        );
+        await new Promise((r) => setTimeout(r, delaySec * 1_000));
         if (signal?.aborted) return;
-        onChunk(text);
-        writeEvent(`data: ${JSON.stringify({ type: "text", text })}\n\n`);
+        continue; // retry
       }
-    } else {
+
+      // Not retryable (or text was already sent, or retries exhausted)
       throw ollamaErr;
     }
   }
