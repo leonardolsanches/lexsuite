@@ -100,14 +100,26 @@ class JobQueue {
 
   /**
    * Attempts to claim one queued job and run it.
-   * If no job is available, returns immediately.
-   * On completion, calls kick() to fill the freed slot.
+   * Slot is reserved (runningCount++) BEFORE the async claim so that
+   * concurrent kick() calls can never overshoot the concurrency limit.
+   * If no job is available the reservation is released immediately.
    */
   private async processOne(): Promise<void> {
-    const job = await claimNextQueuedJob();
-    if (!job) return; // nothing to do
-
+    // Reserve slot before any async work to prevent over-spawning
     this.runningCount++;
+
+    let job;
+    try {
+      job = await claimNextQueuedJob();
+    } catch (err) {
+      this.runningCount--;
+      throw err;
+    }
+
+    if (!job) {
+      this.runningCount--;
+      return;
+    }
     const { id: jobId } = job;
 
     const provider = getActiveProvider() ?? "none";
