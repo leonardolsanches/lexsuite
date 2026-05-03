@@ -169,7 +169,8 @@ export default function ModuleView({ module }: ModuleViewProps) {
   // Track whether we've already attempted reconnect for this page load
   const reconnectAttemptedRef = useRef(false);
 
-  // Auto-reconnect: on mount, check for active jobs and reconnect if found
+  // On mount: (1) reconnect to any running/queued job, (2) surface recently
+  // completed background jobs so the user can access results after page reload.
   useEffect(() => {
     if (!authLoaded || reconnectAttemptedRef.current || isStreaming) return;
     reconnectAttemptedRef.current = true;
@@ -180,60 +181,132 @@ export default function ModuleView({ module }: ModuleViewProps) {
         const headers: Record<string, string> = {};
         if (token) headers['Authorization'] = `Bearer ${token}`;
 
-        const res = await fetch(`${apiBase}/api/jobs?status=running,queued&limit=5&module=${module}`, { headers });
-        if (!res.ok) return;
+        // ── 1. Reconnect to active (running/queued) job ───────────────────
+        const activeRes = await fetch(
+          `${apiBase}/api/jobs?status=running,queued&limit=5&module=${module}`,
+          { headers }
+        );
 
-        const jobs = await res.json() as Array<{
-          id: string; workflowKey: string; module: string; status: string;
-          outputHtml?: string | null;
+        let foundActiveJob = false;
+        if (activeRes.ok) {
+          const activeJobs = await activeRes.json() as Array<{
+            id: string; workflowKey: string; module: string; status: string;
+            outputHtml?: string | null;
+          }>;
+
+          const activeJob = activeJobs.find(
+            j => j.module === module && (j.status === 'running' || j.status === 'queued')
+          );
+
+          if (activeJob) {
+            foundActiveJob = true;
+            const recoveryId = crypto.randomUUID();
+            const recoveryTab: ProcessTab = {
+              id: recoveryId,
+              jobId: activeJob.id,
+              workflowKey: activeJob.workflowKey,
+              label: activeJob.workflowKey,
+              status: 'running',
+              isQueued: activeJob.status === 'queued',
+              queuePosition: null,
+              execSteps: [],
+              mode: 'form',
+              formData: {},
+              pasteText: '',
+              outputHtml: activeJob.outputHtml ?? '',
+              pdfs: [],
+              startedAt: Date.now(),
+            };
+
+            setTabs(prev => {
+              if (prev.some(t => t.jobId === activeJob.id)) return prev;
+              return [...prev, recoveryTab];
+            });
+            setActiveTabId(recoveryId);
+
+            await reconnectToJob(activeJob.id, {
+              onQueued: (position) => {
+                setTabs(prev => prev.map(t => t.id === recoveryId ? { ...t, isQueued: true, queuePosition: position } : t));
+              },
+              onRunning: () => {
+                setTabs(prev => prev.map(t => t.id === recoveryId ? { ...t, isQueued: false, queuePosition: null } : t));
+              },
+              onStep: (step) => {
+                setTabs(prev => prev.map(t => t.id === recoveryId
+                  ? { ...t, execSteps: [...t.execSteps, step], isQueued: false, queuePosition: null }
+                  : t));
+              },
+              onChunk: (partial) => {
+                setTabs(prev => prev.map(t => t.id === recoveryId
+                  ? { ...t, outputHtml: partial, isQueued: false, queuePosition: null }
+                  : t));
+              },
+              onComplete: (fullContent) => {
+                setTabs(prev => prev.map(t => t.id === recoveryId
+                  ? { ...t, status: 'done', outputHtml: fullContent, endedAt: Date.now(), isQueued: false, queuePosition: null }
+                  : t));
+              },
+            });
+          }
+        }
+
+        // ── 2. Surface recently completed background jobs ─────────────────
+        const doneRes = await fetch(
+          `${apiBase}/api/jobs?status=done&limit=5&module=${module}`,
+          { headers }
+        );
+        if (!doneRes.ok) return;
+
+        const doneJobs = await doneRes.json() as Array<{
+          id: string; workflowKey: string; module: string;
+          outputHtml?: string | null; finishedAt?: string | null;
         }>;
 
-        // Pick the first active job for this module
-        const activeJob = jobs.find(j => j.module === module && (j.status === 'running' || j.status === 'queued'));
-        if (!activeJob) return;
+        const withOutput = doneJobs.filter(j => j.outputHtml?.trim());
+        if (withOutput.length === 0) return;
 
-        // Create a recovery tab for the reconnected job
-        const recoveryId = crypto.randomUUID();
-        const recoveryTab: ProcessTab = {
-          id: recoveryId,
-          jobId: activeJob.id,
-          workflowKey: activeJob.workflowKey,
-          label: activeJob.workflowKey,
-          status: 'running',
-          isQueued: activeJob.status === 'queued',
-          queuePosition: null,
-          execSteps: [],
-          mode: 'form',
-          formData: {},
-          pasteText: '',
-          outputHtml: activeJob.outputHtml ?? '',
-          pdfs: [],
-          startedAt: Date.now(),
-        };
+        // Dedup against tabs already open (including the reconnected active job)
+        const existingJobIds = new Set(tabsRef.current.map(t => t.jobId).filter(Boolean));
+        const freshDone: ProcessTab[] = withOutput
+          .filter(j => !existingJobIds.has(j.id))
+          .map(j => ({
+            id: crypto.randomUUID(),
+            jobId: j.id,
+            workflowKey: j.workflowKey,
+            label: j.workflowKey,
+            status: 'done' as const,
+            execSteps: [],
+            mode: 'form' as const,
+            formData: {},
+            pasteText: '',
+            outputHtml: j.outputHtml ?? '',
+            pdfs: [],
+            endedAt: j.finishedAt ? new Date(j.finishedAt).getTime() : Date.now(),
+          }));
+
+        if (freshDone.length === 0) return;
 
         setTabs(prev => {
-          // Don't add if a tab for this job already exists
-          if (prev.some(t => t.jobId === activeJob.id)) return prev;
-          return [...prev, recoveryTab];
-        });
-        setActiveTabId(recoveryId);
+          const nowIds = new Set(prev.map(t => t.jobId).filter(Boolean));
+          const toAdd = freshDone.filter(t => !nowIds.has(t.jobId!));
+          if (toAdd.length === 0) return prev;
 
-        await reconnectToJob(activeJob.id, {
-          onQueued: (position) => {
-            setTabs(prev => prev.map(t => t.id === recoveryId ? { ...t, isQueued: true, queuePosition: position } : t));
-          },
-          onRunning: () => {
-            setTabs(prev => prev.map(t => t.id === recoveryId ? { ...t, isQueued: false, queuePosition: null } : t));
-          },
-          onStep: (step) => {
-            setTabs(prev => prev.map(t => t.id === recoveryId ? { ...t, execSteps: [...t.execSteps, step], isQueued: false, queuePosition: null } : t));
-          },
-          onChunk: (partial) => {
-            setTabs(prev => prev.map(t => t.id === recoveryId ? { ...t, outputHtml: partial, isQueued: false, queuePosition: null } : t));
-          },
-          onComplete: (fullContent) => {
-            setTabs(prev => prev.map(t => t.id === recoveryId ? { ...t, status: 'done', outputHtml: fullContent, endedAt: Date.now(), isQueued: false, queuePosition: null } : t));
-          },
+          // Remove the initial blank placeholder tab (created by useEffect([module]))
+          // so the first thing the user sees is their completed results.
+          const withoutBlank = prev.filter(t =>
+            t.outputHtml || t.jobId || t.sessionId || t.workflowKey
+          );
+          return [...withoutBlank, ...toAdd];
+        });
+
+        // Make the most recent done tab active if nothing else is active
+        if (!foundActiveJob) {
+          setActiveTabId(freshDone[0].id);
+        }
+
+        toast({
+          title: `${freshDone.length} análise${freshDone.length > 1 ? 's' : ''} concluída${freshDone.length > 1 ? 's' : ''} em segundo plano`,
+          description: 'Os resultados estão carregados nas abas.',
         });
       } catch {
         // silent — reconnect is best-effort
