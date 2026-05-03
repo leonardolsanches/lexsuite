@@ -1,10 +1,10 @@
 import {
   localQueryOne,
+  claimNextQueuedJob,
   setJobDone,
   setJobError,
   setJobCancelled,
   appendJobEvent,
-  claimNextQueuedJob,
 } from "./local-db";
 import { runAnalysis, type AnalysisEvent } from "./run-analysis";
 import { getActiveProvider } from "./llm";
