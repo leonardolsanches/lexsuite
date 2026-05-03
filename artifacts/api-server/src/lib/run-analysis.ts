@@ -27,6 +27,39 @@ export type AnalysisEvent =
   | { type: "done" };
 
 /**
+ * Thrown when the analysis failed AND the error event was already forwarded
+ * to the client via `onEvent`. `job-queue.ts` uses this to skip the duplicate
+ * error emit while still marking the job as `error` in the DB.
+ */
+export class AnalysisReportedError extends Error {
+  readonly reportedMessage: string;
+  constructor(reportedMessage: string, cause?: unknown) {
+    super(reportedMessage);
+    this.name = "AnalysisReportedError";
+    this.reportedMessage = reportedMessage;
+    if (cause) this.cause = cause;
+  }
+}
+
+/** Translates raw network/Node errors to user-friendly Portuguese messages. */
+function toUserMessage(err: unknown): string {
+  const raw = err instanceof Error ? err.message : String(err);
+  if (/ECONNRESET|terminated/i.test(raw)) {
+    return "Conexão com o Mini PC foi interrompida. O túnel Cloudflare pode ter caído. Aguarde alguns segundos e tente novamente.";
+  }
+  if (/ETIMEDOUT|timed? ?out/i.test(raw)) {
+    return "Tempo limite de conexão esgotado. O Mini PC pode estar sobrecarregado ou offline. Tente novamente em instantes.";
+  }
+  if (/ECONNREFUSED/i.test(raw)) {
+    return "Não foi possível conectar ao Mini PC. Verifique se o Ollama está rodando e o túnel Cloudflare está ativo.";
+  }
+  if (/ENOTFOUND|getaddrinfo/i.test(raw)) {
+    return "Endereço do Mini PC não encontrado. Verifique a URL do Ollama nas configurações.";
+  }
+  return raw || "Falha inesperada durante a análise.";
+}
+
+/**
  * Full analysis pipeline — module check, prompt, RAG, LLM streaming.
  * Emits typed events via `onEvent`. Returns total output text.
  * Pass an AbortSignal to support cancellation.
@@ -261,7 +294,7 @@ export async function runAnalysis(
     }
   } catch (err: unknown) {
     if (checkpointInterval) clearInterval(checkpointInterval);
-    const msg = err instanceof Error ? err.message : "Falha na análise";
+    const userMsg = toUserMessage(err);
     logger.error({ err }, "Erro durante análise");
     if (sessionRecord) {
       try {
@@ -271,7 +304,10 @@ export async function runAnalysis(
         );
       } catch { /* skip */ }
     }
-    sendError(msg);
+    sendError(userMsg);
+    // Rethrow so job-queue marks the job as 'error', not 'done'.
+    // Use AnalysisReportedError so the queue knows the event was already sent.
+    throw new AnalysisReportedError(userMsg, err);
   }
 
   return fullOutput;

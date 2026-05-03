@@ -6,7 +6,7 @@ import {
   setJobCancelled,
   appendJobEvent,
 } from "./local-db";
-import { runAnalysis, type AnalysisEvent } from "./run-analysis";
+import { runAnalysis, type AnalysisEvent, AnalysisReportedError } from "./run-analysis";
 import { getActiveProvider } from "./llm";
 import { logger } from "./logger";
 
@@ -162,8 +162,14 @@ class JobQueue {
       cancelled = ctrl.signal.aborted;
     } catch (err: unknown) {
       failed = true;
-      const msg = err instanceof Error ? err.message : "Erro interno";
-      this.emit(jobId, { type: "error", message: msg });
+      // If runAnalysis already sent the error event (AnalysisReportedError),
+      // don't emit a duplicate — just persist the error status in the DB.
+      const msg = err instanceof AnalysisReportedError
+        ? err.reportedMessage
+        : err instanceof Error ? err.message : "Erro interno";
+      if (!(err instanceof AnalysisReportedError)) {
+        this.emit(jobId, { type: "error", message: msg });
+      }
       await setJobError(jobId, msg).catch(() => {});
       logger.error({ err, jobId }, "job-queue: erro no job");
     } finally {
