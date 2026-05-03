@@ -91,12 +91,32 @@ export async function ensureJobsTable(): Promise<void> {
     CREATE INDEX IF NOT EXISTS analysis_jobs_status_idx ON analysis_jobs (status)
   `);
 
-  // On restart: any job stuck in 'running' was interrupted — put back in queue
-  const stuck = await localExecute(
-    `UPDATE analysis_jobs SET status = 'queued', started_at = NULL WHERE status = 'running'`
+  // On restart: jobs with partial output_html are salvaged as 'done'; others become 'error'
+  const salvaged = await localExecute(
+    `UPDATE analysis_jobs
+     SET status = 'done', finished_at = NOW()
+     WHERE status = 'running'
+       AND output_html IS NOT NULL AND output_html <> ''`
   );
-  if (stuck.rowCount > 0) {
-    logger.warn({ count: stuck.rowCount }, "job-queue: jobs em 'running' na inicialização — resetados para 'queued'");
+  if (salvaged.rowCount > 0) {
+    logger.warn(
+      { count: salvaged.rowCount },
+      "job-queue: jobs interrompidos com saída parcial — marcados como 'done'"
+    );
+  }
+
+  const interrupted = await localExecute(
+    `UPDATE analysis_jobs
+     SET status = 'error',
+         error_message = 'Servidor reiniciado durante análise. Por favor, tente novamente.',
+         finished_at = NOW()
+     WHERE status = 'running'`
+  );
+  if (interrupted.rowCount > 0) {
+    logger.warn(
+      { count: interrupted.rowCount },
+      "job-queue: jobs interrompidos sem saída — marcados como 'error'"
+    );
   }
 
   // Auto-expire jobs stuck as queued for more than 24 hours
