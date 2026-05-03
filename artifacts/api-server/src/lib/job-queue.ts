@@ -1,19 +1,26 @@
 import {
   localQueryOne,
-  setJobRunning,
   setJobDone,
   setJobError,
   setJobCancelled,
   appendJobEvent,
-  getNextQueuedJob,
+  claimNextQueuedJob,
 } from "./local-db";
 import { runAnalysis, type AnalysisEvent } from "./run-analysis";
+import { getActiveProvider } from "./llm";
 import { logger } from "./logger";
+
+/** Max parallel jobs per provider */
+const CONCURRENCY: Record<string, number> = {
+  anthropic: 3,
+  ollama: 1,
+};
+const DEFAULT_CONCURRENCY = 1;
 
 type Listener = (event: AnalysisEvent) => void;
 
 class JobQueue {
-  private processing = false;
+  private runningCount = 0;
   private listeners = new Map<string, Set<Listener>>();
   private abortControllers = new Map<string, AbortController>();
 
@@ -41,14 +48,29 @@ class JobQueue {
     }
   }
 
-  /** Signal the queue to start processing. Non-blocking. */
+  private get concurrencyLimit(): number {
+    const provider = getActiveProvider();
+    return provider ? (CONCURRENCY[provider] ?? DEFAULT_CONCURRENCY) : DEFAULT_CONCURRENCY;
+  }
+
+  /**
+   * Signal the queue to fill available worker slots. Non-blocking.
+   * Safe to call multiple times — only spawns up to (limit - running) workers.
+   */
   kick() {
-    if (!this.processing) {
-      this.processNext().catch((err) => {
-        logger.error({ err }, "job-queue: erro inesperado no worker");
-        this.processing = false;
-      });
+    const limit = this.concurrencyLimit;
+    const slots = limit - this.runningCount;
+    for (let i = 0; i < slots; i++) {
+      this.spawnWorker();
     }
+  }
+
+  private spawnWorker(): void {
+    this.processOne().catch((err) => {
+      logger.error({ err }, "job-queue: erro inesperado no worker");
+      this.runningCount = Math.max(0, this.runningCount - 1);
+      this.kick();
+    });
   }
 
   /** Cancel a job — queued jobs are cancelled immediately; running jobs are aborted. */
@@ -76,69 +98,75 @@ class JobQueue {
     return false;
   }
 
-  private async processNext(): Promise<void> {
-    this.processing = true;
+  /**
+   * Attempts to claim one queued job and run it.
+   * If no job is available, returns immediately.
+   * On completion, calls kick() to fill the freed slot.
+   */
+  private async processOne(): Promise<void> {
+    const job = await claimNextQueuedJob();
+    if (!job) return; // nothing to do
+
+    this.runningCount++;
+    const { id: jobId } = job;
+
+    const provider = getActiveProvider() ?? "none";
+    logger.info(
+      { jobId, workflowKey: job.workflowKey, provider, running: this.runningCount },
+      "job-queue: iniciando job"
+    );
+
+    const ctrl = new AbortController();
+    this.abortControllers.set(jobId, ctrl);
+
+    // Job is already marked 'running' by claimNextQueuedJob — just notify listeners
+    this.emit(jobId, { type: "running" });
+
+    let outputHtml = "";
+    let failed = false;
+    let cancelled = false;
+
     try {
-      while (true) {
-        const job = await getNextQueuedJob();
-        if (!job) break;
+      outputHtml = await runAnalysis(
+        {
+          userId: job.userId,
+          sessionId: job.sessionId ?? undefined,
+          workflowKey: job.workflowKey,
+          module: job.module,
+          formData: job.payload.formData as Record<string, unknown> | undefined,
+          pasteText: job.payload.pasteText as string | undefined,
+          observations: job.payload.observations as string | undefined,
+          continueFrom: job.payload.continueFrom as string | undefined,
+          thinkMode: job.thinkMode,
+        },
+        (event) => {
+          this.emit(jobId, event);
+          appendJobEvent(jobId, event).catch(() => {});
+        },
+        ctrl.signal
+      );
 
-        const { id: jobId } = job;
-        logger.info({ jobId, workflowKey: job.workflowKey }, "job-queue: iniciando job");
-
-        const ctrl = new AbortController();
-        this.abortControllers.set(jobId, ctrl);
-
-        await setJobRunning(jobId);
-        this.emit(jobId, { type: "running" });
-
-        let outputHtml = "";
-        let failed = false;
-        let cancelled = false;
-
-        try {
-          outputHtml = await runAnalysis(
-            {
-              userId: job.userId,
-              sessionId: job.sessionId ?? undefined,
-              workflowKey: job.workflowKey,
-              module: job.module,
-              formData: job.payload.formData as Record<string, unknown> | undefined,
-              pasteText: job.payload.pasteText as string | undefined,
-              observations: job.payload.observations as string | undefined,
-              continueFrom: job.payload.continueFrom as string | undefined,
-              thinkMode: job.thinkMode,
-            },
-            (event) => {
-              this.emit(jobId, event);
-              // Persist progress to DB (best-effort, non-blocking)
-              appendJobEvent(jobId, event).catch(() => {});
-            },
-            ctrl.signal
-          );
-
-          cancelled = ctrl.signal.aborted;
-        } catch (err: unknown) {
-          failed = true;
-          const msg = err instanceof Error ? err.message : "Erro interno";
-          this.emit(jobId, { type: "error", message: msg });
-          await setJobError(jobId, msg).catch(() => {});
-          logger.error({ err, jobId }, "job-queue: erro no job");
-        } finally {
-          this.abortControllers.delete(jobId);
-        }
-
-        if (cancelled) {
-          await setJobCancelled(jobId).catch(() => {});
-        } else if (!failed) {
-          await setJobDone(jobId, outputHtml).catch(() => {});
-        }
-
-        logger.info({ jobId, cancelled, failed }, "job-queue: job finalizado");
-      }
+      cancelled = ctrl.signal.aborted;
+    } catch (err: unknown) {
+      failed = true;
+      const msg = err instanceof Error ? err.message : "Erro interno";
+      this.emit(jobId, { type: "error", message: msg });
+      await setJobError(jobId, msg).catch(() => {});
+      logger.error({ err, jobId }, "job-queue: erro no job");
     } finally {
-      this.processing = false;
+      this.abortControllers.delete(jobId);
+      this.runningCount = Math.max(0, this.runningCount - 1);
+      // Always try to pick up the next job when a slot frees up
+      this.kick();
     }
+
+    if (cancelled) {
+      await setJobCancelled(jobId).catch(() => {});
+    } else if (!failed) {
+      await setJobDone(jobId, outputHtml).catch(() => {});
+    }
+
+    logger.info({ jobId, cancelled, failed, running: this.runningCount }, "job-queue: job finalizado");
   }
 }
 

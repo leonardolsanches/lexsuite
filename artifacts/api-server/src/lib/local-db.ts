@@ -241,6 +241,30 @@ export async function getNextQueuedJob(): Promise<AnalysisJob | null> {
 }
 
 /**
+ * Atomically claims the next queued job and marks it as 'running'.
+ * Uses FOR UPDATE SKIP LOCKED so concurrent workers never claim the same job.
+ * Returns null if no queued job is available.
+ */
+export async function claimNextQueuedJob(): Promise<AnalysisJob | null> {
+  const rows = await localQuery(
+    `WITH next_job AS (
+       SELECT id FROM analysis_jobs
+       WHERE status = 'queued'
+       ORDER BY queued_at ASC
+       LIMIT 1
+       FOR UPDATE SKIP LOCKED
+     )
+     UPDATE analysis_jobs
+     SET status = 'running', started_at = NOW()
+     FROM next_job
+     WHERE analysis_jobs.id = next_job.id
+     RETURNING analysis_jobs.*`
+  );
+  if (!rows[0]) return null;
+  return mapJob(rows[0]);
+}
+
+/**
  * Returns the 1-based position of a queued job in the queue.
  * Position 1 = next to run. Returns null if job is not queued.
  */
