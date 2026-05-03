@@ -16,6 +16,8 @@ export interface AnalysisParams {
   observations?: string;
   continueFrom?: string;
   thinkMode?: "fast" | "deep";
+  /** Optional Ollama model override (uses server default if omitted). */
+  model?: string;
 }
 
 export type AnalysisEvent =
@@ -79,6 +81,7 @@ export async function runAnalysis(
     observations,
     continueFrom,
     thinkMode,
+    model,
   } = params;
 
   const sendStep = (id: string, label: string, icon: string) =>
@@ -275,7 +278,7 @@ export async function runAnalysis(
       (text) => { fullOutput += text; },
       continueFrom,
       onStatus,
-      { thinkMode: thinkMode === "fast" ? "fast" : "deep" },
+      { thinkMode: thinkMode === "fast" ? "fast" : "deep", modelOverride: model },
       signal
     );
 

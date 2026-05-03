@@ -59,6 +59,8 @@ function buildDateContext(): string {
 
 export interface StreamAnalysisOptions {
   thinkMode?: OllamaThinkMode;
+  /** Override the default Ollama model for this request. */
+  modelOverride?: string;
 }
 
 /**
@@ -103,7 +105,7 @@ export async function streamAnalysis(
 
   // ── Ollama (primário) ─────────────────────────────────────────────────────
   const baseUrl = getOllamaBaseUrl()!;
-  const model = getOllamaModelParecer();
+  const model = options.modelOverride?.trim() || getOllamaModelParecer();
   const thinkMode = options.thinkMode ?? "deep";
 
   logger.info({ model, baseUrl, thinkMode }, "Streaming via Ollama local");

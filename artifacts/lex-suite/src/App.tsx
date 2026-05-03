@@ -13,6 +13,7 @@ import Dashboard from "@/pages/Dashboard";
 import ModuleView from "@/pages/ModuleView";
 import Documents from "@/pages/Documents";
 import Calculadora from "@/pages/Calculadora";
+import JobsPage from "@/pages/JobsPage";
 
 const apiUrl = import.meta.env.VITE_API_URL as string | undefined;
 if (apiUrl) setBaseUrl(apiUrl);
@@ -219,6 +220,12 @@ function ClerkProviderWithRoutes() {
             </Route>
             <Route path="/app/executio">
               <ProtectedRoute component={() => <ModuleView module="executio" />} />
+            </Route>
+            <Route path="/app/rural/jobs">
+              <ProtectedRoute component={() => <JobsPage module="rural" />} />
+            </Route>
+            <Route path="/app/executio/jobs">
+              <ProtectedRoute component={() => <JobsPage module="executio" />} />
             </Route>
             <Route path="/app/rural/documents">
               <ProtectedRoute component={() => <Documents module="rural" />} />

@@ -5,9 +5,12 @@ import {
   getJob,
   getUserJobs,
   getJobQueuePosition,
+  deleteJob,
+  prioritizeJob,
   type AnalysisJob,
 } from "../lib/local-db";
 import { jobQueue } from "../lib/job-queue";
+import { listOllamaModels, getOllamaBaseUrl } from "../lib/ollama";
 import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
@@ -40,6 +43,7 @@ router.post("/jobs", requireAuth, async (req, res): Promise<void> => {
     observations,
     continueFrom,
     thinkMode,
+    model,
   } = req.body;
 
   if (!workflowKey || !module) {
@@ -53,7 +57,7 @@ router.post("/jobs", requireAuth, async (req, res): Promise<void> => {
       sessionId: sessionId ? Number(sessionId) : undefined,
       workflowKey,
       module,
-      payload: { formData, pasteText, observations, continueFrom },
+      payload: { formData, pasteText, observations, continueFrom, model: model || undefined },
       thinkMode: thinkMode === "fast" ? "fast" : "deep",
     });
 
@@ -196,11 +200,10 @@ router.get("/jobs/:id/events", requireAuth, async (req, res): Promise<void> => {
   });
 });
 
-// ── DELETE /api/jobs/:id — cancel a job ─────────────────────────────────────
-router.delete("/jobs/:id", requireAuth, async (req, res): Promise<void> => {
+// ── POST /api/jobs/:id/cancel — cancel a queued or running job ───────────────
+router.post("/jobs/:id/cancel", requireAuth, async (req, res): Promise<void> => {
   const userId = (req as any).userId as string;
   const jobId = String(req.params.id);
-
   try {
     const cancelled = await jobQueue.cancel(jobId, userId);
     if (!cancelled) {
@@ -209,7 +212,88 @@ router.delete("/jobs/:id", requireAuth, async (req, res): Promise<void> => {
     }
     res.json({ ok: true });
   } catch (err: any) {
+    logger.error({ err, jobId }, "POST /jobs/:id/cancel: erro");
+    res.status(500).json({ error: err.message ?? "Erro interno" });
+  }
+});
+
+// ── DELETE /api/jobs/:id — permanently delete a job (cannot delete running) ──
+router.delete("/jobs/:id", requireAuth, async (req, res): Promise<void> => {
+  const userId = (req as any).userId as string;
+  const jobId = String(req.params.id);
+  try {
+    const deleted = await deleteJob(jobId, userId);
+    if (!deleted) {
+      res.status(404).json({ error: "Job não encontrado ou está em execução" });
+      return;
+    }
+    res.json({ ok: true });
+  } catch (err: any) {
     logger.error({ err, jobId }, "DELETE /jobs/:id: erro");
+    res.status(500).json({ error: err.message ?? "Erro interno" });
+  }
+});
+
+// ── POST /api/jobs/:id/retry — re-queue a finished/failed job ────────────────
+router.post("/jobs/:id/retry", requireAuth, async (req, res): Promise<void> => {
+  const userId = (req as any).userId as string;
+  const jobId = String(req.params.id);
+  try {
+    const job = await getJob(jobId, userId);
+    if (!job) {
+      res.status(404).json({ error: "Job não encontrado" });
+      return;
+    }
+    if (job.status === "running" || job.status === "queued") {
+      res.status(400).json({ error: "Job já está ativo ou na fila" });
+      return;
+    }
+    const newJobId = await createJob({
+      userId,
+      sessionId: job.sessionId ?? undefined,
+      workflowKey: job.workflowKey,
+      module: job.module,
+      payload: job.payload,
+      thinkMode: job.thinkMode,
+    });
+    jobQueue.kick();
+    logger.info({ originalJobId: jobId, newJobId }, "job re-enfileirado");
+    res.status(202).json({ jobId: newJobId });
+  } catch (err: any) {
+    logger.error({ err, jobId }, "POST /jobs/:id/retry: erro");
+    res.status(500).json({ error: err.message ?? "Erro interno" });
+  }
+});
+
+// ── PATCH /api/jobs/:id/prioritize — move job to front of queue ──────────────
+router.patch("/jobs/:id/prioritize", requireAuth, async (req, res): Promise<void> => {
+  const userId = (req as any).userId as string;
+  const jobId = String(req.params.id);
+  try {
+    const ok = await prioritizeJob(jobId, userId);
+    if (!ok) {
+      res.status(404).json({ error: "Job não encontrado ou não está na fila" });
+      return;
+    }
+    res.json({ ok: true });
+  } catch (err: any) {
+    logger.error({ err, jobId }, "PATCH /jobs/:id/prioritize: erro");
+    res.status(500).json({ error: err.message ?? "Erro interno" });
+  }
+});
+
+// ── GET /api/ollama/models — list available Ollama models ────────────────────
+router.get("/ollama/models", requireAuth, async (_req, res): Promise<void> => {
+  try {
+    const baseUrl = getOllamaBaseUrl();
+    if (!baseUrl) {
+      res.json({ models: [] });
+      return;
+    }
+    const models = await listOllamaModels(baseUrl);
+    res.json({ models });
+  } catch (err: any) {
+    logger.error({ err }, "GET /ollama/models: erro");
     res.status(500).json({ error: err.message ?? "Erro interno" });
   }
 });

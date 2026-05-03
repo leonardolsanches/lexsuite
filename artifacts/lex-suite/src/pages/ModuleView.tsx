@@ -122,25 +122,8 @@ export default function ModuleView({ module }: ModuleViewProps) {
 
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [thinkMode, setThinkMode] = useState<'deep' | 'fast'>('deep');
-
-  // ── Jobs panel ─────────────────────────────────────────────────────────────
-  type SidebarJob = {
-    id: string; workflowKey: string; module: string; status: string;
-    outputHtml?: string | null; errorMessage?: string | null;
-    queuedAt: string; startedAt?: string | null; finishedAt?: string | null;
-  };
-  const [sidebarJobs, setSidebarJobs] = useState<SidebarJob[]>([]);
-  const [jobsPanelOpen, setJobsPanelOpen] = useState(true);
-
-  const timeAgo = (dateStr: string) => {
-    const diff = Date.now() - new Date(dateStr).getTime();
-    const mins = Math.floor(diff / 60000);
-    if (mins < 1) return 'agora';
-    if (mins < 60) return `${mins}min`;
-    const hours = Math.floor(mins / 60);
-    if (hours < 24) return `${hours}h`;
-    return `${Math.floor(hours / 24)}d`;
-  };
+  const [selectedModel, setSelectedModel] = useState<string>('');
+  const [availableModels, setAvailableModels] = useState<string[]>([]);
 
   // ── LLM connectivity status ───────────────────────────────────────────────
   type LlmStatus = 'checking' | 'online' | 'fallback' | 'degraded' | 'offline' | 'unconfigured';
@@ -179,36 +162,55 @@ export default function ModuleView({ module }: ModuleViewProps) {
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [isStreaming]);
 
-  // Poll jobs for the sidebar panel
+  // Fetch available Ollama models
   useEffect(() => {
     if (!authLoaded) return;
-    let cancelled = false;
-    const fetchSidebarJobs = async () => {
+    (async () => {
       try {
         const token = await getToken();
         const headers: Record<string, string> = {};
         if (token) headers['Authorization'] = `Bearer ${token}`;
-        const res = await fetch(`${apiBase}/api/jobs?limit=12&module=${module}`, { headers });
-        if (!res.ok || cancelled) return;
-        const jobs = await res.json() as SidebarJob[];
-        if (!cancelled) setSidebarJobs(jobs);
+        const res = await fetch(`${apiBase}/api/ollama/models`, { headers });
+        if (!res.ok) return;
+        const data = await res.json() as { models: string[] };
+        setAvailableModels(data.models ?? []);
       } catch { /* silent */ }
-    };
-    fetchSidebarJobs();
-    // Poll more frequently when active jobs exist
-    const getInterval = () =>
-      sidebarJobs.some(j => j.status === 'running' || j.status === 'queued') ? 5000 : 30000;
-    let timer = setInterval(() => { fetchSidebarJobs(); }, getInterval());
-    // Reschedule when active status changes
-    const reschedule = setInterval(() => {
-      clearInterval(timer);
-      timer = setInterval(fetchSidebarJobs, getInterval());
-    }, 10000);
-    return () => { cancelled = true; clearInterval(timer); clearInterval(reschedule); };
+    })();
+  }, [authLoaded, getToken]);
+
+  // Handle ?openJob=<id> URL param — open a specific job as a tab
+  useEffect(() => {
+    if (!authLoaded) return;
+    const params = new URLSearchParams(window.location.search);
+    const openJobId = params.get('openJob');
+    if (!openJobId) return;
+    // Clear the param from URL without triggering a navigation
+    const newUrl = window.location.pathname;
+    window.history.replaceState(null, '', newUrl);
+    (async () => {
+      try {
+        const token = await getToken();
+        const headers: Record<string, string> = {};
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+        const res = await fetch(`${apiBase}/api/jobs/${openJobId}`, { headers });
+        if (!res.ok) return;
+        const job = await res.json() as {
+          id: string; workflowKey: string; module: string; status: string;
+          outputHtml?: string | null; errorMessage?: string | null;
+          queuedAt: string; startedAt?: string | null; finishedAt?: string | null;
+        };
+        if (job.module !== module) return;
+        await handleOpenJobTab(job);
+      } catch { /* silent */ }
+    })();
   }, [authLoaded, module]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Open a job from the sidebar as a tab
-  const handleOpenJobTab = useCallback(async (job: SidebarJob) => {
+  // Open a job as a tab (used by reconnect on mount + ?openJob= param)
+  const handleOpenJobTab = useCallback(async (job: {
+    id: string; workflowKey: string; module: string; status: string;
+    outputHtml?: string | null; errorMessage?: string | null;
+    queuedAt: string; startedAt?: string | null; finishedAt?: string | null;
+  }) => {
     // If a tab for this job already exists, just focus it
     const existing = tabsRef.current.find(t => t.jobId === job.id);
     if (existing) { setActiveTabId(existing.id); return; }
@@ -565,6 +567,7 @@ export default function ModuleView({ module }: ModuleViewProps) {
       module,
       mode: tab.mode,
       thinkMode,
+      model: selectedModel || undefined,
       formData: tab.mode === 'form' ? payloadFormData : undefined,
       pasteText: tab.mode === 'paste'
         ? tab.pasteText
@@ -1037,6 +1040,29 @@ ${bodyHtml}
             {llmStatus === 'unconfigured' && <><WifiOff className="w-3 h-3" /> IA não configurada</>}
             {llmStatus === 'checking' && <><Loader2 className="w-3 h-3 animate-spin" /> Verificando...</>}
           </button>
+          {/* Quick model selector — only shown when Ollama has multiple models */}
+          {availableModels.length > 1 && (
+            <div className="relative flex items-center">
+              <select
+                value={selectedModel}
+                onChange={(e) => setSelectedModel(e.target.value)}
+                title="Modelo Ollama para a próxima análise"
+                className="h-7 pl-2 pr-6 text-xs bg-background border border-border rounded-md text-foreground appearance-none cursor-pointer hover:border-primary/50 focus:outline-none focus:border-primary/50 max-w-[140px] truncate"
+              >
+                <option value="">Modelo padrão</option>
+                {availableModels.map(m => (
+                  <option key={m} value={m}>{m}</option>
+                ))}
+              </select>
+              <ChevronDown className="absolute right-1.5 top-1/2 -translate-y-1/2 w-3 h-3 pointer-events-none text-muted-foreground" />
+            </div>
+          )}
+          <Link href={`/app/${module}/jobs`}>
+            <Button variant="ghost" size="sm" className="text-muted-foreground gap-2">
+              <Activity className="w-4 h-4" />
+              Fila
+            </Button>
+          </Link>
           <Link href={`/app/${module}/documents`}>
             <Button variant="ghost" size="sm" className="text-muted-foreground gap-2">
               <Database className="w-4 h-4" />
@@ -1141,100 +1167,13 @@ ${bodyHtml}
               </div>
             )}
 
-            {/* ── Jobs panel ─────────────────────────────────────────────── */}
-            <div className="pt-2 border-t border-border/40 mt-2">
-              <button
-                onClick={() => setJobsPanelOpen(o => !o)}
-                className="w-full px-2 py-1 flex items-center justify-between text-xs font-medium text-muted-foreground/70 uppercase tracking-wider hover:text-muted-foreground transition-colors"
-              >
-                <div className="flex items-center gap-1.5">
-                  <Activity className="w-3 h-3" />
-                  Fila de Análises
-                  {sidebarJobs.some(j => j.status === 'running' || j.status === 'queued') && (
-                    <span className="ml-1 text-[9px] font-semibold text-primary bg-primary/15 px-1.5 py-0.5 rounded-full">
-                      {sidebarJobs.filter(j => j.status === 'running' || j.status === 'queued').length} ativo
-                    </span>
-                  )}
-                </div>
-                {jobsPanelOpen
-                  ? <ChevronDown className="w-3 h-3" />
-                  : <ChevronRight className="w-3 h-3" />}
-              </button>
-
-              {jobsPanelOpen && (
-                <div className="mt-1 space-y-0.5">
-                  {sidebarJobs.length === 0 ? (
-                    <p className="px-3 py-2 text-[11px] text-muted-foreground/40">Nenhum job recente.</p>
-                  ) : (
-                    sidebarJobs.map(job => {
-                      const wf = moduleWorkflows.find(w => w.key === job.workflowKey);
-                      const name = wf?.name ?? job.workflowKey;
-                      const isInTab = tabsRef.current.some(t => t.jobId === job.id);
-                      const elapsed = job.startedAt && !job.finishedAt
-                        ? Math.floor((Date.now() - new Date(job.startedAt).getTime()) / 1000)
-                        : null;
-                      const elapsedStr = elapsed != null
-                        ? elapsed < 60 ? `${elapsed}s` : `${Math.floor(elapsed / 60)}m${elapsed % 60}s`
-                        : null;
-                      const ts = job.finishedAt ?? job.startedAt ?? job.queuedAt;
-
-                      return (
-                        <button
-                          key={job.id}
-                          onClick={() => handleOpenJobTab(job)}
-                          title={isInTab ? 'Já aberto — clique para focar' : name}
-                          className={`w-full text-left px-2 py-1.5 rounded-md transition-colors border text-xs group ${
-                            job.status === 'running'
-                              ? 'border-primary/20 bg-primary/5 hover:bg-primary/10'
-                              : job.status === 'queued'
-                              ? 'border-amber-500/20 bg-amber-500/5 hover:bg-amber-500/10'
-                              : job.status === 'done'
-                              ? 'border-transparent hover:bg-muted/50'
-                              : job.status === 'error'
-                              ? 'border-destructive/15 bg-destructive/5 hover:bg-destructive/10'
-                              : 'border-transparent hover:bg-muted/30'
-                          }`}
-                        >
-                          <div className="flex items-center gap-1.5 min-w-0">
-                            {/* Status icon */}
-                            {job.status === 'running' && <Loader2 className="w-3 h-3 shrink-0 text-primary animate-spin" />}
-                            {job.status === 'queued'  && <Clock className="w-3 h-3 shrink-0 text-amber-500" />}
-                            {job.status === 'done'    && <CheckCircle2 className="w-3 h-3 shrink-0 text-emerald-500" />}
-                            {job.status === 'error'   && <AlertCircle className="w-3 h-3 shrink-0 text-destructive" />}
-                            {job.status === 'cancelled' && <Square className="w-3 h-3 shrink-0 text-muted-foreground/50" />}
-
-                            {/* Name */}
-                            <span className={`truncate flex-1 font-medium ${
-                              job.status === 'running' ? 'text-primary' :
-                              job.status === 'queued'  ? 'text-amber-500' :
-                              job.status === 'done'    ? 'text-foreground' :
-                              job.status === 'error'   ? 'text-destructive' :
-                              'text-muted-foreground'
-                            }`}>{name}</span>
-
-                            {/* Time */}
-                            <span className="text-[10px] text-muted-foreground/50 shrink-0 font-mono tabular-nums">
-                              {job.status === 'running' && elapsedStr ? elapsedStr : timeAgo(ts)}
-                            </span>
-                          </div>
-
-                          {/* Error hint */}
-                          {job.status === 'error' && job.errorMessage && (
-                            <div className="mt-0.5 ml-4.5 text-[10px] text-destructive/60 truncate">
-                              {job.errorMessage}
-                            </div>
-                          )}
-
-                          {/* "já aberto" badge */}
-                          {isInTab && (
-                            <div className="mt-0.5 ml-4.5 text-[9px] text-muted-foreground/40">já aberto</div>
-                          )}
-                        </button>
-                      );
-                    })
-                  )}
-                </div>
-              )}
+            {/* ── Jobs page link ──────────────────────────────────────── */}
+            <div className="pt-2 border-t border-border/40 mt-2 px-2">
+              <Link href={`/app/${module}/jobs`} className="flex items-center gap-2 px-2 py-2 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors group">
+                <Activity className="w-3.5 h-3.5 shrink-0" />
+                <span className="flex-1">Fila de Análises</span>
+                <ChevronRight className="w-3 h-3 opacity-40 group-hover:opacity-100 transition-opacity" />
+              </Link>
             </div>
           </ScrollArea>
         </div>

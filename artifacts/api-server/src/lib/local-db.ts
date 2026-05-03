@@ -235,6 +235,25 @@ export async function setJobCancelled(jobId: string): Promise<void> {
   );
 }
 
+/** Permanently removes a job from the DB. Cannot delete a running job. */
+export async function deleteJob(jobId: string, userId: string): Promise<boolean> {
+  const result = await localExecute(
+    `DELETE FROM analysis_jobs WHERE id = $1 AND user_id = $2 AND status != 'running'`,
+    [jobId, userId]
+  );
+  return result.rowCount > 0;
+}
+
+/** Moves a queued job to the front by back-dating its queued_at. */
+export async function prioritizeJob(jobId: string, userId: string): Promise<boolean> {
+  const result = await localExecute(
+    `UPDATE analysis_jobs SET queued_at = NOW() - INTERVAL '100 years'
+     WHERE id = $1 AND user_id = $2 AND status = 'queued'`,
+    [jobId, userId]
+  );
+  return result.rowCount > 0;
+}
+
 export async function getNextQueuedJob(): Promise<AnalysisJob | null> {
   const row = await localQueryOne(
     `SELECT * FROM analysis_jobs WHERE status = 'queued' ORDER BY queued_at ASC LIMIT 1`

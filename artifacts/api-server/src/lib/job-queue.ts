@@ -151,6 +151,7 @@ class JobQueue {
           observations: job.payload.observations as string | undefined,
           continueFrom: job.payload.continueFrom as string | undefined,
           thinkMode: job.thinkMode,
+          model: job.payload.model as string | undefined,
         },
         (event) => {
           this.emit(jobId, event);
