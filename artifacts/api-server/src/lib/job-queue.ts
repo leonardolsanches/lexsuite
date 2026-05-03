@@ -67,8 +67,9 @@ class JobQueue {
 
   private spawnWorker(): void {
     this.processOne().catch((err) => {
+      // processOne() always decrements runningCount before rethrowing,
+      // so we must NOT decrement again here — just log and try next job.
       logger.error({ err }, "job-queue: erro inesperado no worker");
-      this.runningCount = Math.max(0, this.runningCount - 1);
       this.kick();
     });
   }
