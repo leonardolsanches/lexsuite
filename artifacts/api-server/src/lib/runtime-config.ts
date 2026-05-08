@@ -4,38 +4,54 @@
  * Stores operator-managed configuration (API keys, provider settings) at runtime.
  * Priority order for each key:
  *   1. In-memory override (set via /api/admin/llm-config)
- *   2. DB Bridge system_config table (persisted across restarts)
+ *   2. Local PostgreSQL system_config table (persisted across restarts, always available)
  *   3. Environment variable (deploy-time default)
+ *
+ * DB Bridge is NOT used here — all config lives in Replit local PostgreSQL so
+ * the server starts cleanly even when the Mini PC tunnel is offline.
  */
 
-import { bridgeExecute, bridgeQueryOne, isDbBridgeConfigured } from "./bridge";
+import { localExecute, localQuery, saveLocalDbConfig, deleteLocalDbConfig } from "./local-db";
+import { setDbBridgeUrl } from "./bridge";
 import { logger } from "./logger";
 
 const memoryConfig = new Map<string, string>();
 
-/** Ensures the system_config table exists in the DB Bridge database. */
+/** Ensures the system_config table exists in local PostgreSQL. */
 async function ensureTable(): Promise<void> {
-  await bridgeExecute(`
+  await localExecute(`
     CREATE TABLE IF NOT EXISTS system_config (
-      key   VARCHAR(128) PRIMARY KEY,
-      value TEXT NOT NULL,
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      key        VARCHAR(128) PRIMARY KEY,
+      value      TEXT         NOT NULL,
+      updated_at TIMESTAMPTZ  NOT NULL DEFAULT NOW()
     )
   `);
 }
 
-/** Loads all config rows from the DB into memory on server startup. */
+/** Loads all config rows from local PostgreSQL into memory on server startup. */
 export async function loadConfigFromDb(): Promise<void> {
-  if (!isDbBridgeConfigured()) return;
   try {
     await ensureTable();
-    const rows = await bridgeExecute(`SELECT key, value FROM system_config`);
-    for (const row of rows.rows) {
-      const k = row["key"] as string;
-      const v = row["value"] as string;
-      if (k && v) memoryConfig.set(k, v);
+    const rows = await localQuery<{ key: string; value: string }>(
+      `SELECT key, value FROM system_config`
+    );
+    for (const row of rows) {
+      if (row.key && row.value) memoryConfig.set(row.key, row.value);
     }
-    logger.info({ count: rows.rows.length }, "runtime-config: loaded from DB");
+    // Also load db_bridge_url from local_config and activate it in the bridge module
+    const bridgeRows = await localQuery<{ key: string; value: string }>(
+      `SELECT key, value FROM local_config WHERE key = 'db_bridge_url'`
+    );
+    for (const row of bridgeRows) {
+      if (row.key && row.value) {
+        memoryConfig.set(row.key, row.value);
+        if (row.key === "db_bridge_url") {
+          setDbBridgeUrl(row.value);
+          logger.info("runtime-config: DB_BRIDGE_URL carregado do banco local");
+        }
+      }
+    }
+    logger.info({ count: rows.length }, "runtime-config: configurações carregadas do banco local");
   } catch (err) {
     logger.warn({ err }, "runtime-config: could not load from DB (non-fatal)");
   }
@@ -43,43 +59,55 @@ export async function loadConfigFromDb(): Promise<void> {
 
 /**
  * Gets a config value.
- * Priority: in-memory → DB → env var
+ * Priority: in-memory → env var
  */
 export function getConfig(key: string, envFallback?: string): string | null {
   return memoryConfig.get(key) ?? envFallback ?? null;
 }
 
 /**
- * Sets a config value in memory and persists to DB Bridge.
+ * Sets a config value in memory and persists to local PostgreSQL.
+ * db_bridge_url is routed to local_config for compatibility with the bridge module.
  */
 export async function setConfig(key: string, value: string): Promise<void> {
   memoryConfig.set(key, value);
 
-  if (!isDbBridgeConfigured()) return;
+  // db_bridge_url is stored in local_config (shared with bridge module)
+  if (key === "db_bridge_url") {
+    await saveLocalDbConfig(key, value).catch((err) => {
+      logger.warn({ err, key }, "runtime-config: could not persist db_bridge_url to local_config");
+    });
+    return;
+  }
+
   try {
     await ensureTable();
-    await bridgeExecute(
+    await localExecute(
       `INSERT INTO system_config (key, value, updated_at)
        VALUES ($1, $2, NOW())
        ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
       [key, value]
     );
   } catch (err) {
-    logger.warn({ err, key }, "runtime-config: could not persist to DB (non-fatal)");
+    logger.warn({ err, key }, "runtime-config: could not persist to local DB (non-fatal)");
   }
 }
 
 /**
- * Deletes a config value from memory and DB.
+ * Deletes a config value from memory and local PostgreSQL.
  */
 export async function deleteConfig(key: string): Promise<void> {
   memoryConfig.delete(key);
 
-  if (!isDbBridgeConfigured()) return;
+  if (key === "db_bridge_url") {
+    await deleteLocalDbConfig(key).catch(() => {});
+    return;
+  }
+
   try {
-    await bridgeExecute(`DELETE FROM system_config WHERE key = $1`, [key]);
+    await localExecute(`DELETE FROM system_config WHERE key = $1`, [key]);
   } catch (err) {
-    logger.warn({ err, key }, "runtime-config: could not delete from DB (non-fatal)");
+    logger.warn({ err, key }, "runtime-config: could not delete from local DB (non-fatal)");
   }
 }
 
@@ -92,7 +120,6 @@ export function isAdminUser(userId: string): boolean {
 
   if (adminIds.length > 0) return adminIds.includes(userId);
 
-  // Fallback: first user in memory is treated as admin when no ADMIN_USER_IDS is set.
-  // This is intentionally permissive for solo-operator setups.
+  // Fallback: first user is treated as admin when no ADMIN_USER_IDS is set.
   return true;
 }
