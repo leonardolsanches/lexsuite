@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { X, Loader2, CheckCircle2, XCircle, Eye, EyeOff, Cpu, Cloud, Wifi } from "lucide-react";
+import { X, Loader2, CheckCircle2, XCircle, Eye, EyeOff, Cpu, Cloud, Wifi, Database } from "lucide-react";
 import { useAuth } from "@clerk/react";
 
 const apiBase = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/+$/, "") ?? "";
@@ -18,6 +18,11 @@ interface LlmConfig {
     urlSource: "database" | "env" | "none";
     model: string;
   };
+  dbBridge: {
+    configured: boolean;
+    url: string | null;
+    urlSource: "database" | "env" | "none";
+  };
 }
 
 const CLAUDE_MODELS = [
@@ -33,20 +38,26 @@ interface Props {
   onSaved: () => void;
 }
 
+type PingResult = "ok" | "fail" | null;
+
 export default function LLMSettingsModal({ open, onClose, onSaved }: Props) {
   const { getToken } = useAuth();
   const [config, setConfig] = useState<LlmConfig | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [testing, setTesting] = useState(false);
-  const [testResult, setTestResult] = useState<"ok" | "fail" | null>(null);
+  const [saveMsg, setSaveMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
+
   const [showKey, setShowKey] = useState(false);
   const [apiKey, setApiKey] = useState("");
   const [model, setModel] = useState("claude-opus-4-5");
   const [ollamaUrl, setOllamaUrl] = useState("");
-  const [saveMsg, setSaveMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
+  const [dbBridgeUrl, setDbBridgeUrl] = useState("");
 
-  /** Fetch wrapper that injects the Clerk JWT — needed for cross-origin calls (Render). */
+  const [pingOllama, setPingOllama] = useState<PingResult>(null);
+  const [pingOllamaLoading, setPingOllamaLoading] = useState(false);
+  const [pingBridge, setPingBridge] = useState<PingResult>(null);
+  const [pingBridgeLoading, setPingBridgeLoading] = useState(false);
+
   const authFetch = useCallback(async (url: string, init?: RequestInit): Promise<Response> => {
     const token = await getToken();
     return fetch(url, {
@@ -62,9 +73,11 @@ export default function LLMSettingsModal({ open, onClose, onSaved }: Props) {
     if (!open) return;
     setLoading(true);
     setSaveMsg(null);
-    setTestResult(null);
+    setPingOllama(null);
+    setPingBridge(null);
     setApiKey("");
     setOllamaUrl("");
+    setDbBridgeUrl("");
     authFetch(`${apiBase}/api/admin/llm-config`)
       .then((r) => r.json())
       .then((data: LlmConfig) => {
@@ -80,7 +93,8 @@ export default function LLMSettingsModal({ open, onClose, onSaved }: Props) {
   const hasChanges =
     apiKey !== "" ||
     model !== config?.anthropic.model ||
-    ollamaUrl !== "";
+    ollamaUrl !== "" ||
+    dbBridgeUrl !== "";
 
   async function handleSave() {
     setSaving(true);
@@ -90,6 +104,7 @@ export default function LLMSettingsModal({ open, onClose, onSaved }: Props) {
       if (apiKey !== "") body.anthropicApiKey = apiKey;
       if (model !== config?.anthropic.model) body.anthropicModel = model;
       if (ollamaUrl !== "") body.ollamaBaseUrl = ollamaUrl;
+      if (dbBridgeUrl !== "") body.dbBridgeUrl = dbBridgeUrl;
 
       if (Object.keys(body).length === 0) {
         setSaveMsg({ type: "err", text: "Nenhuma alteração para salvar." });
@@ -107,17 +122,12 @@ export default function LLMSettingsModal({ open, onClose, onSaved }: Props) {
         return;
       }
 
-      setSaveMsg({
-        type: "ok",
-        text: data.pingOk === true
-          ? "Configuração salva e conexão com Claude confirmada ✓"
-          : data.pingOk === false
-          ? "Configuração salva, mas o ping falhou — verifique a chave."
-          : "Configuração salva com sucesso.",
-      });
-
+      setSaveMsg({ type: "ok", text: "Configuração salva com sucesso. Teste a conexão abaixo." });
       setApiKey("");
       setOllamaUrl("");
+      setDbBridgeUrl("");
+      setPingOllama(null);
+      setPingBridge(null);
       const refreshed = await authFetch(`${apiBase}/api/admin/llm-config`).then((r) => r.json()) as LlmConfig;
       setConfig(refreshed);
       onSaved();
@@ -128,17 +138,31 @@ export default function LLMSettingsModal({ open, onClose, onSaved }: Props) {
     }
   }
 
-  async function handleTest() {
-    setTesting(true);
-    setTestResult(null);
+  async function handlePingOllama() {
+    setPingOllamaLoading(true);
+    setPingOllama(null);
     try {
-      const res = await authFetch(`${apiBase}/api/admin/llm-ping`, { method: "POST" });
+      const res = await authFetch(`${apiBase}/api/admin/ping-ollama`, { method: "POST" });
       const data = await res.json() as { online: boolean };
-      setTestResult(data.online ? "ok" : "fail");
+      setPingOllama(data.online ? "ok" : "fail");
     } catch {
-      setTestResult("fail");
+      setPingOllama("fail");
     } finally {
-      setTesting(false);
+      setPingOllamaLoading(false);
+    }
+  }
+
+  async function handlePingBridge() {
+    setPingBridgeLoading(true);
+    setPingBridge(null);
+    try {
+      const res = await authFetch(`${apiBase}/api/admin/ping-db-bridge`, { method: "POST" });
+      const data = await res.json() as { online: boolean; reason?: string };
+      setPingBridge(data.online ? "ok" : "fail");
+    } catch {
+      setPingBridge("fail");
+    } finally {
+      setPingBridgeLoading(false);
     }
   }
 
@@ -153,92 +177,144 @@ export default function LLMSettingsModal({ open, onClose, onSaved }: Props) {
           <div>
             <h2 className="text-base font-semibold">Configurações de IA</h2>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Motor de linguagem utilizado nas análises jurídicas
+              Motor de linguagem e conexões do Mini PC
             </p>
           </div>
-          <button
-            onClick={onClose}
-            className="text-muted-foreground hover:text-foreground transition-colors"
-          >
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground transition-colors">
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Body */}
-        <div className="px-6 py-5 space-y-5 max-h-[80vh] overflow-y-auto">
+        <div className="px-6 py-5 space-y-6 max-h-[80vh] overflow-y-auto">
           {loading ? (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
             </div>
           ) : (
             <>
-              {/* Active provider status */}
-              {config && (
-                <div className="rounded-lg border border-border bg-muted/30 p-4 flex items-start gap-3">
-                  {config.provider === "anthropic" ? (
-                    <Cloud className="w-5 h-5 text-violet-500 shrink-0 mt-0.5" />
-                  ) : config.provider === "ollama" ? (
-                    <Cpu className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
-                  ) : (
-                    <Wifi className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium">
-                      {config.provider === "anthropic"
-                        ? "Claude (Anthropic) — ativo"
-                        : config.provider === "ollama"
-                        ? "Ollama local — ativo"
-                        : "Nenhum motor configurado"}
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {config.provider === "anthropic" && config.anthropic.keyPreview && (
-                        <>Chave: <code className="font-mono">{config.anthropic.keyPreview}</code>
-                        {config.anthropic.keySource === "env" && <span className="ml-1 text-muted-foreground/60">(variável de ambiente)</span>}
-                        {config.anthropic.keySource === "database" && <span className="ml-1 text-emerald-500/80">(salva no banco)</span>}
-                        </>
-                      )}
-                      {config.provider === "anthropic" && (
-                        <> · Modelo: {config.anthropic.model}</>
-                      )}
-                      {config.provider === "ollama" && (
-                        <>Modelo: {config.ollama.model}</>
-                      )}
-                      {config.provider === "none" && (
-                        "Configure a chave do Claude abaixo para ativar."
-                      )}
-                    </p>
-                  </div>
-                  {/* Test button */}
-                  <button
-                    onClick={handleTest}
-                    disabled={testing || config.provider === "none"}
-                    className="shrink-0 text-xs px-3 py-1.5 rounded-md border border-border bg-background hover:bg-muted disabled:opacity-40 transition-colors flex items-center gap-1.5"
-                  >
-                    {testing ? <Loader2 className="w-3 h-3 animate-spin" /> : <Wifi className="w-3 h-3" />}
-                    Testar
-                  </button>
-                </div>
-              )}
-
-              {/* Test result */}
-              {testResult && (
-                <div className={`flex items-center gap-2 text-sm rounded-lg px-3 py-2 ${testResult === "ok" ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20" : "bg-destructive/10 text-destructive border border-destructive/20"}`}>
-                  {testResult === "ok"
-                    ? <><CheckCircle2 className="w-4 h-4 shrink-0" /> Conexão com o motor de IA confirmada.</>
-                    : <><XCircle className="w-4 h-4 shrink-0" /> Ping falhou — verifique a chave ou a conexão.</>
-                  }
-                </div>
-              )}
-
-              {/* Claude API key section */}
+              {/* ── Ollama section ─────────────────────────────────── */}
               <div className="space-y-3">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Claude (Anthropic)</p>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                  <Cpu className="w-3.5 h-3.5" /> Ollama — Mini PC local
+                </p>
+
+                {config?.ollama.configured && (
+                  <div className="rounded-lg border border-border bg-muted/30 p-3 flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-xs text-muted-foreground truncate">
+                        URL: <span className="font-mono text-foreground/70">{config.ollama.url}</span>
+                        {config.ollama.urlSource === "database" && <span className="ml-2 text-emerald-500/80">(salvo no banco)</span>}
+                        {config.ollama.urlSource === "env" && <span className="ml-2 text-muted-foreground/60">(env var)</span>}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Modelo: <span className="font-mono text-foreground/70">{config.ollama.model}</span>
+                      </p>
+                    </div>
+                    <button
+                      onClick={handlePingOllama}
+                      disabled={pingOllamaLoading}
+                      className="shrink-0 text-xs px-3 py-1.5 rounded-md border border-border bg-background hover:bg-muted disabled:opacity-40 transition-colors flex items-center gap-1.5"
+                    >
+                      {pingOllamaLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Wifi className="w-3 h-3" />}
+                      Testar
+                    </button>
+                  </div>
+                )}
+
+                {pingOllama && (
+                  <div className={`flex items-center gap-2 text-sm rounded-lg px-3 py-2 ${pingOllama === "ok" ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20" : "bg-destructive/10 text-destructive border border-destructive/20"}`}>
+                    {pingOllama === "ok"
+                      ? <><CheckCircle2 className="w-4 h-4 shrink-0" /> Ollama respondendo normalmente.</>
+                      : <><XCircle className="w-4 h-4 shrink-0" /> Ollama inacessível — verifique o túnel.</>}
+                  </div>
+                )}
+
                 <div>
-                  <label className="text-sm font-medium block mb-1">
-                    Chave da API
-                  </label>
+                  <label className="text-sm font-medium block mb-1">Nova URL do túnel Ollama</label>
                   <p className="text-xs text-muted-foreground mb-2">
-                    Obtenha em <a href="https://console.anthropic.com" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground">console.anthropic.com</a>. A chave é salva com segurança no banco de dados e nunca fica exposta no navegador.
+                    Cole a nova URL do Cloudflare (ex: <code className="font-mono">https://xxx.trycloudflare.com</code>). Salvo no banco — persiste entre reinicializações do servidor.
+                  </p>
+                  <input
+                    type="text"
+                    value={ollamaUrl}
+                    onChange={(e) => setOllamaUrl(e.target.value)}
+                    placeholder={config?.ollama.url ? `Atual: ${config.ollama.url}` : "https://seu-tunel.trycloudflare.com"}
+                    className="w-full px-3 py-2 text-sm bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring font-mono placeholder:font-sans placeholder:text-muted-foreground/60"
+                  />
+                  {ollamaUrl && !ollamaUrl.startsWith("http") && (
+                    <p className="text-xs text-destructive mt-1">A URL deve começar com http:// ou https://</p>
+                  )}
+                </div>
+              </div>
+
+              {/* ── DB Bridge section ──────────────────────────────── */}
+              <div className="space-y-3 border-t border-border pt-5">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                  <Database className="w-3.5 h-3.5" /> DB Bridge — embeddings e RAG
+                </p>
+
+                {config?.dbBridge.configured && (
+                  <div className="rounded-lg border border-border bg-muted/30 p-3 flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-xs text-muted-foreground truncate">
+                        URL: <span className="font-mono text-foreground/70">{config.dbBridge.url}</span>
+                        {config.dbBridge.urlSource === "database" && <span className="ml-2 text-emerald-500/80">(salvo no banco)</span>}
+                        {config.dbBridge.urlSource === "env" && <span className="ml-2 text-muted-foreground/60">(env var)</span>}
+                      </p>
+                    </div>
+                    <button
+                      onClick={handlePingBridge}
+                      disabled={pingBridgeLoading}
+                      className="shrink-0 text-xs px-3 py-1.5 rounded-md border border-border bg-background hover:bg-muted disabled:opacity-40 transition-colors flex items-center gap-1.5"
+                    >
+                      {pingBridgeLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Wifi className="w-3 h-3" />}
+                      Testar
+                    </button>
+                  </div>
+                )}
+
+                {pingBridge && (
+                  <div className={`flex items-center gap-2 text-sm rounded-lg px-3 py-2 ${pingBridge === "ok" ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20" : "bg-destructive/10 text-destructive border border-destructive/20"}`}>
+                    {pingBridge === "ok"
+                      ? <><CheckCircle2 className="w-4 h-4 shrink-0" /> DB Bridge respondendo — embeddings ativos.</>
+                      : <><XCircle className="w-4 h-4 shrink-0" /> DB Bridge inacessível — base de conhecimento indisponível.</>}
+                  </div>
+                )}
+
+                {!config?.dbBridge.configured && (
+                  <p className="text-xs text-amber-500/80 bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2">
+                    DB Bridge não configurado. O Curador RAG e os embeddings ficam indisponíveis.
+                  </p>
+                )}
+
+                <div>
+                  <label className="text-sm font-medium block mb-1">Nova URL do túnel DB Bridge</label>
+                  <p className="text-xs text-muted-foreground mb-2">
+                    URL do FastAPI local (ex: <code className="font-mono">https://yyy.trycloudflare.com</code>). Salvo no banco local — persiste entre reinicializações do servidor Replit.
+                  </p>
+                  <input
+                    type="text"
+                    value={dbBridgeUrl}
+                    onChange={(e) => setDbBridgeUrl(e.target.value)}
+                    placeholder={config?.dbBridge.url ? `Atual: ${config.dbBridge.url}` : "https://seu-db-bridge.trycloudflare.com"}
+                    className="w-full px-3 py-2 text-sm bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring font-mono placeholder:font-sans placeholder:text-muted-foreground/60"
+                  />
+                  {dbBridgeUrl && !dbBridgeUrl.startsWith("http") && (
+                    <p className="text-xs text-destructive mt-1">A URL deve começar com http:// ou https://</p>
+                  )}
+                </div>
+              </div>
+
+              {/* ── Claude section ─────────────────────────────────── */}
+              <div className="space-y-3 border-t border-border pt-5">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                  <Cloud className="w-3.5 h-3.5" /> Claude (Anthropic) — fallback cloud
+                </p>
+                <div>
+                  <label className="text-sm font-medium block mb-1">Chave da API</label>
+                  <p className="text-xs text-muted-foreground mb-2">
+                    Obtenha em <a href="https://console.anthropic.com" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground">console.anthropic.com</a>. Salva no banco de dados, nunca exposta no navegador.
                   </p>
                   <div className="relative">
                     <input
@@ -275,47 +351,12 @@ export default function LLMSettingsModal({ open, onClose, onSaved }: Props) {
                 </div>
               </div>
 
-              {/* Ollama section — editable */}
-              <div className="space-y-3 pt-1">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Ollama (Mini PC local)</p>
-                <div>
-                  <label className="text-sm font-medium block mb-1">
-                    URL do túnel
-                  </label>
-                  <p className="text-xs text-muted-foreground mb-2">
-                    URL do Cloudflare ou ngrok que aponta para o Ollama local (ex: <code className="font-mono">https://xxx.trycloudflare.com</code>). Atualize aqui quando o túnel mudar — sem precisar ir ao Render.
-                  </p>
-                  <input
-                    type="text"
-                    value={ollamaUrl}
-                    onChange={(e) => setOllamaUrl(e.target.value)}
-                    placeholder={
-                      config?.ollama.url
-                        ? `Atual: ${config.ollama.url}${config.ollama.urlSource === "database" ? " (banco)" : " (env var)"} — cole para substituir`
-                        : "https://seu-tunel.trycloudflare.com"
-                    }
-                    className="w-full px-3 py-2 text-sm bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring font-mono placeholder:font-sans placeholder:text-muted-foreground/60"
-                  />
-                  {ollamaUrl && !ollamaUrl.startsWith("http") && (
-                    <p className="text-xs text-destructive mt-1">A URL deve começar com http:// ou https://</p>
-                  )}
-                  {config?.ollama.configured && (
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Modelo: <span className="font-mono text-foreground/70">{config.ollama.model}</span>
-                      {config.ollama.urlSource === "database" && <span className="ml-2 text-emerald-500/80">(URL salva no banco)</span>}
-                      {config.ollama.urlSource === "env" && <span className="ml-2 text-muted-foreground/60">(URL da variável de ambiente)</span>}
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              {/* Save result message */}
+              {/* Save result */}
               {saveMsg && (
                 <div className={`flex items-center gap-2 text-sm rounded-lg px-3 py-2 ${saveMsg.type === "ok" ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20" : "bg-destructive/10 text-destructive border border-destructive/20"}`}>
                   {saveMsg.type === "ok"
                     ? <CheckCircle2 className="w-4 h-4 shrink-0" />
-                    : <XCircle className="w-4 h-4 shrink-0" />
-                  }
+                    : <XCircle className="w-4 h-4 shrink-0" />}
                   {saveMsg.text}
                 </div>
               )}

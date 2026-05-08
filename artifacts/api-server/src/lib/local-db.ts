@@ -303,6 +303,55 @@ export async function getJobQueuePosition(jobId: string): Promise<number | null>
   return pos > 0 ? pos : null;
 }
 
+// ── Local config persistence (key-value in PostgreSQL) ──────────────────────
+
+async function ensureLocalConfigTable(): Promise<void> {
+  await localExecute(`
+    CREATE TABLE IF NOT EXISTS local_config (
+      key   TEXT PRIMARY KEY,
+      value TEXT NOT NULL,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+}
+
+/**
+ * Loads config entries from local PostgreSQL.
+ * Returns a map of key → value.
+ */
+export async function loadLocalDbConfig(): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  try {
+    await ensureLocalConfigTable();
+    const rows = await localQuery<{ key: string; value: string }>(
+      `SELECT key, value FROM local_config`
+    );
+    for (const r of rows) {
+      if (r.key && r.value) out.set(r.key, r.value);
+    }
+  } catch (err) {
+    // Non-fatal — env vars remain the fallback
+  }
+  return out;
+}
+
+/** Persists a config key to local PostgreSQL. */
+export async function saveLocalDbConfig(key: string, value: string): Promise<void> {
+  await ensureLocalConfigTable();
+  await localExecute(
+    `INSERT INTO local_config (key, value, updated_at)
+     VALUES ($1, $2, NOW())
+     ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
+    [key, value]
+  );
+}
+
+/** Deletes a config key from local PostgreSQL. */
+export async function deleteLocalDbConfig(key: string): Promise<void> {
+  await ensureLocalConfigTable();
+  await localExecute(`DELETE FROM local_config WHERE key = $1`, [key]);
+}
+
 function mapJob(row: Record<string, unknown>): AnalysisJob {
   return {
     id: row.id as string,

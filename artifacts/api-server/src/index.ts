@@ -3,7 +3,8 @@ import { logger } from "./lib/logger";
 import { seedDatabase } from "./lib/seed";
 import { getOllamaBaseUrl, warmupOllama } from "./lib/ollama";
 import { loadConfigFromDb } from "./lib/runtime-config";
-import { ensureJobsTable } from "./lib/local-db";
+import { ensureJobsTable, loadLocalDbConfig } from "./lib/local-db";
+import { setDbBridgeUrl } from "./lib/bridge";
 import { jobQueue } from "./lib/job-queue";
 
 const rawPort = process.env["PORT"];
@@ -32,6 +33,19 @@ app.listen(port, async (err) => {
   loadConfigFromDb().catch((err) => {
     logger.warn({ err }, "loadConfigFromDb falhou — usando apenas variáveis de ambiente");
   });
+
+  // Load locally-persisted config (db_bridge_url override, etc.) from local PostgreSQL
+  loadLocalDbConfig()
+    .then((cfg) => {
+      const savedDbBridgeUrl = cfg.get("db_bridge_url");
+      if (savedDbBridgeUrl) {
+        setDbBridgeUrl(savedDbBridgeUrl);
+        logger.info("startup: DB_BRIDGE_URL carregado do banco local");
+      }
+    })
+    .catch((err) => {
+      logger.warn({ err }, "loadLocalDbConfig falhou — usando variável de ambiente para DB_BRIDGE_URL");
+    });
 
   seedDatabase().catch((err) => {
     logger.error({ err }, "Seed falhou — servidor continua no ar");

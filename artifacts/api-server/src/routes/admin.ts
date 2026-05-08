@@ -4,6 +4,8 @@ import { getConfig, setConfig, deleteConfig, isAdminUser, loadConfigFromDb } fro
 import { isAnthropicConfigured, getAnthropicModel, pingAnthropic } from "../lib/anthropic";
 import { isOllamaConfigured, getOllamaBaseUrl, getOllamaModelParecer, pingOllama } from "../lib/ollama";
 import { getActiveProvider } from "../lib/llm";
+import { getDbBridgeUrl, isDbBridgeConfigured, pingDbBridge, setDbBridgeUrl } from "../lib/bridge";
+import { saveLocalDbConfig, deleteLocalDbConfig } from "../lib/local-db";
 import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
@@ -26,9 +28,13 @@ router.get("/llm-config", requireAuth, async (req, res): Promise<void> => {
     : "none";
 
   const ollamaUrl = getOllamaBaseUrl();
-  // Show partial URL for display (hide sensitive tunnel tokens if any)
   const ollamaUrlPreview = ollamaUrl
     ? (ollamaUrl.length > 40 ? ollamaUrl.slice(0, 35) + "..." : ollamaUrl)
+    : null;
+
+  const dbBridgeUrl = getDbBridgeUrl();
+  const dbBridgeUrlPreview = dbBridgeUrl
+    ? (dbBridgeUrl.length > 40 ? dbBridgeUrl.slice(0, 35) + "..." : dbBridgeUrl)
     : null;
 
   res.json({
@@ -47,10 +53,17 @@ router.get("/llm-config", requireAuth, async (req, res): Promise<void> => {
         : "none",
       model: getOllamaModelParecer(),
     },
+    dbBridge: {
+      configured: isDbBridgeConfigured(),
+      url: dbBridgeUrlPreview,
+      urlSource: dbBridgeUrl
+        ? (process.env.DB_BRIDGE_URL && !getDbBridgeUrl()?.includes("trycloudflare") ? "env" : "database")
+        : "none",
+    },
   });
 });
 
-/** PUT /api/admin/llm-config — set API key and/or model */
+/** PUT /api/admin/llm-config — set API key and/or model and/or tunnel URLs */
 router.put("/llm-config", requireAuth, async (req, res): Promise<void> => {
   const userId = (req as any).userId as string;
   if (!isAdminUser(userId)) {
@@ -58,10 +71,11 @@ router.put("/llm-config", requireAuth, async (req, res): Promise<void> => {
     return;
   }
 
-  const { anthropicApiKey, anthropicModel, ollamaBaseUrl } = req.body as {
+  const { anthropicApiKey, anthropicModel, ollamaBaseUrl, dbBridgeUrl } = req.body as {
     anthropicApiKey?: string;
     anthropicModel?: string;
     ollamaBaseUrl?: string;
+    dbBridgeUrl?: string;
   };
 
   if (anthropicApiKey !== undefined) {
@@ -89,11 +103,28 @@ router.put("/llm-config", requireAuth, async (req, res): Promise<void> => {
       logger.info({ userId }, "admin: OLLAMA_BASE_URL removida (usa env var)");
     } else {
       if (!ollamaBaseUrl.startsWith("http")) {
-        res.status(400).json({ error: "URL inválida — deve começar com http:// ou https://" });
+        res.status(400).json({ error: "URL Ollama inválida — deve começar com http:// ou https://" });
         return;
       }
       await setConfig("ollama_base_url", ollamaBaseUrl.trim().replace(/\/$/, ""));
       logger.info({ userId }, "admin: OLLAMA_BASE_URL atualizada");
+    }
+  }
+
+  if (dbBridgeUrl !== undefined) {
+    if (dbBridgeUrl === "") {
+      setDbBridgeUrl("");
+      await deleteLocalDbConfig("db_bridge_url").catch(() => {});
+      logger.info({ userId }, "admin: DB_BRIDGE_URL removida (usa env var)");
+    } else {
+      if (!dbBridgeUrl.startsWith("http")) {
+        res.status(400).json({ error: "URL DB Bridge inválida — deve começar com http:// ou https://" });
+        return;
+      }
+      const clean = dbBridgeUrl.trim().replace(/\/+$/, "");
+      setDbBridgeUrl(clean);
+      await saveLocalDbConfig("db_bridge_url", clean).catch(() => {});
+      logger.info({ userId }, "admin: DB_BRIDGE_URL atualizada");
     }
   }
 
@@ -105,6 +136,8 @@ router.put("/llm-config", requireAuth, async (req, res): Promise<void> => {
 
   const rawKey = getConfig("anthropic_api_key", process.env.ANTHROPIC_API_KEY ?? undefined);
   const newOllamaUrl = getOllamaBaseUrl();
+  const newDbBridgeUrl = getDbBridgeUrl();
+
   res.json({
     ok: true,
     provider: getActiveProvider() ?? "none",
@@ -116,6 +149,9 @@ router.put("/llm-config", requireAuth, async (req, res): Promise<void> => {
     ollama: {
       configured: !!newOllamaUrl,
       urlSource: newOllamaUrl ? (getConfig("ollama_base_url") ? "database" : "env") : "none",
+    },
+    dbBridge: {
+      configured: !!newDbBridgeUrl,
     },
   });
 });
@@ -139,6 +175,38 @@ router.post("/llm-ping", requireAuth, async (req, res): Promise<void> => {
   }
 
   res.json({ provider: provider ?? "none", online });
+});
+
+/** POST /api/admin/ping-ollama — test Ollama connectivity independently */
+router.post("/ping-ollama", requireAuth, async (req, res): Promise<void> => {
+  const userId = (req as any).userId as string;
+  if (!isAdminUser(userId)) {
+    res.status(403).json({ error: "Acesso restrito a administradores." });
+    return;
+  }
+  const url = getOllamaBaseUrl();
+  if (!url) {
+    res.json({ online: false, reason: "URL não configurada" });
+    return;
+  }
+  const online = await pingOllama(url);
+  res.json({ online, url: url.slice(0, 40) });
+});
+
+/** POST /api/admin/ping-db-bridge — test DB Bridge connectivity independently */
+router.post("/ping-db-bridge", requireAuth, async (req, res): Promise<void> => {
+  const userId = (req as any).userId as string;
+  if (!isAdminUser(userId)) {
+    res.status(403).json({ error: "Acesso restrito a administradores." });
+    return;
+  }
+  const url = getDbBridgeUrl();
+  if (!url) {
+    res.json({ online: false, reason: "URL não configurada" });
+    return;
+  }
+  const online = await pingDbBridge();
+  res.json({ online, url: url.slice(0, 40) });
 });
 
 export default router;

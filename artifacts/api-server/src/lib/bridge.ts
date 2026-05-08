@@ -2,12 +2,19 @@ import { logger } from "./logger";
 
 export type Row = Record<string, unknown>;
 
+let runtimeDbBridgeUrl: string | null = null;
+
+/** Override the DB Bridge URL at runtime (admin panel). Survives until server restart. */
+export function setDbBridgeUrl(url: string): void {
+  runtimeDbBridgeUrl = url.trim().replace(/\/+$/, "") || null;
+}
+
 export function getDbBridgeUrl(): string | null {
-  return process.env.DB_BRIDGE_URL ?? null;
+  return runtimeDbBridgeUrl ?? process.env.DB_BRIDGE_URL ?? null;
 }
 
 export function isDbBridgeConfigured(): boolean {
-  return !!process.env.DB_BRIDGE_URL;
+  return !!(runtimeDbBridgeUrl ?? process.env.DB_BRIDGE_URL);
 }
 
 export async function pingDbBridge(): Promise<boolean> {
