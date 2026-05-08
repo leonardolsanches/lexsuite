@@ -303,6 +303,80 @@ export async function getJobQueuePosition(jobId: string): Promise<number | null>
   return pos > 0 ? pos : null;
 }
 
+// ── Core app tables (users, sessions, workflows, prompts) ───────────────────
+
+/**
+ * Creates all tables that must live in local Replit PostgreSQL so the app
+ * works even when the DB Bridge tunnel (Mini PC) is offline.
+ */
+export async function ensureAppTables(): Promise<void> {
+  // Users — synced from Clerk on each authenticated request
+  await localExecute(`
+    CREATE TABLE IF NOT EXISTS users (
+      id          TEXT        PRIMARY KEY,
+      email       TEXT        NOT NULL,
+      name        TEXT,
+      role        TEXT        NOT NULL DEFAULT 'user',
+      created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+
+  // Which modules each user has access to
+  await localExecute(`
+    CREATE TABLE IF NOT EXISTS user_modules (
+      id           SERIAL      PRIMARY KEY,
+      user_id      TEXT        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      module       TEXT        NOT NULL,
+      activated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE (user_id, module)
+    )
+  `);
+
+  // Analysis sessions (tabs inside a module)
+  await localExecute(`
+    CREATE TABLE IF NOT EXISTS sessions (
+      id           SERIAL      PRIMARY KEY,
+      user_id      TEXT        NOT NULL,
+      workflow_key TEXT        NOT NULL,
+      module       TEXT        NOT NULL,
+      label        TEXT        NOT NULL,
+      mode         TEXT        NOT NULL DEFAULT 'deep',
+      status       TEXT        NOT NULL DEFAULT 'idle',
+      output_html  TEXT,
+      form_data    JSONB,
+      created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+  await localExecute(`
+    CREATE INDEX IF NOT EXISTS sessions_user_id_idx ON sessions (user_id)
+  `);
+
+  // Workflow definitions (seeded once at startup)
+  await localExecute(`
+    CREATE TABLE IF NOT EXISTS workflows (
+      id         SERIAL PRIMARY KEY,
+      key        TEXT   UNIQUE NOT NULL,
+      name       TEXT   NOT NULL,
+      subtitle   TEXT,
+      module     TEXT   NOT NULL,
+      category   TEXT,
+      prompt_key TEXT   NOT NULL,
+      fields     JSONB  NOT NULL DEFAULT '[]',
+      sort_order INT    NOT NULL DEFAULT 0
+    )
+  `);
+
+  // Prompt templates (seeded once at startup)
+  await localExecute(`
+    CREATE TABLE IF NOT EXISTS prompts (
+      key     TEXT PRIMARY KEY,
+      module  TEXT NOT NULL,
+      content TEXT NOT NULL
+    )
+  `);
+}
+
 // ── Local config persistence (key-value in PostgreSQL) ──────────────────────
 
 async function ensureLocalConfigTable(): Promise<void> {

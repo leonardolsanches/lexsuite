@@ -1,6 +1,7 @@
 import { getActiveProvider } from "./llm";
 import { getOllamaBaseUrl, isOllamaConfigured, pingOllama } from "./ollama";
-import { bridgeQuery, bridgeQueryOne, bridgeExecute, isDbBridgeConfigured } from "./bridge";
+import { isDbBridgeConfigured } from "./bridge";
+import { localQuery, localQueryOne, localExecute } from "./local-db";
 import { searchRelevantChunks, buildRagContext } from "./rag";
 import { getLocalPrompt } from "./prompts-registry";
 import { streamAnalysis } from "./llm";
@@ -111,7 +112,7 @@ export async function runAnalysis(
   if (signal?.aborted) { sendError("Análise cancelada."); return ""; }
 
   try {
-    const activeModules = await bridgeQuery(
+    const activeModules = await localQuery(
       "SELECT module FROM user_modules WHERE user_id = $1",
       [userId]
     );
@@ -121,7 +122,7 @@ export async function runAnalysis(
       return "";
     }
   } catch (err: unknown) {
-    logger.warn({ err }, "DB Bridge indisponível para verificação de módulo — permitindo acesso");
+    logger.warn({ err }, "Erro ao verificar módulos — permitindo acesso");
   }
 
   // ── 3. Prompt lookup ───────────────────────────────────────────────────────
@@ -130,24 +131,24 @@ export async function runAnalysis(
 
   let prompt: { key: unknown; content: unknown; module: unknown } | null = null;
   try {
-    prompt = await bridgeQueryOne(
+    prompt = await localQueryOne(
       "SELECT key, content, module FROM prompts WHERE key = $1",
       [workflowKey]
     );
   } catch (err: unknown) {
-    logger.warn({ err, workflowKey }, "DB Bridge indisponível — tentando registro local de prompts");
+    logger.warn({ err, workflowKey }, "Banco local indisponível — tentando registro local de prompts");
   }
 
   if (!prompt) {
     const local = getLocalPrompt(workflowKey);
     if (local) {
       prompt = local;
-      logger.info({ workflowKey }, "Prompt carregado do registro local (bridge offline)");
+      logger.info({ workflowKey }, "Prompt carregado do registro local (fallback)");
     }
   }
 
   if (!prompt) {
-    sendError(`Prompt não encontrado para o workflow '${workflowKey}'. Verifique se o Mini PC está online ou se o workflow está cadastrado.`);
+    sendError(`Prompt não encontrado para o workflow '${workflowKey}'. Verifique se o banco foi inicializado corretamente.`);
     return "";
   }
 
@@ -163,7 +164,7 @@ export async function runAnalysis(
   }
   if (observations) dataSection += `OBSERVAÇÕES ADICIONAIS:\n${observations}\n\n`;
 
-  // ── 5. RAG / document context ──────────────────────────────────────────────
+  // ── 5. RAG / document context (DB Bridge — Mini PC only) ───────────────────
   sendStep("context", "Buscando contexto relevante...", "search");
   if (signal?.aborted) { sendError("Análise cancelada."); return ""; }
 
@@ -178,42 +179,31 @@ export async function runAnalysis(
           logger.info({ chunkCount: chunks.length, module }, "RAG: contexto recuperado");
         }
       }
-    } else {
-      const userDocs = await bridgeQuery(
-        "SELECT filename, content FROM documents WHERE user_id = $1 AND module = $2 AND status = 'ready'",
-        [userId, module]
-      );
-      if (userDocs.length > 0) {
-        const docsContext = userDocs
-          .map(d => `[${d.filename}]: ${String(d.content).slice(0, 2000)}`)
-          .join("\n\n");
-        ragContext = `BASE DE CONHECIMENTO (documentos indexados):\n${docsContext}\n\n`;
-      }
     }
   } catch (err: unknown) {
-    logger.warn({ err }, "DB Bridge indisponível para RAG/docs — prosseguindo sem contexto");
+    logger.warn({ err }, "DB Bridge indisponível para RAG — prosseguindo sem contexto");
   }
 
   if (ragContext) dataSection = ragContext + dataSection;
   const fullPrompt = String(prompt.content).replace("{{DADOS}}", dataSection || "(nenhum dado fornecido)");
 
-  // ── 6. Session tracking ────────────────────────────────────────────────────
+  // ── 6. Session tracking (local PostgreSQL) ─────────────────────────────────
   let sessionRecord: { id: number } | null = null;
   if (sessionId) {
     try {
-      const s = await bridgeQueryOne(
+      const s = await localQueryOne(
         "SELECT id FROM sessions WHERE id = $1 AND user_id = $2",
         [sessionId, userId]
       );
       if (s) sessionRecord = { id: s.id as number };
     } catch {
-      logger.warn("DB Bridge indisponível — sessão não rastreada");
+      logger.warn("Erro ao buscar sessão no banco local");
     }
   }
   if (sessionRecord) {
     try {
-      await bridgeExecute(
-        "UPDATE sessions SET status = 'running', form_data = $2, updated_at = NOW() WHERE id = $1",
+      await localExecute(
+        "UPDATE sessions SET status = 'running', form_data = $2::jsonb, updated_at = NOW() WHERE id = $1",
         [sessionRecord.id, formData ? JSON.stringify(formData) : null]
       );
     } catch {
@@ -235,7 +225,6 @@ export async function runAnalysis(
 
   const writeEvent = (sseData: string) => {
     if (signal?.aborted) return;
-    // Forward the raw SSE data line as a parsed event
     const lines = sseData.split("\n");
     for (const line of lines) {
       if (!line.startsWith("data: ")) continue;
@@ -257,11 +246,11 @@ export async function runAnalysis(
         if (fullOutput.length > lastCheckpointLen) {
           lastCheckpointLen = fullOutput.length;
           try {
-            await bridgeExecute(
+            await localExecute(
               "UPDATE sessions SET output_html = $2, updated_at = NOW() WHERE id = $1",
               [sessionRecord!.id, fullOutput]
             );
-          } catch { /* bridge offline */ }
+          } catch { /* non-fatal */ }
         }
       }, 60_000)
     : null;
@@ -288,7 +277,7 @@ export async function runAnalysis(
       onEvent({ type: "done" });
       if (sessionRecord) {
         try {
-          await bridgeExecute(
+          await localExecute(
             "UPDATE sessions SET status = 'done', output_html = $2, updated_at = NOW() WHERE id = $1",
             [sessionRecord.id, fullOutput]
           );
@@ -301,15 +290,13 @@ export async function runAnalysis(
     logger.error({ err }, "Erro durante análise");
     if (sessionRecord) {
       try {
-        await bridgeExecute(
+        await localExecute(
           "UPDATE sessions SET status = 'error', updated_at = NOW() WHERE id = $1",
           [sessionRecord.id]
         );
       } catch { /* skip */ }
     }
     sendError(userMsg);
-    // Rethrow so job-queue marks the job as 'error', not 'done'.
-    // Use AnalysisReportedError so the queue knows the event was already sent.
     throw new AnalysisReportedError(userMsg, err);
   }
 

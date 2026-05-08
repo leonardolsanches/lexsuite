@@ -1,4 +1,4 @@
-import { bridgeQueryOne, bridgeExecute } from "./bridge";
+import { localQueryOne, localExecute } from "./local-db";
 import { logger } from "./logger";
 
 const LEX_RURAL_WORKFLOWS = [
@@ -1567,24 +1567,20 @@ Não invente fatos ou precedentes. A minuta é instrumento de trabalho sujeito �
 ];
 
 export async function seedDatabase() {
-  if (!process.env.DB_BRIDGE_URL) {
-    logger.warn("DB_BRIDGE_URL não configurado — seed ignorado. Configure o Secret e reinicie.");
-    return;
-  }
   try {
-    const existing = await bridgeQueryOne("SELECT id FROM workflows LIMIT 1");
+    const existing = await localQueryOne("SELECT id FROM workflows LIMIT 1");
     if (existing) {
       logger.info("Database already seeded, skipping...");
       return;
     }
 
-    logger.info("Seeding database with Lex Suite workflows...");
+    logger.info("Seeding local database with Lex Suite workflows...");
 
     const allWorkflows = [...LEX_RURAL_WORKFLOWS, ...LEX_EXECUTIO_WORKFLOWS];
     for (const wf of allWorkflows) {
-      await bridgeExecute(
+      await localExecute(
         `INSERT INTO workflows (key, name, subtitle, module, category, prompt_key, fields, sort_order)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+         VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8)
          ON CONFLICT (key) DO NOTHING`,
         [wf.key, wf.name, wf.subtitle, wf.module, wf.category ?? null, wf.promptKey, wf.fields, wf.sortOrder]
       );
@@ -1592,7 +1588,7 @@ export async function seedDatabase() {
 
     const allPrompts = [...LEX_RURAL_PROMPTS, ...LEX_EXECUTIO_PROMPTS];
     for (const p of allPrompts) {
-      await bridgeExecute(
+      await localExecute(
         `INSERT INTO prompts (key, module, content)
          VALUES ($1, $2, $3)
          ON CONFLICT (key) DO NOTHING`,

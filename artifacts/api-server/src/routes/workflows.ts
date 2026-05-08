@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { requireAuth } from "../lib/auth";
-import { bridgeQuery, bridgeQueryOne } from "../lib/bridge";
+import { localQuery, localQueryOne } from "../lib/local-db";
 
 const router: IRouter = Router();
 
@@ -8,11 +8,11 @@ router.get("/workflows", requireAuth, async (req, res, next): Promise<void> => {
   const module = req.query.module as string | undefined;
   try {
     const workflows = module
-      ? await bridgeQuery(
+      ? await localQuery(
           "SELECT * FROM workflows WHERE module = $1 ORDER BY sort_order",
           [module]
         )
-      : await bridgeQuery("SELECT * FROM workflows ORDER BY sort_order");
+      : await localQuery("SELECT * FROM workflows ORDER BY sort_order");
 
     res.json(workflows.map(w => ({
       id: w.id,
@@ -34,7 +34,7 @@ router.get("/workflows", requireAuth, async (req, res, next): Promise<void> => {
 router.get("/prompts/:key", requireAuth, async (req, res, next): Promise<void> => {
   const key = req.params.key as string;
   try {
-    const prompt = await bridgeQueryOne(
+    const prompt = await localQueryOne(
       "SELECT * FROM prompts WHERE key = $1",
       [key]
     );

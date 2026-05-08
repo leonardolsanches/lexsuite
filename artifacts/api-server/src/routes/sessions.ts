@@ -1,11 +1,17 @@
 import { Router, type IRouter } from "express";
 import { requireAuth } from "../lib/auth";
-import { bridgeQuery, bridgeQueryOne, bridgeExecute, toIso, type Row } from "../lib/bridge";
+import { localQuery, localQueryOne, localExecute } from "../lib/local-db";
 import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
 
-function mapSession(s: Row) {
+function toIso(val: unknown): string {
+  if (val instanceof Date) return val.toISOString();
+  if (typeof val === "string") return new Date(val).toISOString();
+  return String(val);
+}
+
+function mapSession(s: Record<string, unknown>) {
   return {
     id: s.id,
     userId: s.user_id,
@@ -28,17 +34,17 @@ router.get("/sessions", requireAuth, async (req, res): Promise<void> => {
 
   try {
     const sessions = module
-      ? await bridgeQuery(
+      ? await localQuery(
           "SELECT * FROM sessions WHERE user_id = $1 AND module = $2 ORDER BY created_at DESC LIMIT $3",
           [userId, module, limit]
         )
-      : await bridgeQuery(
+      : await localQuery(
           "SELECT * FROM sessions WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2",
           [userId, limit]
         );
     res.json(sessions.map(mapSession));
   } catch (err) {
-    logger.warn({ err }, "GET /sessions: DB Bridge indisponível");
+    logger.warn({ err }, "GET /sessions: erro no banco local");
     res.json([]);
   }
 });
@@ -53,11 +59,11 @@ router.post("/sessions", requireAuth, async (req, res): Promise<void> => {
   }
 
   try {
-    const session = await bridgeQueryOne(
+    const session = await localQueryOne(
       `INSERT INTO sessions (user_id, workflow_key, module, label, mode, form_data, status)
        VALUES ($1, $2, $3, $4, $5, $6, 'idle')
        RETURNING *`,
-      [userId, workflowKey, module, label, mode, formData ?? null]
+      [userId, workflowKey, module, label, mode, formData ? JSON.stringify(formData) : null]
     );
 
     if (!session) {
@@ -67,8 +73,8 @@ router.post("/sessions", requireAuth, async (req, res): Promise<void> => {
 
     res.status(201).json(mapSession(session));
   } catch (err: any) {
-    logger.warn({ err }, "POST /sessions: DB Bridge indisponível ou sem permissão");
-    res.status(503).json({ error: "Banco de dados de sessões indisponível. Verifique as permissões do DB Bridge." });
+    logger.warn({ err }, "POST /sessions: erro no banco local");
+    res.status(503).json({ error: "Banco de dados indisponível." });
   }
 });
 
@@ -78,7 +84,7 @@ router.get("/sessions/stats", requireAuth, async (req, res): Promise<void> => {
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
   try {
-    const all = await bridgeQuery(
+    const all = await localQuery(
       "SELECT * FROM sessions WHERE user_id = $1 ORDER BY created_at DESC",
       [userId]
     );
@@ -93,7 +99,7 @@ router.get("/sessions/stats", requireAuth, async (req, res): Promise<void> => {
       sessionsThisMonth: thisMonth,
     });
   } catch (err) {
-    logger.warn({ err }, "GET /sessions/stats: DB Bridge indisponível");
+    logger.warn({ err }, "GET /sessions/stats: erro no banco local");
     res.json({
       totalSessions: 0,
       sessionsByModule: { executio: 0, rural: 0 },
@@ -114,7 +120,7 @@ router.get("/sessions/:id", requireAuth, async (req, res): Promise<void> => {
   }
 
   try {
-    const session = await bridgeQueryOne(
+    const session = await localQueryOne(
       "SELECT * FROM sessions WHERE id = $1 AND user_id = $2",
       [id, userId]
     );
@@ -124,8 +130,8 @@ router.get("/sessions/:id", requireAuth, async (req, res): Promise<void> => {
     }
     res.json(mapSession(session));
   } catch (err) {
-    logger.warn({ err }, "GET /sessions/:id: DB Bridge indisponível");
-    res.status(503).json({ error: "Banco de dados de sessões indisponível" });
+    logger.warn({ err }, "GET /sessions/:id: erro no banco local");
+    res.status(503).json({ error: "Banco de dados indisponível" });
   }
 });
 
@@ -142,16 +148,16 @@ router.patch("/sessions/:id", requireAuth, async (req, res): Promise<void> => {
   const { label, status, outputHtml, formData } = req.body;
 
   try {
-    const session = await bridgeQueryOne(
+    const session = await localQueryOne(
       `UPDATE sessions SET
          label = COALESCE($3, label),
          status = COALESCE($4, status),
          output_html = COALESCE($5, output_html),
-         form_data = COALESCE($6, form_data),
+         form_data = COALESCE($6::jsonb, form_data),
          updated_at = NOW()
        WHERE id = $1 AND user_id = $2
        RETURNING *`,
-      [id, userId, label ?? null, status ?? null, outputHtml ?? null, formData ?? null]
+      [id, userId, label ?? null, status ?? null, outputHtml ?? null, formData ? JSON.stringify(formData) : null]
     );
     if (!session) {
       res.status(404).json({ error: "Session not found" });
@@ -159,8 +165,8 @@ router.patch("/sessions/:id", requireAuth, async (req, res): Promise<void> => {
     }
     res.json(mapSession(session));
   } catch (err) {
-    logger.warn({ err }, "PATCH /sessions/:id: DB Bridge indisponível");
-    res.status(503).json({ error: "Banco de dados de sessões indisponível" });
+    logger.warn({ err }, "PATCH /sessions/:id: erro no banco local");
+    res.status(503).json({ error: "Banco de dados indisponível" });
   }
 });
 
@@ -175,7 +181,7 @@ router.delete("/sessions/:id", requireAuth, async (req, res): Promise<void> => {
   }
 
   try {
-    const { rowCount } = await bridgeExecute(
+    const { rowCount } = await localExecute(
       "DELETE FROM sessions WHERE id = $1 AND user_id = $2",
       [id, userId]
     );
@@ -185,8 +191,8 @@ router.delete("/sessions/:id", requireAuth, async (req, res): Promise<void> => {
     }
     res.sendStatus(204);
   } catch (err) {
-    logger.warn({ err }, "DELETE /sessions/:id: DB Bridge indisponível");
-    res.status(503).json({ error: "Banco de dados de sessões indisponível" });
+    logger.warn({ err }, "DELETE /sessions/:id: erro no banco local");
+    res.status(503).json({ error: "Banco de dados indisponível" });
   }
 });
 

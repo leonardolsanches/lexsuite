@@ -2,7 +2,13 @@ import { Router, type IRouter } from "express";
 import { getAuth } from "@clerk/express";
 import { requireAuth, getOrCreateUser } from "../lib/auth";
 import { isOllamaConfigured, getOllamaBaseUrl, getOllamaModelParecer } from "../lib/ollama";
-import { bridgeQuery, bridgeQueryOne, bridgeExecute, toIso } from "../lib/bridge";
+import { localQuery, localQueryOne } from "../lib/local-db";
+
+function toIso(val: unknown): string {
+  if (val instanceof Date) return val.toISOString();
+  if (typeof val === "string") return new Date(val).toISOString();
+  return String(val);
+}
 
 const router: IRouter = Router();
 
@@ -16,7 +22,7 @@ router.get("/me", requireAuth, async (req, res): Promise<void> => {
   const userName = (auth as any)?.sessionClaims?.firstName as string | undefined;
 
   const user = await getOrCreateUser(userId, userEmail, userName ?? null);
-  const modules = await bridgeQuery(
+  const modules = await localQuery(
     "SELECT id, user_id, module, activated_at FROM user_modules WHERE user_id = $1",
     [userId]
   );
@@ -33,7 +39,7 @@ router.get("/me", requireAuth, async (req, res): Promise<void> => {
 
 router.get("/modules", requireAuth, async (req, res): Promise<void> => {
   const userId = (req as any).userId as string;
-  const modules = await bridgeQuery(
+  const modules = await localQuery(
     "SELECT id, user_id, module, activated_at FROM user_modules WHERE user_id = $1",
     [userId]
   );
@@ -54,7 +60,7 @@ router.post("/modules/:module/activate", requireAuth, async (req, res): Promise<
     return;
   }
 
-  const existing = await bridgeQueryOne(
+  const existing = await localQueryOne(
     "SELECT id, user_id, module, activated_at FROM user_modules WHERE user_id = $1 AND module = $2",
     [userId, module]
   );
@@ -64,7 +70,7 @@ router.post("/modules/:module/activate", requireAuth, async (req, res): Promise<
     return;
   }
 
-  const newModule = await bridgeQueryOne(
+  const newModule = await localQueryOne(
     "INSERT INTO user_modules (user_id, module) VALUES ($1, $2) RETURNING id, user_id, module, activated_at",
     [userId, module]
   );

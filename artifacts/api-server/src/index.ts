@@ -3,7 +3,7 @@ import { logger } from "./lib/logger";
 import { seedDatabase } from "./lib/seed";
 import { getOllamaBaseUrl, warmupOllama } from "./lib/ollama";
 import { loadConfigFromDb } from "./lib/runtime-config";
-import { ensureJobsTable, loadLocalDbConfig } from "./lib/local-db";
+import { ensureJobsTable, ensureAppTables, loadLocalDbConfig } from "./lib/local-db";
 import { setDbBridgeUrl } from "./lib/bridge";
 import { jobQueue } from "./lib/job-queue";
 
@@ -47,13 +47,14 @@ app.listen(port, async (err) => {
       logger.warn({ err }, "loadLocalDbConfig falhou — usando variável de ambiente para DB_BRIDGE_URL");
     });
 
-  seedDatabase().catch((err) => {
-    logger.error({ err }, "Seed falhou — servidor continua no ar");
-  });
-
-  // Initialize job queue table and resume any pending jobs
-  ensureJobsTable()
-    .then(() => {
+  // Ensure all local PostgreSQL tables exist (users, sessions, workflows, prompts, jobs)
+  ensureAppTables()
+    .then(() => ensureJobsTable())
+    .then(async () => {
+      // Seed workflows and prompts into local PostgreSQL (idempotent)
+      await seedDatabase().catch((err) => {
+        logger.error({ err }, "Seed falhou — servidor continua no ar");
+      });
       jobQueue.kick();
       logger.info("job-queue: inicializado e pronto");
     })

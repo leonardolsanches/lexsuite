@@ -1,6 +1,6 @@
 import { getAuth } from "@clerk/express";
 import type { Request, Response, NextFunction } from "express";
-import { bridgeQuery, bridgeQueryOne } from "./bridge";
+import { localQuery, localQueryOne } from "./local-db";
 
 export const requireAuth = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   const auth = getAuth(req);
@@ -26,7 +26,7 @@ export const requireAuth = async (req: Request, res: Response, next: NextFunctio
 };
 
 export async function getOrCreateUser(clerkUserId: string, email: string, name?: string | null) {
-  const user = await bridgeQueryOne(
+  const user = await localQueryOne(
     `INSERT INTO users (id, email, name, role)
      VALUES ($1, $2, $3, 'user')
      ON CONFLICT (id) DO UPDATE SET email = EXCLUDED.email
@@ -34,7 +34,7 @@ export async function getOrCreateUser(clerkUserId: string, email: string, name?:
     [clerkUserId, email, name ?? null]
   );
 
-  await bridgeQuery(
+  await localQuery(
     `INSERT INTO user_modules (user_id, module)
      VALUES ($1, 'rural'), ($1, 'executio')
      ON CONFLICT (user_id, module) DO NOTHING`,

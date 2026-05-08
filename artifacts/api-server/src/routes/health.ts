@@ -1,5 +1,6 @@
 import { Router, type IRouter } from "express";
-import { getDbBridgeUrl, pingDbBridge, bridgeQuery } from "../lib/bridge";
+import { getDbBridgeUrl, pingDbBridge } from "../lib/bridge";
+import { localQuery } from "../lib/local-db";
 
 const router: IRouter = Router();
 
@@ -17,8 +18,7 @@ router.get("/debug", async (_req, res) => {
     db_bridge_url_set: !!url,
     db_bridge_url_masked: maskedUrl,
     ping: null,
-    select_1: null,
-    workflows_count: null,
+    local_workflows_count: null,
     error: null,
   };
 
@@ -29,20 +29,11 @@ router.get("/debug", async (_req, res) => {
     result.error = `ping: ${e instanceof Error ? e.message : String(e)}`;
   }
 
-  if (result.ping) {
-    try {
-      const rows = await bridgeQuery("SELECT 1 AS ok");
-      result.select_1 = rows[0]?.ok ?? null;
-    } catch (e) {
-      result.error = `select_1: ${e instanceof Error ? e.message : String(e)}`;
-    }
-
-    try {
-      const rows = await bridgeQuery("SELECT COUNT(*)::int AS n FROM workflows");
-      result.workflows_count = rows[0]?.n ?? null;
-    } catch (e) {
-      result.error = `workflows: ${e instanceof Error ? e.message : String(e)}`;
-    }
+  try {
+    const rows = await localQuery("SELECT COUNT(*)::int AS n FROM workflows");
+    result.local_workflows_count = rows[0]?.n ?? 0;
+  } catch (e) {
+    result.error = `workflows: ${e instanceof Error ? e.message : String(e)}`;
   }
 
   res.json(result);
