@@ -65,16 +65,30 @@ function mapDoc(d: Row) {
 }
 
 router.get("/documents", requireAuth, async (req, res): Promise<void> => {
+  if (!isDbBridgeConfigured()) {
+    res.status(503).json({ error: "DB Bridge não configurado. Configure a URL nas configurações de IA.", code: "DB_BRIDGE_OFFLINE" });
+    return;
+  }
   const userId = (req as any).userId as string;
-  const docs = await bridgeQuery(
-    "SELECT id, user_id, filename, module, status, chunk_count, created_at FROM documents WHERE user_id = $1 ORDER BY created_at DESC",
-    [userId]
-  );
-  res.json(docs.map(mapDoc));
+  try {
+    const docs = await bridgeQuery(
+      "SELECT id, user_id, filename, module, status, chunk_count, created_at FROM documents WHERE user_id = $1 ORDER BY created_at DESC",
+      [userId]
+    );
+    res.json(docs.map(mapDoc));
+  } catch (err) {
+    logger.warn({ err }, "GET /documents: DB Bridge indisponível");
+    res.status(503).json({ error: "DB Bridge offline. Atualize a URL nas configurações de IA.", code: "DB_BRIDGE_OFFLINE" });
+  }
 });
 
 router.post("/documents/upload", requireAuth, upload.single("file"), async (req, res): Promise<void> => {
   const userId = (req as any).userId as string;
+
+  if (!isDbBridgeConfigured()) {
+    res.status(503).json({ error: "DB Bridge não configurado. Atualize a URL nas configurações de IA antes de carregar documentos.", code: "DB_BRIDGE_OFFLINE" });
+    return;
+  }
 
   if (!req.file) {
     res.status(400).json({ error: "Nenhum arquivo enviado" });

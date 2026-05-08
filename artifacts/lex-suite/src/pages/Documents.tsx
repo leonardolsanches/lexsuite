@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
-import { ArrowLeft, Database, Upload, FileText, CheckCircle2, Trash2, Loader2, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Database, Upload, FileText, CheckCircle2, Trash2, Loader2, AlertCircle, WifiOff } from 'lucide-react';
 import { Link } from 'wouter';
 import { Button } from '@/components/ui/button';
 import { useListDocuments, getListDocumentsQueryKey, useDeleteDocument } from '@workspace/api-client-react';
@@ -49,15 +49,18 @@ export default function Documents({ module }: { module: 'rural' | 'executio' }) 
 
   const hasIndexing = (docs: any[]) => docs.some((d: any) => d.status === 'indexing');
 
-  const { data: docs = [], isLoading } = useListDocuments({
+  const { data: docs = [], isLoading, error } = useListDocuments({
     query: {
       queryKey: getListDocumentsQueryKey(),
+      retry: false,
       refetchInterval: (query) => {
         const data = query.state.data as any[] | undefined;
         return data && hasIndexing(data.filter((d: any) => d.module === module)) ? 5000 : false;
       },
     },
   });
+
+  const isBridgeOffline = (error as any)?.response?.status === 503 || (error as any)?.status === 503;
 
   const moduleDocs = docs.filter((d: any) => d.module === module);
 
@@ -138,6 +141,17 @@ export default function Documents({ module }: { module: 'rural' | 'executio' }) 
 
         {isLoading ? (
           <div className="text-muted-foreground text-sm">Carregando documentos...</div>
+        ) : isBridgeOffline ? (
+          <Card className="bg-card border-dashed border-border">
+            <CardContent className="p-12 text-center space-y-4">
+              <WifiOff className="w-12 h-12 text-destructive mx-auto opacity-60" />
+              <p className="font-medium text-foreground">DB Bridge offline</p>
+              <p className="text-muted-foreground font-sans text-sm max-w-sm mx-auto">
+                O banco de dados do Mini PC está inacessível. Atualize a URL do DB Bridge nas{' '}
+                <strong>configurações de IA</strong> (ícone de engrenagem no cabeçalho) e tente novamente.
+              </p>
+            </CardContent>
+          </Card>
         ) : moduleDocs.length === 0 ? (
           <Card className="bg-card border-dashed border-border">
             <CardContent className="p-12 text-center space-y-4">
