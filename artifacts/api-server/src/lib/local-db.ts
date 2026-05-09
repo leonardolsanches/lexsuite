@@ -327,9 +327,14 @@ export async function ensureAppTables(): Promise<void> {
       id           SERIAL      PRIMARY KEY,
       user_id      TEXT        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       module       TEXT        NOT NULL,
-      activated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      UNIQUE (user_id, module)
+      activated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
+  `);
+  // Ensure unique constraint exists — CREATE TABLE IF NOT EXISTS won't add it
+  // to tables that were created before this constraint was declared.
+  await localExecute(`
+    CREATE UNIQUE INDEX IF NOT EXISTS user_modules_user_id_module_uniq
+    ON user_modules (user_id, module)
   `);
 
   // Analysis sessions (tabs inside a module)

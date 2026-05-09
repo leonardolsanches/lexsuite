@@ -189,9 +189,13 @@ export async function* streamOllama(
     body: JSON.stringify(ollamaPayload),
   });
 
-  // If bridge proxy not yet installed, fall back to direct Ollama URL
-  if (useBridge && response.status === 404) {
-    logger.warn("Bridge proxy /ollama-proxy/stream não encontrado — usando Ollama direto");
+  // If bridge proxy not installed (404) or bridge tunnel is down (502/503),
+  // fall back to direct Ollama URL so the analysis still works.
+  if (useBridge && (response.status === 404 || response.status === 502 || response.status === 503)) {
+    logger.warn(
+      { status: response.status },
+      "Bridge proxy indisponível — usando Ollama direto"
+    );
     response = await fetch(`${baseUrl}/api/generate`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
