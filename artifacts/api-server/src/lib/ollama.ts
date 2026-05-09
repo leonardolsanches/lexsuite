@@ -190,15 +190,25 @@ export async function* streamOllama(
     think: thinkMode !== "fast",
   };
 
-  // Timeout covers the ENTIRE streaming lifecycle (fetch + reader loop).
-  // deep mode: 15 min — enough for 32b with long thinking chains.
-  // fast mode: 5 min  — thinking disabled, should finish well within this.
-  const timeoutMs = thinkMode === "deep" ? 15 * 60_000 : 5 * 60_000;
+  // Pre-generation timeout: aborts if the model never starts producing response
+  // tokens (stuck in thinking/prefill forever).
+  // deep mode: 30 min — 32b can spend a long time in the thinking phase.
+  // fast mode:  5 min — thinking is disabled, should start generating quickly.
+  // Once the first real response token arrives the timeout is cleared — the
+  // model is actively generating and will finish on its own.
+  const timeoutMs = thinkMode === "deep" ? 30 * 60_000 : 5 * 60_000;
   const abortController = new AbortController();
-  const timeoutHandle = setTimeout(() => {
-    logger.warn({ thinkMode, timeoutMs }, "streamOllama: timeout atingido — abortando");
+  let timeoutHandle: ReturnType<typeof setTimeout> | null = setTimeout(() => {
+    logger.warn({ thinkMode, timeoutMs }, "streamOllama: timeout pré-geração atingido — modelo não começou a gerar tokens");
     abortController.abort();
   }, timeoutMs);
+
+  const clearPreGenTimeout = () => {
+    if (timeoutHandle !== null) {
+      clearTimeout(timeoutHandle);
+      timeoutHandle = null;
+    }
+  };
 
   let response: Response;
   try {
@@ -209,7 +219,7 @@ export async function* streamOllama(
       signal: abortController.signal,
     });
   } catch (err) {
-    clearTimeout(timeoutHandle);
+    clearPreGenTimeout();
     throw err;
   }
 
@@ -228,19 +238,19 @@ export async function* streamOllama(
         signal: abortController.signal,
       });
     } catch (err) {
-      clearTimeout(timeoutHandle);
+      clearPreGenTimeout();
       throw err;
     }
   }
 
   if (!response.ok) {
-    clearTimeout(timeoutHandle);
+    clearPreGenTimeout();
     const body = await response.text().catch(() => response.statusText);
     throw new Error(`Ollama retornou ${response.status}: ${body}`);
   }
 
   if (!response.body) {
-    clearTimeout(timeoutHandle);
+    clearPreGenTimeout();
     throw new Error("Ollama: resposta sem body");
   }
 
@@ -266,6 +276,8 @@ export async function* streamOllama(
             onThinkChunk(data.thinking.length);
           }
           if (typeof data.response === "string" && data.response) {
+            // First real response token — model is generating, cancel the pre-gen timeout
+            clearPreGenTimeout();
             yield data.response;
           }
           if (data.done) return;
@@ -274,7 +286,7 @@ export async function* streamOllama(
       }
     }
   } finally {
-    clearTimeout(timeoutHandle);
+    clearPreGenTimeout();
     reader.releaseLock();
   }
 
