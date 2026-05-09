@@ -8,10 +8,12 @@ import documentsRouter from "./documents";
 import adminRouter from "./admin";
 import knowledgeRouter from "./knowledge";
 import jobsRouter from "./jobs";
+import tunnelRouter from "./tunnel";
 
 const router: IRouter = Router();
 
 router.use(healthRouter);
+router.use(tunnelRouter);
 router.use(authRouter);
 router.use(workflowsRouter);
 router.use(sessionsRouter);
