@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "zLuF3VcwT9ni6UVyIlJci"
+uri = "file://.local/outputs/Lex-Suite-Orchestrator.pptx"
+type = "slides"
+title = "Lex Suite Orchestrator.pptx"
