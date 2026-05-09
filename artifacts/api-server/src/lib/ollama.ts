@@ -107,9 +107,16 @@ export async function ensureModelLoaded(
     if (dots % 18 === 0) triggerLoad();
   }
 
-  throw new Error(
-    `Modelo ${model} não carregou após 15 minutos. Verifique se o Ollama está rodando no Mini PC e o túnel Cloudflare está ativo.`
+  // Timeout reached but /api/ps never confirmed the model.
+  // This can happen with large models (32b) that take a long time to initialise
+  // — Ollama doesn't add them to /api/ps until they are fully ready, but they
+  // ARE being loaded in the background. Log a warning and let the caller
+  // attempt streaming; Ollama will queue the request until the model is ready.
+  logger.warn(
+    { model },
+    "ensureModelLoaded: timeout — modelo não detectado no /api/ps. Prosseguindo para streaming (modelo pode estar quase pronto)."
   );
+  onStatus?.(`Modelo não detectado em 15 min — tentando streaming diretamente...`);
 }
 
 // System instruction injected into every Ollama request.
