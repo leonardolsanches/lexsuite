@@ -183,11 +183,28 @@ export async function* streamOllama(
     think: thinkMode !== "fast",
   };
 
-  let response = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(ollamaPayload),
-  });
+  // Timeout covers the ENTIRE streaming lifecycle (fetch + reader loop).
+  // deep mode: 15 min — enough for 32b with long thinking chains.
+  // fast mode: 5 min  — thinking disabled, should finish well within this.
+  const timeoutMs = thinkMode === "deep" ? 15 * 60_000 : 5 * 60_000;
+  const abortController = new AbortController();
+  const timeoutHandle = setTimeout(() => {
+    logger.warn({ thinkMode, timeoutMs }, "streamOllama: timeout atingido — abortando");
+    abortController.abort();
+  }, timeoutMs);
+
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(ollamaPayload),
+      signal: abortController.signal,
+    });
+  } catch (err) {
+    clearTimeout(timeoutHandle);
+    throw err;
+  }
 
   // If bridge proxy not installed (404) or bridge tunnel is down (502/503),
   // fall back to direct Ollama URL so the analysis still works.
@@ -196,47 +213,62 @@ export async function* streamOllama(
       { status: response.status },
       "Bridge proxy indisponível — usando Ollama direto"
     );
-    response = await fetch(`${baseUrl}/api/generate`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(ollamaPayload),
-    });
+    try {
+      response = await fetch(`${baseUrl}/api/generate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(ollamaPayload),
+        signal: abortController.signal,
+      });
+    } catch (err) {
+      clearTimeout(timeoutHandle);
+      throw err;
+    }
   }
 
   if (!response.ok) {
+    clearTimeout(timeoutHandle);
     const body = await response.text().catch(() => response.statusText);
     throw new Error(`Ollama retornou ${response.status}: ${body}`);
   }
 
-  if (!response.body) throw new Error("Ollama: resposta sem body");
+  if (!response.body) {
+    clearTimeout(timeoutHandle);
+    throw new Error("Ollama: resposta sem body");
+  }
 
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
 
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
 
-    buffer += decoder.decode(value, { stream: true });
-    const lines = buffer.split("\n");
-    buffer = lines.pop() ?? "";
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() ?? "";
 
-    for (const line of lines) {
-      if (!line.trim()) continue;
-      try {
-        const data = JSON.parse(line);
-        // Ollama ≥0.5 with think:true emits separate "thinking" tokens — route to callback
-        if (typeof data.thinking === "string" && data.thinking && onThinkChunk) {
-          onThinkChunk(data.thinking.length);
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        try {
+          const data = JSON.parse(line);
+          // Ollama ≥0.5 with think:true emits separate "thinking" tokens — route to callback
+          if (typeof data.thinking === "string" && data.thinking && onThinkChunk) {
+            onThinkChunk(data.thinking.length);
+          }
+          if (typeof data.response === "string" && data.response) {
+            yield data.response;
+          }
+          if (data.done) return;
+        } catch {
         }
-        if (typeof data.response === "string" && data.response) {
-          yield data.response;
-        }
-        if (data.done) return;
-      } catch {
       }
     }
+  } finally {
+    clearTimeout(timeoutHandle);
+    reader.releaseLock();
   }
 
   if (buffer.trim()) {
